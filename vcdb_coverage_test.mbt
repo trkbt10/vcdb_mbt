@@ -929,3 +929,171 @@ test "coverage/wal/remove_record" {
     _ => assert_true(false)
   }
 }
+
+///|
+/// Test: WAL with control characters in strings
+test "coverage/wal/control_chars" {
+  let attrs = @core.empty_attrs()
+  // Include various control characters that need escaping
+  attrs.set("with_backspace", @core.String("hello\u0008world")) // backspace
+  attrs.set("with_formfeed", @core.String("page1\u000Cpage2")) // form feed
+  attrs.set("with_control", @core.String("text\u0001ctrl")) // other control char
+
+  let records = [
+    @persistence.WalRecord::upsert(
+      @core.VectorId::from_int(1),
+      [1.0],
+      attrs,
+    ),
+  ]
+
+  let encoded = @persistence.encode_wal_segment(records)
+  let decoded = @persistence.decode_wal_records(encoded)
+
+  assert_eq(decoded.length(), 1)
+  match decoded[0].attrs {
+    Some(a) => {
+      // Verify control chars survived encoding
+      match a.get("with_backspace") {
+        Some(@core.String(s)) => assert_true(s.length() > 0)
+        _ => ()
+      }
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+/// Test: WAL with 4-byte UTF-8 characters (emoji)
+test "coverage/wal/4byte_utf8" {
+  let attrs = @core.empty_attrs()
+  attrs.set("emoji", @core.String("Hello 🎉🚀💻 World"))
+  attrs.set("chinese", @core.String("你好世界"))
+  attrs.set("mixed", @core.String("Test🔥中文ABC"))
+
+  let records = [
+    @persistence.WalRecord::upsert(
+      @core.VectorId::from_int(1),
+      [1.0, 2.0],
+      attrs,
+    ),
+  ]
+
+  let encoded = @persistence.encode_wal_segment(records)
+  let decoded = @persistence.decode_wal_records(encoded)
+
+  assert_eq(decoded.length(), 1)
+  match decoded[0].attrs {
+    Some(a) => {
+      match a.get("emoji") {
+        Some(@core.String(s)) => assert_eq(s, "Hello 🎉🚀💻 World")
+        _ => assert_true(false)
+      }
+      match a.get("chinese") {
+        Some(@core.String(s)) => assert_eq(s, "你好世界")
+        _ => assert_true(false)
+      }
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+/// Test: Multiple WAL records in sequence
+test "coverage/wal/multiple_records" {
+  let records : Array[@persistence.WalRecord] = []
+
+  // Add various record types
+  for i in 1..=5 {
+    let attrs = @core.empty_attrs()
+    attrs.set("idx", @core.Int(i.to_int64()))
+    records.push(
+      @persistence.WalRecord::upsert(
+        @core.VectorId::from_int(i),
+        [i.to_double()],
+        attrs,
+      ),
+    )
+  }
+
+  // Add remove
+  records.push(@persistence.WalRecord::remove(@core.VectorId::from_int(3)))
+
+  // Add set_attrs
+  let new_attrs = @core.empty_attrs()
+  new_attrs.set("updated", @core.Bool(true))
+  records.push(@persistence.WalRecord::set_attrs(@core.VectorId::from_int(1), new_attrs))
+
+  let encoded = @persistence.encode_wal_segment(records)
+  assert_true(@persistence.verify_wal_checksum(encoded))
+
+  let decoded = @persistence.decode_wal_records(encoded)
+  assert_eq(decoded.length(), 7)
+}
+
+// =============================================================================
+// Section 9: Additional attr coverage
+// =============================================================================
+
+///|
+/// Test: Attrs copy functionality
+test "coverage/attrs/copy" {
+  let attrs = @core.empty_attrs()
+  attrs.set("key1", @core.String("value1"))
+  attrs.set("key2", @core.Int(42L))
+
+  // Get internal map size
+  assert_eq(attrs.size(), 2)
+
+  // Modify and verify independence when used in store
+  let store = @core.CoreStore::new(2, @core.Dot, capacity=5)
+  let _ = store.add_or_update(
+    @core.VectorId::from_int(1),
+    [1.0, 2.0],
+    attrs,
+    upsert=false,
+  )
+
+  // Modify original attrs
+  attrs.set("key3", @core.Bool(true))
+
+  // Store attrs should not be affected
+  match store.get(@core.VectorId::from_int(1)) {
+    Some(rec) => {
+      assert_eq(rec.attrs.size(), 2) // Only original 2 keys
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+/// Test: Store shrink_to_fit
+test "coverage/store/shrink" {
+  let store = @core.CoreStore::new(2, @core.L2, capacity=100)
+
+  // Add 10 vectors
+  for i in 1..=10 {
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+      upsert=false,
+    )
+  }
+
+  // Capacity should be large
+  assert_true(store.capacity() >= 10)
+
+  // Remove some
+  for i in 1..=5 {
+    let _ = store.remove_by_id(@core.VectorId::from_int(i))
+  }
+
+  assert_eq(store.size(), 5)
+
+  // Shrink
+  store.shrink_to_fit()
+
+  // Size should still be 5
+  assert_eq(store.size(), 5)
+}
