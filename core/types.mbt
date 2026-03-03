@@ -10,7 +10,7 @@ pub(all) enum Metric {
 } derive(Eq, Show)
 
 ///|
-/// Vector ID type - Int64 for large-scale support (Issue #1 improvement)
+/// Vector ID type - Int64 for large-scale support
 pub(all) struct VectorId(Int64) derive(Eq, Show, Hash, Compare)
 
 ///|
@@ -24,7 +24,7 @@ pub(all) enum AttrValue {
 } derive(Eq, Show)
 
 ///|
-/// Attributes map - empty map as default, no null (Issue #5 improvement)
+/// Attributes map - empty map as default
 pub(all) struct Attrs(Map[String, AttrValue]) derive(Show)
 
 ///|

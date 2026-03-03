@@ -14,7 +14,7 @@ pub fn BruteforceState::new(metric : @core.Metric) -> BruteforceState {
 ///|
 /// Bruteforce search - linear scan over all vectors.
 /// Returns top-k results sorted by score (highest first).
-/// Issue #4: Query is normalized for cosine metric.
+/// Query is normalized for cosine metric.
 pub fn bf_search(
   state : BruteforceState,
   store : @core.CoreStore,
@@ -30,7 +30,7 @@ pub fn bf_search(
       store.dim.to_string(),
     )
   }
-  // Normalize query for cosine (Issue #4)
+  // Normalize query for cosine
   let query = store.normalize_query(q)
   let out : Array[@core.SearchHit] = []
   let score_fn = @core.get_score_fn(state.metric)

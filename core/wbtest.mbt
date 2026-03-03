@@ -131,7 +131,7 @@ test "store/remove" {
 
 ///|
 test "store/cosine_normalization" {
-  // Issue #4: cosine metric should auto-normalize
+  // Cosine metric should auto-normalize
   let store = CoreStore::new(2, Metric::Cosine)
   let _ = store.add_or_update(VectorId::from_int(1), [3.0, 4.0], empty_attrs())
   let record = store.get(VectorId::from_int(1))

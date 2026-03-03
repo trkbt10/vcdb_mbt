@@ -87,7 +87,7 @@ pub fn CoreStore::ensure_capacity(self : CoreStore, extra : Int) -> Bool {
 }
 
 ///|
-/// Write vector at index, normalizing for cosine metric (Issue #4)
+/// Write vector at index, normalizing for cosine metric
 fn CoreStore::write_vector_at(
   self : CoreStore,
   index : Int,
@@ -97,7 +97,7 @@ fn CoreStore::write_vector_at(
   for i in 0..<self.dim {
     self.data[base + i] = vector[i]
   }
-  // Issue #4: Auto-normalize for cosine metric
+  // Auto-normalize for cosine metric
   if self.metric == Cosine {
     let mut sum = 0.0
     for i in 0..<self.dim {
@@ -264,7 +264,7 @@ pub fn CoreStore::shrink_to_fit(self : CoreStore) -> Unit {
 }
 
 ///|
-/// Normalize query vector for cosine metric (Issue #4)
+/// Normalize query vector for cosine metric
 pub fn CoreStore::normalize_query(
   self : CoreStore,
   q : Array[Double],

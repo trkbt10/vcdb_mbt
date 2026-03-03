@@ -1,7 +1,6 @@
 ///|
 /// Normalize a vector to unit L2 norm in place.
 /// Leaves a zero vector unchanged (avoids dividing by zero).
-/// Issue #4 improvement: explicit normalization for cosine metric
 pub fn normalize_in_place(vec : Array[Double]) -> Unit {
   let mut sum = 0.0
   for v in vec {
@@ -15,7 +14,6 @@ pub fn normalize_in_place(vec : Array[Double]) -> Unit {
 
 ///|
 /// Normalize a vector and return a new copy.
-/// Issue #4 improvement: non-mutating version for query normalization
 pub fn normalize(vec : Array[Double]) -> Array[Double] {
   let out = vec.copy()
   normalize_in_place(out)

@@ -296,7 +296,7 @@ pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
 }
 
 ///|
-/// Train IVF centroids using k-means++ initialization (Issue #3 improvement)
+/// Train IVF centroids using k-means++ initialization
 pub fn ivf_train(
   state : IVFState,
   store : @core.CoreStore,
