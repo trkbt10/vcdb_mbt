@@ -1415,8 +1415,8 @@ test "wal/invalid_attrs_len" {
   // Manually create a record with impossibly large attrs_len
   let w = @core.BinaryWriter::new()
   // Header
-  w.push_u32(0x564C5741U) // Magic
-  w.push_u32(2U) // Version
+  w.push_u32(wal_magic)
+  w.push_u32(wal_version)
   // Record type (Upsert = 1)
   w.push_byte(b'\x01')
   // Reserved
@@ -1486,8 +1486,8 @@ test "wal/json_exponent_notation" {
 test "wal/reject_non_aligned_vector" {
   let w = @core.BinaryWriter::new()
   // Header
-  w.push_u32(0x564C5741U) // Magic
-  w.push_u32(2U) // Version
+  w.push_u32(wal_magic)
+  w.push_u32(wal_version)
   // Record type (Upsert = 1)
   w.push_byte(b'\x01')
   // Reserved
