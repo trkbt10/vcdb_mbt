@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          moon version --all
+          moon update
+
+      - name: Format check
+        run: moon fmt --check
+
+      - name: Type check
+        run: moon check
+
+      - name: Run tests with coverage
+        run: moon test --enable-coverage
+
+      - name: Generate coverage report
+        run: moon coverage report -f summary
+
+      - name: Upload coverage to Coveralls
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: moon coverage report -f coveralls --send-to coveralls --coveralls-token "$COVERALLS_REPO_TOKEN"

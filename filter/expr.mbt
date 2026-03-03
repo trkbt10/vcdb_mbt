@@ -1,0 +1,248 @@
+///|
+/// Filter Expression DSL for attribute-based filtering
+/// Supports boolean combinations (Must/MustNot/Should) with leaf predicates.
+
+///|
+/// Leaf expression types
+pub(all) enum LeafExpr {
+  Match(String, @core.AttrValue) // key == value
+  Range(String, @core.NumericRange) // key in range
+  Exists(String) // key exists (not null)
+  IsNull(String) // key is null or doesn't exist
+} derive(Show)
+
+///|
+/// Filter expression (can be nested)
+pub(all) enum FilterExpr {
+  Leaf(LeafExpr)
+  Must(Array[FilterExpr]) // All must match (AND)
+  MustNot(Array[FilterExpr]) // None must match (AND NOT)
+  Should(Array[FilterExpr], Int) // At least N must match (OR with min)
+} derive(Show)
+
+///|
+/// Filter strategy for search
+pub(all) enum FilterStrategy {
+  PreFilter // Filter before vector search (faster for selective filters)
+  PostFilter // Filter after vector search (simpler, always correct)
+  Auto // Automatically choose based on selectivity
+} derive(Show)
+
+///|
+/// Create a Match filter
+pub fn FilterExpr::match_(key : String, value : @core.AttrValue) -> FilterExpr {
+  Leaf(Match(key, value))
+}
+
+///|
+/// Create a Range filter
+pub fn FilterExpr::range(
+  key : String,
+  range : @core.NumericRange,
+) -> FilterExpr {
+  Leaf(Range(key, range))
+}
+
+///|
+/// Create an Exists filter
+pub fn FilterExpr::exists(key : String) -> FilterExpr {
+  Leaf(Exists(key))
+}
+
+///|
+/// Create an IsNull filter
+pub fn FilterExpr::is_null(key : String) -> FilterExpr {
+  Leaf(IsNull(key))
+}
+
+///|
+/// Create a Must (AND) filter
+pub fn FilterExpr::must(exprs : Array[FilterExpr]) -> FilterExpr {
+  Must(exprs)
+}
+
+///|
+/// Create a MustNot (NOT) filter
+pub fn FilterExpr::must_not(exprs : Array[FilterExpr]) -> FilterExpr {
+  MustNot(exprs)
+}
+
+///|
+/// Create a Should (OR) filter with minimum matches
+pub fn FilterExpr::should(
+  exprs : Array[FilterExpr],
+  min? : Int = 1,
+) -> FilterExpr {
+  Should(exprs, min)
+}
+
+///|
+/// Evaluate a leaf expression against attrs
+fn eval_leaf(expr : LeafExpr, attrs : @core.Attrs) -> Bool {
+  match expr {
+    Match(key, expected) =>
+      match attrs.get(key) {
+        None => false
+        Some(actual) => attr_value_eq(actual, expected)
+      }
+    Range(key, range) =>
+      match attrs.get(key) {
+        None => false
+        Some(value) =>
+          match @core.attr_value_to_number(value) {
+            None => false
+            Some(num) => range.matches(num)
+          }
+      }
+    Exists(key) =>
+      match attrs.get(key) {
+        None => false
+        Some(Null) => false
+        Some(_) => true
+      }
+    IsNull(key) =>
+      match attrs.get(key) {
+        None => true
+        Some(Null) => true
+        Some(_) => false
+      }
+  }
+}
+
+///|
+/// Check if two AttrValues are equal
+fn attr_value_eq(a : @core.AttrValue, b : @core.AttrValue) -> Bool {
+  match (a, b) {
+    (Null, Null) => true
+    (Bool(x), Bool(y)) => x == y
+    (Int(x), Int(y)) => x == y
+    (Float(x), Float(y)) => x == y
+    (String(x), String(y)) => x == y
+    _ => false
+  }
+}
+
+///|
+/// Evaluate a filter expression against attrs
+pub fn eval_filter(expr : FilterExpr, attrs : @core.Attrs) -> Bool {
+  match expr {
+    Leaf(leaf) => eval_leaf(leaf, attrs)
+    Must(exprs) => {
+      for e in exprs {
+        if not(eval_filter(e, attrs)) {
+          return false
+        }
+      }
+      true
+    }
+    MustNot(exprs) => {
+      for e in exprs {
+        if eval_filter(e, attrs) {
+          return false
+        }
+      }
+      true
+    }
+    Should(exprs, min) => {
+      let mut count = 0
+      for e in exprs {
+        if eval_filter(e, attrs) {
+          count = count + 1
+          if count >= min {
+            return true
+          }
+        }
+      }
+      count >= min
+    }
+  }
+}
+
+///|
+/// Compile a filter expression to a predicate function
+pub fn compile_filter(
+  expr : FilterExpr,
+) -> (@core.VectorId, @core.Attrs) -> Bool {
+  fn(id : @core.VectorId, attrs : @core.Attrs) -> Bool {
+    let _ = id
+    eval_filter(expr, attrs)
+  }
+}
+
+///|
+/// Get candidate IDs from a basic attribute index using a filter expression
+/// Returns None if pre-filtering is not possible (should use post-filter)
+pub fn get_candidates_basic(
+  expr : FilterExpr,
+  index : @attr.BasicAttrIndex,
+) -> Array[@core.VectorId]? {
+  match expr {
+    Leaf(Match(key, value)) => Some(index.eq(key, value))
+    Leaf(Exists(key)) => Some(index.exists(key))
+    Leaf(Range(key, range)) => index.range(key, range)
+    Leaf(IsNull(_)) => None // Cannot efficiently find nulls
+    Must(exprs) => {
+      // Intersect all candidate sets
+      let mut result : Array[@core.VectorId]? = None
+      for e in exprs {
+        match get_candidates_basic(e, index) {
+          None => return None
+          Some(candidates) =>
+            match result {
+              None => result = Some(candidates)
+              Some(current) => result = Some(intersect_ids(current, candidates))
+            }
+        }
+      }
+      result
+    }
+    MustNot(_) => None // Cannot efficiently negate
+    Should(exprs, min) => {
+      // If min <= 0, it matches everything (no minimum required)
+      // Fall back to post-filter
+      if min <= 0 {
+        return None
+      }
+      // If min > 1, we cannot efficiently prefilter because we need to count
+      // how many clauses each candidate satisfies
+      if min > 1 {
+        return None
+      }
+      // For min == 1 (OR), union all candidate sets
+      let all : Array[@core.VectorId] = []
+      let seen : Map[Int64, Bool] = {}
+      for e in exprs {
+        match get_candidates_basic(e, index) {
+          None => return None
+          Some(candidates) =>
+            for id in candidates {
+              if not(seen.contains(id.to_int64())) {
+                seen.set(id.to_int64(), true)
+                all.push(id)
+              }
+            }
+        }
+      }
+      Some(all)
+    }
+  }
+}
+
+///|
+/// Intersect two ID arrays
+fn intersect_ids(
+  a : Array[@core.VectorId],
+  b : Array[@core.VectorId],
+) -> Array[@core.VectorId] {
+  let b_set : Map[Int64, Bool] = {}
+  for id in b {
+    b_set.set(id.to_int64(), true)
+  }
+  let result : Array[@core.VectorId] = []
+  for id in a {
+    if b_set.contains(id.to_int64()) {
+      result.push(id)
+    }
+  }
+  result
+}
