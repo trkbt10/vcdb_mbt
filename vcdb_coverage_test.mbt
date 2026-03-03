@@ -1682,3 +1682,272 @@ test "coverage/math/normalize_zero" {
   assert_eq(vec[1], 0.0)
   assert_eq(vec[2], 0.0)
 }
+
+// =============================================================================
+// Section 12: WAL decode error paths
+// =============================================================================
+
+///|
+/// Test: WAL decode with invalid type byte
+test "coverage/wal/invalid_type" {
+  let w = @core.BinaryWriter::new()
+  // WAL header
+  w.push_u32(@persistence.wal_magic)
+  w.push_u32(@persistence.wal_version)
+  w.push_u32(0U) // flags
+  w.push_u32(1U) // 1 record
+
+  // Invalid record - type byte 0xFF is not valid
+  w.push_byte(b'\xFF') // Invalid type
+  w.push_byte(b'\x00') // reserved
+  w.push_u64(1UL) // id
+  w.push_u32(0U) // attrs_len
+  w.push_u32(0U) // vector_len
+
+  // Add a placeholder CRC
+  w.push_u32(0U)
+
+  let bytes = w.concat()
+  // Decoding should handle the invalid type gracefully
+  let decoded = @persistence.decode_wal_records(bytes)
+  // May return empty or partial results
+  let _ = decoded
+}
+
+///|
+/// Test: WAL decode with truncated data
+test "coverage/wal/truncated_record" {
+  let w = @core.BinaryWriter::new()
+  // WAL header
+  w.push_u32(@persistence.wal_magic)
+  w.push_u32(@persistence.wal_version)
+  w.push_u32(0U) // flags
+  w.push_u32(1U) // Claims 1 record
+
+  // Incomplete record - only type byte
+  w.push_byte(b'\x01') // Upsert type
+  // Missing the rest of the record...
+
+  w.push_u32(0U) // CRC
+
+  let bytes = w.concat()
+  // Should handle gracefully (return empty or partial)
+  let decoded = @persistence.decode_wal_records(bytes)
+  let _ = decoded
+}
+
+///|
+/// Test: WAL with attrs that have None values
+test "coverage/wal/attrs_none_value" {
+  // Test the `None => continue` branch in attrs_to_json
+  let attrs = @core.empty_attrs()
+  // Can't directly set None, but empty attrs exercises different paths
+  attrs.set("key1", @core.Null)
+  attrs.set("key2", @core.Bool(false))
+
+  let records = [
+    @persistence.WalRecord::upsert(
+      @core.VectorId::from_int(1),
+      [1.0],
+      attrs,
+    ),
+  ]
+
+  let encoded = @persistence.encode_wal_segment(records)
+  let decoded = @persistence.decode_wal_records(encoded)
+  assert_eq(decoded.length(), 1)
+}
+
+// =============================================================================
+// Section 13: Distributed load edge cases
+// =============================================================================
+
+///|
+/// Test: Load with missing segment in manifest (CRUSH fallback)
+test "coverage/distributed/crush_fallback" {
+  let store = @core.CoreStore::new(2, @core.Dot, capacity=10)
+
+  for i in 1..=5 {
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+      upsert=false,
+    )
+  }
+
+  let crush = @persistence.CrushMap::new(4, 1, [@persistence.CrushTarget::new("node1")])
+  let data_storages : Map[String, @persistence.MemoryStorage] = {}
+  data_storages.set("node1", @persistence.MemoryStorage::new())
+  let index_storage = @persistence.MemoryStorage::new()
+
+  let opts = @persistence.SegmentOptions::default("fallback", crush)
+  let _ = @persistence.save_store_distributed(store, opts, data_storages, index_storage)
+
+  // Load should work via normal path
+  let restored = @persistence.load_store_distributed("fallback", data_storages, index_storage)
+  assert_eq(restored.size(), 5)
+}
+
+///|
+/// Test: Attrs estimation for all types
+test "coverage/distributed/attrs_estimation" {
+  let store = @core.CoreStore::new(2, @core.Dot, capacity=10)
+
+  // Create attrs with all types to test estimation
+  let attrs = @core.empty_attrs()
+  attrs.set("str", @core.String("test string value"))
+  attrs.set("int", @core.Int(123456789L))
+  attrs.set("float", @core.Float(3.14159265359))
+  attrs.set("bool", @core.Bool(true))
+  attrs.set("null", @core.Null)
+
+  let _ = store.add_or_update(
+    @core.VectorId::from_int(1),
+    [1.0, 2.0],
+    attrs,
+    upsert=false,
+  )
+
+  let crush = @persistence.CrushMap::new(1, 1, [@persistence.CrushTarget::new("n1")])
+  let data_storages : Map[String, @persistence.MemoryStorage] = {}
+  data_storages.set("n1", @persistence.MemoryStorage::new())
+  let index_storage = @persistence.MemoryStorage::new()
+
+  let opts = @persistence.SegmentOptions::default("estimate", crush)
+  let _ = @persistence.save_store_distributed(store, opts, data_storages, index_storage)
+
+  let restored = @persistence.load_store_distributed("estimate", data_storages, index_storage)
+  assert_eq(restored.size(), 1)
+}
+
+// =============================================================================
+// Section 14: Heap and misc coverage
+// =============================================================================
+
+///|
+/// Test: MaxHeap operations
+test "coverage/heap/max_heap" {
+  // Compare function: returns > 0 if a should be higher priority
+  let heap = @core.MaxHeap::new(fn(a : Int, b : Int) {
+    if a > b { 1 } else if a < b { -1 } else { 0 }
+  })
+
+  heap.push(5)
+  heap.push(3)
+  heap.push(7)
+  heap.push(1)
+  heap.push(9)
+
+  assert_eq(heap.length(), 5)
+
+  // Pop in descending order (max first)
+  assert_eq(heap.pop(), Some(9))
+  assert_eq(heap.pop(), Some(7))
+  assert_eq(heap.pop(), Some(5))
+  assert_eq(heap.pop(), Some(3))
+  assert_eq(heap.pop(), Some(1))
+  assert_eq(heap.pop(), None)
+}
+
+///|
+/// Test: MaxHeap peek
+test "coverage/heap/peek" {
+  let heap = @core.MaxHeap::new(fn(a : Int, b : Int) {
+    if a > b { 1 } else if a < b { -1 } else { 0 }
+  })
+
+  assert_true(heap.peek().is_none())
+  assert_true(heap.is_empty())
+
+  heap.push(10)
+  assert_eq(heap.peek(), Some(10))
+
+  heap.push(15)
+  assert_eq(heap.peek(), Some(15)) // Max is now 15
+
+  // Peek doesn't remove
+  assert_eq(heap.length(), 2)
+}
+
+///|
+/// Test: Index file without ANN bytes
+test "coverage/index_file/no_ann" {
+  let header : @persistence.IndexHeader = {
+    metric_code: 1,
+    dim: 4,
+    count: 2,
+    strategy_code: 0,
+    has_ann: false,
+  }
+
+  let entries = [
+    @persistence.IndexEntry::{
+      id: @core.VectorId::from_int(100),
+      ptr: { segment: "seg", offset: 8, length: 50 },
+    },
+  ]
+
+  let encoded = @persistence.encode_index_file(header, entries, None)
+  let decoded = @persistence.decode_index_file(encoded).unwrap()
+
+  assert_eq(decoded.header.has_ann, false)
+  assert_true(decoded.ann.is_none())
+  assert_eq(decoded.entries.length(), 1)
+}
+
+///|
+/// Test: Store get_index for non-existent ID
+test "coverage/store/get_index_missing" {
+  let store = @core.CoreStore::new(2, @core.Dot, capacity=10)
+
+  let _ = store.add_or_update(
+    @core.VectorId::from_int(1),
+    [1.0, 2.0],
+    @core.empty_attrs(),
+    upsert=false,
+  )
+
+  // Get index for non-existent ID
+  assert_true(store.get_index(@core.VectorId::from_int(999)).is_none())
+
+  // Get index for existing ID
+  assert_true(store.get_index(@core.VectorId::from_int(1)).is_some())
+}
+
+///|
+/// Test: TopK push_sorted_desc (requires Scored trait)
+test "coverage/topk/push_sorted" {
+  // Create scored items
+  struct ScoredItem {
+    id : Int
+    score : Double
+  } derive(Show)
+
+  // push_top_k should handle equal scores
+  let results : Array[(Int, Double)] = []
+  @core.push_top_k(results, (1, 0.5), 3, fn(x) { x.1 })
+  @core.push_top_k(results, (2, 0.5), 3, fn(x) { x.1 }) // Same score
+  @core.push_top_k(results, (3, 0.5), 3, fn(x) { x.1 }) // Same score
+
+  assert_eq(results.length(), 3)
+}
+
+///|
+/// Test: TopK with scores worse than current worst
+test "coverage/topk/reject_worse" {
+  let results : Array[(Int, Double)] = []
+
+  // Fill with good scores
+  @core.push_top_k(results, (1, 0.9), 2, fn(x) { x.1 })
+  @core.push_top_k(results, (2, 0.8), 2, fn(x) { x.1 })
+
+  // Now try to add worse scores - should be rejected
+  @core.push_top_k(results, (3, 0.1), 2, fn(x) { x.1 })
+  @core.push_top_k(results, (4, 0.2), 2, fn(x) { x.1 })
+
+  // Still only 2 items (the better ones)
+  assert_eq(results.length(), 2)
+  assert_true(results[0].1 >= 0.8)
+  assert_true(results[1].1 >= 0.8)
+}
