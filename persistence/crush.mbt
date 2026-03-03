@@ -147,14 +147,14 @@ pub fn crush_primary(id : @core.VectorId, map : CrushMap) -> String? {
 
 ///|
 /// Segment manifest entry
-pub struct SegmentEntry {
+pub(all) struct SegmentEntry {
   name : String // Segment name (e.g., "db.pg0.part0")
   target_key : String // Storage target key
 } derive(Show)
 
 ///|
 /// Placement manifest
-pub struct PlacementManifest {
+pub(all) struct PlacementManifest {
   base : String // Base name
   segments : Array[SegmentEntry] // Segment entries
   crush : CrushMap // CRUSH configuration used
@@ -164,7 +164,7 @@ pub struct PlacementManifest {
 
 ///|
 /// Move plan for rebalancing
-pub struct MovePlan {
+pub(all) struct MovePlan {
   name : String // Segment name
   from : String // Source target key
   to : String // Destination target key

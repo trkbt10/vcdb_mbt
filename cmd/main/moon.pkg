@@ -1,6 +1,7 @@
-// import {
-//   "trkbt10/vcdb" @lib,
-// }
+import {
+  "trkbt10/vcdb",
+  "trkbt10/vcdb/core",
+}
 
 options(
   "is-main": true,
