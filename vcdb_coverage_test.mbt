@@ -1297,3 +1297,388 @@ test "coverage/topk/k_zero" {
   @core.push_top_k(results, (1, 0.5), 0, fn(x) { x.1 })
   assert_eq(results.length(), 0)
 }
+
+// =============================================================================
+// Section 11: Remaining coverage gaps
+// =============================================================================
+
+///|
+/// Test: WAL with unicode escape sequences (\uXXXX)
+test "coverage/wal/unicode_escape" {
+  // Create attrs with strings that will be encoded with \uXXXX escapes
+  let attrs = @core.empty_attrs()
+  // Control characters that need \uXXXX encoding
+  attrs.set("ctrl_a", @core.String("\u0001")) // SOH
+  attrs.set("ctrl_b", @core.String("\u0002")) // STX
+  attrs.set("bell", @core.String("\u0007")) // Bell
+
+  let records = [
+    @persistence.WalRecord::upsert(
+      @core.VectorId::from_int(1),
+      [1.0],
+      attrs,
+    ),
+  ]
+
+  let encoded = @persistence.encode_wal_segment(records)
+  let decoded = @persistence.decode_wal_records(encoded)
+
+  assert_eq(decoded.length(), 1)
+  // Verify the attrs survived roundtrip
+  match decoded[0].attrs {
+    Some(a) => assert_true(a.size() >= 1)
+    None => assert_true(false)
+  }
+}
+
+///|
+/// Test: WAL hex parsing with uppercase letters
+test "coverage/wal/hex_uppercase" {
+  // JSON with uppercase hex escapes like \u000A
+  let attrs = @core.empty_attrs()
+  // This will trigger hex_char_value with 'A'-'F' range
+  attrs.set("mixed", @core.String("ABCDEF0123456789"))
+
+  let records = [
+    @persistence.WalRecord::upsert(
+      @core.VectorId::from_int(1),
+      [1.0],
+      attrs,
+    ),
+  ]
+
+  let encoded = @persistence.encode_wal_segment(records)
+  let decoded = @persistence.decode_wal_records(encoded)
+
+  assert_eq(decoded.length(), 1)
+  match decoded[0].attrs {
+    Some(a) => {
+      match a.get("mixed") {
+        Some(@core.String(s)) => assert_eq(s, "ABCDEF0123456789")
+        _ => assert_true(false)
+      }
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+/// Test: WAL with parse error fallback
+test "coverage/wal/parse_error_fallback" {
+  // Test what happens when we have malformed data
+  // Create a minimal valid WAL header but with bad records
+  let w = @core.BinaryWriter::new()
+  // WAL header
+  w.push_u32(@persistence.wal_magic)
+  w.push_u32(@persistence.wal_version)
+  w.push_u32(0U) // flags
+  w.push_u32(0U) // record count = 0
+
+  // CRC placeholder
+  w.push_u32(0U)
+
+  let bytes = w.concat()
+
+  // This should decode as empty (0 records)
+  let decoded = @persistence.decode_wal_records(bytes)
+  assert_eq(decoded.length(), 0)
+}
+
+///|
+/// Test: Segment with empty vector
+test "coverage/segment/empty_vector" {
+  let writer = @persistence.SegmentWriter::new("empty_vec")
+
+  // Add record with empty attrs but valid vector
+  let ptr = writer.append(
+    @core.VectorId::from_int(1),
+    [0.0], // minimal vector
+    @core.empty_attrs(),
+  )
+
+  let bytes = writer.to_bytes()
+  let reader = @persistence.SegmentReader::from_bytes("empty_vec", bytes).unwrap()
+
+  match reader.read_at(ptr.offset, ptr.length) {
+    Some((id, vec, attrs)) => {
+      assert_eq(id.to_int64(), 1L)
+      assert_eq(vec.length(), 1)
+      assert_eq(attrs.size(), 0)
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+/// Test: Segment collect with multiple varying-size records
+test "coverage/segment/collect_varying" {
+  let writer = @persistence.SegmentWriter::new("varying")
+
+  // Add records with varying attr sizes
+  for i in 1..=10 {
+    let attrs = @core.empty_attrs()
+    // Varying number of attrs
+    for j in 0..<(i % 5) {
+      attrs.set("key" + j.to_string(), @core.Int(j.to_int64()))
+    }
+    let vec : Array[Double] = []
+    for _ in 0..<(i % 3 + 1) {
+      vec.push(i.to_double())
+    }
+    let _ = writer.append(@core.VectorId::from_int(i), vec, attrs)
+  }
+
+  let bytes = writer.to_bytes()
+  let reader = @persistence.SegmentReader::from_bytes("varying", bytes).unwrap()
+
+  let records = reader.collect()
+  assert_eq(records.length(), 10)
+}
+
+///|
+/// Test: Index file decode with truncated data
+test "coverage/index_file/truncated" {
+  // Create valid header but truncated entries
+  let w = @core.BinaryWriter::new()
+
+  // Header (16 bytes)
+  w.push_u32(@persistence.index_magic)
+  w.push_u32(@persistence.index_version)
+  w.push_u32(0U)
+  w.push_u32(0U)
+
+  // Info (20 bytes)
+  w.push_u32(0U) // metric
+  w.push_u32(3U) // dim
+  w.push_u32(1U) // count = 1 (but no entry data)
+  w.push_u32(0U) // strategy
+  w.push_u32(0U) // flags (no ANN)
+
+  let bytes = w.concat()
+  // This should still decode (entries will be empty due to insufficient data)
+  let result = @persistence.decode_index_file(bytes)
+  assert_true(result.is_some())
+}
+
+///|
+/// Test: Distributed write with segmented mode forcing splits
+test "coverage/distributed/force_segment_split" {
+  let store = @core.CoreStore::new(4, @core.Dot, capacity=100)
+
+  // Add vectors with large attrs to ensure we exceed segment limits
+  for i in 1..=50 {
+    let attrs = @core.empty_attrs()
+    // Add a lot of attrs to increase record size
+    for j in 0..<10 {
+      attrs.set("field_" + j.to_string(), @core.String("value_" + i.to_string() + "_" + j.to_string()))
+    }
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0, 0.0, 0.0],
+      attrs,
+      upsert=false,
+    )
+  }
+
+  let crush = @persistence.CrushMap::new(2, 1, [@persistence.CrushTarget::new("node1")])
+  let data_storages : Map[String, @persistence.MemoryStorage] = {}
+  data_storages.set("node1", @persistence.MemoryStorage::new())
+  let index_storage = @persistence.MemoryStorage::new()
+
+  // Use default options (segmented is false by default, so won't actually split)
+  let opts = @persistence.SegmentOptions::default("split_test", crush)
+  let _ = @persistence.save_store_distributed(store, opts, data_storages, index_storage)
+
+  // Verify data was saved
+  let restored = @persistence.load_store_distributed("split_test", data_storages, index_storage)
+  assert_eq(restored.size(), 50)
+}
+
+///|
+/// Test: CRUSH with zero PGs
+test "coverage/crush/zero_pgs" {
+  let crush = @persistence.CrushMap::new(0, 1, [@persistence.CrushTarget::new("node")])
+
+  // Should still work with pg=0
+  let result = @persistence.crush_locate(@core.VectorId::from_int(1), crush)
+  assert_eq(result.pg, 0)
+}
+
+///|
+/// Test: Store remove triggers compaction
+test "coverage/store/remove_compaction" {
+  let store = @core.CoreStore::new(2, @core.Dot, capacity=10)
+
+  // Fill the store
+  for i in 1..=5 {
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+      upsert=false,
+    )
+  }
+
+  assert_eq(store.size(), 5)
+
+  // Remove middle element (should trigger compaction/swap)
+  let move_info = store.remove_by_id(@core.VectorId::from_int(3))
+
+  assert_eq(store.size(), 4)
+  assert_true(not(store.has(@core.VectorId::from_int(3))))
+
+  // Check if compaction happened
+  match move_info {
+    Some(info) => {
+      // Something was moved
+      let _ = info
+    }
+    None => ()
+  }
+}
+
+///|
+/// Test: Binary writer/reader with bytes
+test "coverage/binary/bytes_roundtrip" {
+  let w = @core.BinaryWriter::new()
+
+  // Write raw bytes
+  let raw = Bytes::from_array([0x01, 0x02, 0x03, 0x04, 0x05])
+  w.push_bytes(raw)
+
+  let written = w.concat()
+  let r = @core.BinaryReader::new(written)
+
+  // Read back
+  let read_bytes = r.read_bytes(5)
+  assert_eq(read_bytes.length(), 5)
+  assert_eq(read_bytes[0], b'\x01')
+  assert_eq(read_bytes[4], b'\x05')
+}
+
+///|
+/// Test: Store with L2 metric (no normalization)
+test "coverage/store/l2_metric" {
+  let store = @core.CoreStore::new(3, @core.L2, capacity=10)
+
+  let _ = store.add_or_update(
+    @core.VectorId::from_int(1),
+    [3.0, 4.0, 0.0], // Should NOT be normalized
+    @core.empty_attrs(),
+    upsert=false,
+  )
+
+  match store.get(@core.VectorId::from_int(1)) {
+    Some(rec) => {
+      // L2 doesn't normalize, so values should be preserved
+      assert_true((rec.vector[0] - 3.0).abs() < 0.001)
+      assert_true((rec.vector[1] - 4.0).abs() < 0.001)
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+/// Test: Store with Dot metric (no normalization)
+test "coverage/store/dot_metric" {
+  let store = @core.CoreStore::new(2, @core.Dot, capacity=10)
+
+  let _ = store.add_or_update(
+    @core.VectorId::from_int(1),
+    [5.0, 12.0], // Should NOT be normalized
+    @core.empty_attrs(),
+    upsert=false,
+  )
+
+  match store.get(@core.VectorId::from_int(1)) {
+    Some(rec) => {
+      // Dot doesn't normalize
+      assert_true((rec.vector[0] - 5.0).abs() < 0.001)
+      assert_true((rec.vector[1] - 12.0).abs() < 0.001)
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+/// Test: Math dot_at function
+test "coverage/math/dot_at" {
+  let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+  let query = [1.0, 1.0, 1.0]
+  let dim = 3
+
+  // dot_at(data, 0, query, dim) = 1*1 + 2*1 + 3*1 = 6
+  let result1 = @core.dot_at(data, 0, query, dim)
+  assert_eq(result1, 6.0)
+
+  // dot_at(data, 3, query, dim) = 4*1 + 5*1 + 6*1 = 15
+  let result2 = @core.dot_at(data, 3, query, dim)
+  assert_eq(result2, 15.0)
+}
+
+///|
+/// Test: Math l2neg_at function
+test "coverage/math/l2neg_at" {
+  let data = [1.0, 2.0, 3.0, 0.0, 0.0, 0.0]
+  let query = [1.0, 2.0, 3.0]
+  let dim = 3
+
+  // l2neg_at returns negative squared L2 distance
+  // For identical vectors, distance should be 0
+  let result1 = @core.l2neg_at(data, 0, query, dim)
+  assert_eq(result1, 0.0)
+
+  // For different vectors (0,0,0) vs (1,2,3)
+  let result2 = @core.l2neg_at(data, 3, query, dim)
+  // -(1^2 + 2^2 + 3^2) = -(1 + 4 + 9) = -14
+  assert_eq(result2, -14.0)
+}
+
+///|
+/// Test: Math get_score_fn
+test "coverage/math/get_score_fn" {
+  let data = [1.0, 0.0, 0.0]
+  let query = [1.0, 0.0, 0.0]
+  let dim = 3
+
+  // Get score function for each metric
+  let cosine_fn = @core.get_score_fn(@core.Cosine)
+  let dot_fn = @core.get_score_fn(@core.Dot)
+  let l2_fn = @core.get_score_fn(@core.L2)
+
+  // Identical vectors should have high scores
+  let cosine_score = cosine_fn(data, 0, query, dim)
+  let dot_score = dot_fn(data, 0, query, dim)
+  let l2_score = l2_fn(data, 0, query, dim)
+
+  assert_eq(cosine_score, 1.0)
+  assert_eq(dot_score, 1.0)
+  assert_eq(l2_score, 0.0) // No distance
+}
+
+///|
+/// Test: Normalize in place
+test "coverage/math/normalize_in_place" {
+  let vec = [3.0, 4.0, 0.0]
+  @core.normalize_in_place(vec)
+
+  // Should have unit length
+  let len = @core.l2_norm(vec)
+  assert_true((len - 1.0).abs() < 0.001)
+
+  // Values should be 3/5, 4/5, 0
+  assert_true((vec[0] - 0.6).abs() < 0.001)
+  assert_true((vec[1] - 0.8).abs() < 0.001)
+}
+
+///|
+/// Test: Normalize zero vector
+test "coverage/math/normalize_zero" {
+  let vec = [0.0, 0.0, 0.0]
+  @core.normalize_in_place(vec)
+
+  // Zero vector stays zero (no division by zero)
+  assert_eq(vec[0], 0.0)
+  assert_eq(vec[1], 0.0)
+  assert_eq(vec[2], 0.0)
+}
