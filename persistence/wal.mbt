@@ -1,16 +1,14 @@
 ///|
-/// Write-Ahead Log (WAL) implementation - MoonBit Format v3
+/// Write-Ahead Log (WAL) implementation
 /// Format:
 /// - Header (8 bytes): Magic (4 bytes) + Version (4 bytes)
 /// - Records: Type (1 byte) + Reserved (1 byte) + ID (8 bytes) + AttrsLen (4 bytes) + VectorLen (4 bytes) + Data
 /// - Footer (8 bytes, optional): Magic (4 bytes) + CRC32 (4 bytes)
-///
-/// Note: v3 uses 8-byte IDs (Int64), incompatible with TypeScript v2 (4-byte IDs)
 /// - Attrs: JSON encoded UTF-8 string
 /// - Vectors: Float32 array (4 bytes per element)
 
 ///|
-/// WAL Magic number: "VLWA" in little-endian (0x564c5741)
+/// WAL Magic number: "VLWA" in little-endian
 pub let wal_magic : UInt = 0x41574C56U
 
 ///|
@@ -18,8 +16,8 @@ pub let wal_magic : UInt = 0x41574C56U
 pub let wal_footer_magic : UInt = 0x43524357U
 
 ///|
-/// WAL version (v3 uses 8-byte IDs, incompatible with v2)
-pub let wal_version : UInt = 3U
+/// WAL format version
+pub let wal_version : UInt = 1U
 
 ///|
 /// WAL record types
