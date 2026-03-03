@@ -1,4 +1,20 @@
 ///|
+/// vcdb - A high-performance vector database for approximate nearest neighbor search.
+///
+/// This module provides the main VectorDB facade that unifies access to different
+/// ANN (Approximate Nearest Neighbor) indexing strategies:
+/// - Bruteforce: Exact linear scan, best for small datasets (<1000 vectors)
+/// - HNSW: Hierarchical Navigable Small World graphs, best for general use
+/// - IVF: Inverted File Index, best for large datasets with training
+///
+/// Example:
+/// ```moonbit
+/// let db = VectorDB::with_hnsw(128, metric=Cosine)
+/// db.add(VectorId::from_int(1), embedding, attrs)
+/// let results = db.search(query, k=10, filter=None)
+/// ```
+
+///|
 /// Re-export factory functions for convenience
 pub fn empty_attrs() -> @core.Attrs {
   @core.empty_attrs()
@@ -6,7 +22,17 @@ pub fn empty_attrs() -> @core.Attrs {
 
 ///|
 /// VectorDB - High-level vector database facade.
+///
 /// Provides a unified API for all ANN strategies: Bruteforce, HNSW, and IVF.
+/// The database automatically handles:
+/// - Vector normalization for cosine similarity
+/// - Index updates on add/remove operations
+/// - Tombstone management for HNSW deletions
+///
+/// Fields:
+/// - store: The underlying CoreStore holding vectors and attributes
+/// - strategy: The selected ANN strategy (Bruteforce/HNSW/IVF)
+/// - bruteforce/hnsw/ivf: Strategy-specific index state
 pub struct VectorDB {
   store : @core.CoreStore
   strategy : @core.Strategy
@@ -16,7 +42,12 @@ pub struct VectorDB {
 }
 
 ///|
-/// Create a new VectorDB with the given options
+/// Create a new VectorDB with the given options.
+///
+/// Parameters:
+/// - options: Configuration including dimension, metric, capacity, and strategy
+///
+/// Returns: A new VectorDB instance configured according to options
 pub fn VectorDB::new(options : @core.DatabaseOptions) -> VectorDB {
   let store = @core.CoreStore::new(
     options.dim,
@@ -54,13 +85,27 @@ pub fn VectorDB::new(options : @core.DatabaseOptions) -> VectorDB {
 }
 
 ///|
-/// Create a VectorDB with default options (Bruteforce)
+/// Create a VectorDB with default options (Bruteforce strategy).
+///
+/// Parameters:
+/// - dim: Vector dimension
+///
+/// Returns: A VectorDB with Bruteforce strategy and Cosine metric
 pub fn VectorDB::with_dim(dim : Int) -> VectorDB {
   VectorDB::new(@core.DatabaseOptions::default(dim))
 }
 
 ///|
-/// Create a VectorDB with HNSW strategy
+/// Create a VectorDB with HNSW strategy.
+///
+/// HNSW (Hierarchical Navigable Small World) is recommended for most use cases.
+/// It provides O(log n) search time with high recall.
+///
+/// Parameters:
+/// - dim: Vector dimension
+/// - metric: Similarity metric (default: Cosine)
+///
+/// Returns: A VectorDB configured with HNSW index
 pub fn VectorDB::with_hnsw(
   dim : Int,
   metric? : @core.Metric = Cosine,
@@ -75,7 +120,16 @@ pub fn VectorDB::with_hnsw(
 }
 
 ///|
-/// Create a VectorDB with IVF strategy
+/// Create a VectorDB with IVF strategy.
+///
+/// IVF (Inverted File Index) is best for very large datasets.
+/// Requires training with train() before optimal search performance.
+///
+/// Parameters:
+/// - dim: Vector dimension
+/// - metric: Similarity metric (default: Cosine)
+///
+/// Returns: A VectorDB configured with IVF index
 pub fn VectorDB::with_ivf(
   dim : Int,
   metric? : @core.Metric = Cosine,
@@ -90,25 +144,32 @@ pub fn VectorDB::with_ivf(
 }
 
 ///|
-/// Get the number of vectors in the database
+/// Get the number of vectors in the database.
+///
+/// Note: For HNSW, this includes tombstoned (deleted) vectors.
+/// Use has() to check if a specific ID is accessible.
 pub fn VectorDB::size(self : VectorDB) -> Int {
   self.store.size()
 }
 
 ///|
-/// Get the dimension of vectors
+/// Get the dimension of vectors in this database.
 pub fn VectorDB::dim(self : VectorDB) -> Int {
   self.store.dim
 }
 
 ///|
-/// Get the metric used
+/// Get the similarity metric used by this database.
 pub fn VectorDB::metric(self : VectorDB) -> @core.Metric {
   self.store.metric
 }
 
 ///|
-/// Check if an id is tombstoned in HNSW (internal helper)
+/// Check if an id is tombstoned in HNSW (internal helper).
+///
+/// HNSW uses tombstones for soft-delete to maintain graph connectivity.
+/// Tombstoned vectors are excluded from search results but remain in storage
+/// until compact() is called.
 fn VectorDB::is_tombstoned(self : VectorDB, id : @core.VectorId) -> Bool {
   match self.hnsw {
     None => false
@@ -121,24 +182,34 @@ fn VectorDB::is_tombstoned(self : VectorDB, id : @core.VectorId) -> Bool {
 }
 
 ///|
-/// Check if an id exists
-/// For HNSW mode, tombstoned IDs are considered non-existent
+/// Check if an id exists and is accessible.
+///
+/// For HNSW mode, tombstoned IDs are considered non-existent.
+///
+/// Parameters:
+/// - id: The vector ID to check
+///
+/// Returns: true if the vector exists and is not tombstoned
 pub fn VectorDB::has(self : VectorDB, id : @core.VectorId) -> Bool {
   if not(self.store.has(id)) {
     return false
   }
-  // In HNSW mode, check tombstone
   not(self.is_tombstoned(id))
 }
 
 ///|
-/// Get a vector by id
-/// For HNSW mode, tombstoned IDs return None
+/// Get a vector and its attributes by ID.
+///
+/// For HNSW mode, tombstoned IDs return None.
+///
+/// Parameters:
+/// - id: The vector ID to retrieve
+///
+/// Returns: The vector record if found and accessible, None otherwise
 pub fn VectorDB::get(
   self : VectorDB,
   id : @core.VectorId,
 ) -> @core.VectorRecord? {
-  // In HNSW mode, check tombstone first
   if self.is_tombstoned(id) {
     return None
   }
@@ -146,8 +217,15 @@ pub fn VectorDB::get(
 }
 
 ///|
-/// Add a vector to the database
-/// For HNSW mode, allows re-adding tombstoned IDs (clears tombstone and re-indexes)
+/// Add a new vector to the database.
+///
+/// For HNSW mode, allows re-adding tombstoned IDs (clears tombstone and re-indexes).
+/// Fails if the ID already exists and is not tombstoned.
+///
+/// Parameters:
+/// - id: Unique identifier for the vector
+/// - vector: The embedding vector (must match database dimension)
+/// - attrs: Metadata attributes for filtering
 pub fn VectorDB::add(
   self : VectorDB,
   id : @core.VectorId,
@@ -181,7 +259,6 @@ pub fn VectorDB::add(
   // Normal add path
   let (_, created) = self.store.add_or_update(id, vector, attrs, upsert=false)
   if created {
-    // Update index
     match self.hnsw {
       Some(state) => @ann.hnsw_add(state, self.store, id)
       None => ()
@@ -194,7 +271,17 @@ pub fn VectorDB::add(
 }
 
 ///|
-/// Add or update a vector (upsert)
+/// Add or update a vector (upsert operation).
+///
+/// If the ID exists, updates the vector and reindexes.
+/// If the ID doesn't exist, adds a new vector.
+///
+/// Parameters:
+/// - id: Unique identifier for the vector
+/// - vector: The embedding vector
+/// - attrs: Metadata attributes
+///
+/// Returns: true if a new vector was created, false if existing was updated
 pub fn VectorDB::upsert(
   self : VectorDB,
   id : @core.VectorId,
@@ -215,7 +302,6 @@ pub fn VectorDB::upsert(
     }
   } else if existed {
     // Updated existing vector: need to reindex for ANN strategies
-    // For HNSW: mark old as tombstone and re-add (graph connectivity update)
     match self.hnsw {
       Some(state) => {
         @ann.hnsw_remove(state, id, self.store)
@@ -223,7 +309,6 @@ pub fn VectorDB::upsert(
       }
       None => ()
     }
-    // For IVF: remove from old centroid and reassign (no bootstrap)
     match self.ivf {
       Some(state) => {
         @ann.ivf_remove(state, id)
@@ -236,16 +321,23 @@ pub fn VectorDB::upsert(
 }
 
 ///|
-/// Remove a vector by id
-/// Note: When using HNSW, this only marks as tombstone without physical removal.
-/// Use compact() to reclaim space.
+/// Remove a vector by ID.
+///
+/// Behavior differs by strategy:
+/// - Bruteforce/IVF: Physically removes the vector
+/// - HNSW: Marks as tombstone (soft delete) to maintain graph connectivity
+///
+/// For HNSW, use compact() to reclaim space from tombstoned vectors.
+///
+/// Parameters:
+/// - id: The vector ID to remove
+///
+/// Returns: true if the vector was removed, false if not found or already deleted
 pub fn VectorDB::remove(self : VectorDB, id : @core.VectorId) -> Bool {
-  // Check if vector exists (including tombstone check for HNSW)
   guard self.store.has(id) else { return false }
-  // For HNSW, check if already tombstoned before reporting success
+  // For HNSW, check if already tombstoned
   match self.hnsw {
     Some(state) => {
-      // Already tombstoned = already deleted, return false
       if self.is_tombstoned(id) {
         return false
       }
@@ -267,7 +359,14 @@ pub fn VectorDB::remove(self : VectorDB, id : @core.VectorId) -> Bool {
 }
 
 ///|
-/// Search for k nearest neighbors
+/// Search for k nearest neighbors to a query vector.
+///
+/// Parameters:
+/// - query: The query vector (must match database dimension)
+/// - k: Number of results to return
+/// - filter: Optional predicate to filter results by ID and attributes
+///
+/// Returns: Array of SearchHit sorted by score (highest/most similar first)
 pub fn VectorDB::search(
   self : VectorDB,
   query : Array[Double],
@@ -294,7 +393,15 @@ pub fn VectorDB::search(
 }
 
 ///|
-/// Find the single best match
+/// Find the single best match for a query.
+///
+/// Convenience method equivalent to search(query, 1, filter).
+///
+/// Parameters:
+/// - query: The query vector
+/// - filter: Optional filter predicate
+///
+/// Returns: The best matching SearchHit, or None if no matches
 pub fn VectorDB::find(
   self : VectorDB,
   query : Array[Double],
@@ -309,10 +416,24 @@ pub fn VectorDB::find(
 }
 
 ///|
-/// Search with FilterExpr and optional attribute index for pre-filtering
-/// - PreFilter: Use attr index to get candidates, then score only those
+/// Search with filter expressions and optional attribute index.
+///
+/// Supports two filtering strategies:
+/// - PreFilter: Use attr index to get candidate IDs, then score only those
 /// - PostFilter: Score all vectors, then filter results
-/// - Auto: Choose based on estimated selectivity
+/// - Auto: Automatically choose based on estimated selectivity
+///
+/// PreFilter is more efficient when the filter is selective (<50% of vectors).
+/// PostFilter is better for broad filters or when no attr index is available.
+///
+/// Parameters:
+/// - query: The query vector
+/// - k: Number of results to return
+/// - expr: Optional filter expression (Must/MustNot/Should/Leaf)
+/// - attr_index: Optional attribute index for pre-filtering
+/// - strategy: Filtering strategy (PreFilter/PostFilter/Auto)
+///
+/// Returns: Array of SearchHit matching the filter criteria
 pub fn VectorDB::search_with_expr(
   self : VectorDB,
   query : Array[Double],
@@ -329,7 +450,6 @@ pub fn VectorDB::search_with_expr(
         PreFilter => true
         PostFilter => false
         Auto =>
-          // Use pre-filter if we have an attr index and can get candidates
           match attr_index {
             None => false
             Some(index) =>
@@ -344,14 +464,12 @@ pub fn VectorDB::search_with_expr(
       if use_prefilter {
         match attr_index {
           None => {
-            // Fallback to post-filter
             let pred = @filter.compile_filter(filter_expr)
             self.search(query, k, Some(pred))
           }
           Some(index) =>
             match @filter.get_candidates_basic(filter_expr, index) {
               None => {
-                // Cannot pre-filter, fallback to post-filter
                 let pred = @filter.compile_filter(filter_expr)
                 self.search(query, k, Some(pred))
               }
@@ -359,7 +477,6 @@ pub fn VectorDB::search_with_expr(
             }
         }
       } else {
-        // Post-filter: compile expr to predicate and pass to search
         let pred = @filter.compile_filter(filter_expr)
         self.search(query, k, Some(pred))
       }
@@ -368,23 +485,23 @@ pub fn VectorDB::search_with_expr(
 }
 
 ///|
-/// Search only within a set of candidate IDs (for pre-filtering)
+/// Search only within a set of candidate IDs (for pre-filtering).
+///
+/// Internal method used by search_with_expr for pre-filter strategy.
+/// Scores only the specified candidate vectors instead of all vectors.
 fn VectorDB::search_candidates(
   self : VectorDB,
   query : Array[Double],
   k : Int,
   candidates : Array[@core.VectorId],
 ) -> Array[@core.SearchHit] {
-  // Validate query dimension
   guard query.length() == self.store.dim else { return [] }
   if candidates.is_empty() {
     return []
   }
-  // Normalize query for cosine
   let q = self.store.normalize_query(query)
   let score_fn = @core.get_score_fn(self.store.metric)
   let dim = self.store.dim
-  // Score all candidates, excluding tombstoned IDs
   let results : Array[@core.SearchHit] = []
   for id in candidates {
     // Skip tombstoned IDs (HNSW deletions)
@@ -409,7 +526,13 @@ fn VectorDB::search_candidates(
 }
 
 ///|
-/// Update only the attrs for a vector
+/// Update only the attributes for a vector (without changing the embedding).
+///
+/// Parameters:
+/// - id: The vector ID to update
+/// - attrs: New attributes to set
+///
+/// Returns: true if updated, false if ID not found
 pub fn VectorDB::update_attrs(
   self : VectorDB,
   id : @core.VectorId,
@@ -419,7 +542,13 @@ pub fn VectorDB::update_attrs(
 }
 
 ///|
-/// Train IVF index (only applicable for IVF strategy)
+/// Train the IVF index for optimal search performance.
+///
+/// Only applicable for IVF strategy. Call this after adding a representative
+/// sample of vectors to build the centroid clusters.
+///
+/// Parameters:
+/// - iterations: Number of k-means iterations (default: 10)
 pub fn VectorDB::train(self : VectorDB, iterations? : Int = 10) -> Unit {
   match self.ivf {
     Some(state) => @ann.ivf_train(state, self.store, iterations~)
@@ -428,16 +557,19 @@ pub fn VectorDB::train(self : VectorDB, iterations? : Int = 10) -> Unit {
 }
 
 ///|
-/// Serialize database to bytes
+/// Serialize the database to bytes for persistence.
+///
+/// Includes all vectors, attributes, and index state.
+/// Use deserialize() to restore.
+///
+/// Returns: Binary representation of the database
 pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
   let w = @core.BinaryWriter::new()
   // Write strategy type and params
   match self.strategy {
     Bruteforce => w.push_u32(0U)
-    // No params for bruteforce
     HNSW(params) => {
       w.push_u32(1U)
-      // Serialize HNSW params
       w.push_u32(params.m.reinterpret_as_uint())
       w.push_u32(params.ef_construction.reinterpret_as_uint())
       w.push_u32(params.ef_search.reinterpret_as_uint())
@@ -447,7 +579,6 @@ pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
     }
     IVF(params) => {
       w.push_u32(2U)
-      // Serialize IVF params
       w.push_u32(params.nlist.reinterpret_as_uint())
       w.push_u32(params.nprobe.reinterpret_as_uint())
     }
@@ -487,17 +618,21 @@ pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
 }
 
 ///|
-/// Deserialize database from bytes
+/// Deserialize a database from bytes.
+///
+/// Restores all vectors, attributes, and index state from a previous serialize().
+///
+/// Parameters:
+/// - data: Binary data from serialize()
+///
+/// Returns: The restored VectorDB instance
 pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
   let r = @core.BinaryReader::new(data)
-  // Read strategy type
   let strategy_type = r.read_u32()
-  // Read strategy params based on type
   let (hnsw_params, ivf_params) : (@core.HNSWParams?, @core.IVFParams?) = match
     strategy_type {
-    0U => (None, None) // Bruteforce: no params
+    0U => (None, None)
     1U => {
-      // Read HNSW params
       let m = r.read_u32().reinterpret_as_int()
       let ef_construction = r.read_u32().reinterpret_as_int()
       let ef_search = r.read_u32().reinterpret_as_int()
@@ -517,20 +652,17 @@ pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
       )
     }
     _ => {
-      // Read IVF params
       let nlist = r.read_u32().reinterpret_as_int()
       let nprobe = r.read_u32().reinterpret_as_int()
       (None, Some(@core.IVFParams::{ nlist, nprobe }))
     }
   }
-  // Read store
   let store_len = r.read_u32().reinterpret_as_int()
   let store_bytes = r.read_bytes(store_len)
   let store = @core.CoreStore::deserialize(store_bytes)
-  // Read index state and create db
   match strategy_type {
     0U => {
-      let _ = r.read_u32() // bf_len (empty for bruteforce)
+      let _ = r.read_u32()
       {
         store,
         strategy: @core.Bruteforce,
