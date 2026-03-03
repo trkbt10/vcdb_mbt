@@ -1097,3 +1097,203 @@ test "coverage/store/shrink" {
   // Size should still be 5
   assert_eq(store.size(), 5)
 }
+
+// =============================================================================
+// Section 10: Additional edge case coverage
+// =============================================================================
+
+///|
+/// Test: Store ensure_capacity
+test "coverage/store/ensure_capacity" {
+  let store = @core.CoreStore::new(2, @core.Cosine, capacity=5)
+
+  // Returns false when capacity is already sufficient (no resize needed)
+  let grew1 = store.ensure_capacity(3)
+  assert_true(not(grew1)) // false = no resize needed
+
+  // Add vectors to fill capacity
+  for i in 1..=5 {
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+      upsert=false,
+    )
+  }
+
+  // Now at capacity, adding more requires growth
+  let grew2 = store.ensure_capacity(1)
+  assert_true(grew2) // true = had to grow
+  assert_true(store.capacity() > 5)
+}
+
+///|
+/// Test: Store update_attrs
+test "coverage/store/update_attrs" {
+  let store = @core.CoreStore::new(2, @core.Dot, capacity=10)
+
+  // Add vector
+  let attrs1 = @core.empty_attrs()
+  attrs1.set("version", @core.Int(1L))
+  let _ = store.add_or_update(
+    @core.VectorId::from_int(1),
+    [1.0, 2.0],
+    attrs1,
+    upsert=false,
+  )
+
+  // Update attrs
+  let attrs2 = @core.empty_attrs()
+  attrs2.set("version", @core.Int(2L))
+  attrs2.set("new_key", @core.String("new_value"))
+
+  let updated = store.update_attrs(@core.VectorId::from_int(1), attrs2)
+  assert_true(updated)
+
+  // Verify
+  match store.get(@core.VectorId::from_int(1)) {
+    Some(rec) => {
+      match rec.attrs.get("version") {
+        Some(@core.Int(v)) => assert_eq(v, 2L)
+        _ => assert_true(false)
+      }
+      match rec.attrs.get("new_key") {
+        Some(@core.String(s)) => assert_eq(s, "new_value")
+        _ => assert_true(false)
+      }
+    }
+    None => assert_true(false)
+  }
+
+  // Try to update non-existent
+  let not_updated = store.update_attrs(@core.VectorId::from_int(999), @core.empty_attrs())
+  assert_true(not(not_updated))
+}
+
+///|
+/// Test: Store get_by_index
+test "coverage/store/get_by_index" {
+  let store = @core.CoreStore::new(3, @core.L2, capacity=10)
+
+  for i in 1..=5 {
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i * 10),
+      [i.to_double(), 0.0, 0.0],
+      @core.empty_attrs(),
+      upsert=false,
+    )
+  }
+
+  // Get by index 0
+  let rec0 = store.get_by_index(0)
+  assert_eq(rec0.vector.length(), 3)
+
+  // Get by index 4
+  let rec4 = store.get_by_index(4)
+  assert_eq(rec4.vector.length(), 3)
+}
+
+///|
+/// Test: Binary reader/writer edge cases
+test "coverage/binary/edge_cases" {
+  let w = @core.BinaryWriter::new()
+
+  // Write various sizes
+  w.push_byte(b'\xFF')
+  w.push_u32(0xFFFFFFFFU)
+  w.push_u64(0xFFFFFFFFFFFFFFFFUL)
+  w.push_i32(-1)
+  w.push_i64(-9999999L)
+  w.push_f32(Float::from_double(-3.14))
+  w.push_f64(-2.718281828)
+
+  let bytes = w.concat()
+  let r = @core.BinaryReader::new(bytes)
+
+  assert_eq(r.read_byte(), b'\xFF')
+  assert_eq(r.read_u32(), 0xFFFFFFFFU)
+  assert_eq(r.read_u64(), 0xFFFFFFFFFFFFFFFFUL)
+  assert_eq(r.read_i32(), -1)
+  assert_eq(r.read_i64(), -9999999L)
+
+  let f32 = r.read_f32()
+  assert_true((f32.to_double() - (-3.14)).abs() < 0.01)
+
+  let f64 = r.read_f64()
+  assert_true((f64 - (-2.718281828)).abs() < 0.0001)
+}
+
+///|
+/// Test: Binary reader remaining bytes
+test "coverage/binary/remaining" {
+  let w = @core.BinaryWriter::new()
+  w.push_u32(12345U)
+  w.push_u32(67890U)
+
+  let bytes = w.concat()
+  let r = @core.BinaryReader::new(bytes)
+
+  assert_eq(r.remaining(), 8)
+  let _ = r.read_u32()
+  assert_eq(r.remaining(), 4)
+  let _ = r.read_u32()
+  assert_eq(r.remaining(), 0)
+}
+
+///|
+/// Test: Math functions
+test "coverage/math/functions" {
+  // Test dot product
+  let a = [1.0, 2.0, 3.0]
+  let b = [4.0, 5.0, 6.0]
+  let dot = @core.dot(a, b)
+  assert_eq(dot, 32.0) // 1*4 + 2*5 + 3*6
+
+  // Test l2_squared (squared euclidean distance)
+  let l2_sq = @core.l2_squared(a, b)
+  // (4-1)^2 + (5-2)^2 + (6-3)^2 = 9 + 9 + 9 = 27
+  assert_eq(l2_sq, 27.0)
+
+  // Test l2_norm
+  let norm = @core.l2_norm(a)
+  // sqrt(1 + 4 + 9) = sqrt(14)
+  assert_true((norm - 14.0.sqrt()).abs() < 0.001)
+
+  // Test normalize
+  let norm_a = @core.normalize(a)
+  let len = @core.l2_norm(norm_a)
+  assert_true((len - 1.0).abs() < 0.001)
+
+  // Test cosine_similarity
+  let norm_b = @core.normalize(b)
+  let cos_sim = @core.cosine_similarity(norm_a, norm_b)
+  assert_true(cos_sim > 0.9) // Should be high for similar directions
+}
+
+///|
+/// Test: TopK push operations
+test "coverage/topk/operations" {
+  let results : Array[(Int, Double)] = []
+  let k = 3
+
+  // Add items using push_top_k
+  @core.push_top_k(results, (1, 0.5), k, fn(x) { x.1 })
+  @core.push_top_k(results, (2, 0.8), k, fn(x) { x.1 })
+  @core.push_top_k(results, (3, 0.3), k, fn(x) { x.1 })
+  @core.push_top_k(results, (4, 0.9), k, fn(x) { x.1 })
+  @core.push_top_k(results, (5, 0.1), k, fn(x) { x.1 })
+
+  // Should only keep top 3
+  assert_eq(results.length(), 3)
+
+  // Best scores should be kept (0.9, 0.8, 0.5)
+  assert_true(results[0].1 >= 0.8)
+}
+
+///|
+/// Test: TopK with k=0
+test "coverage/topk/k_zero" {
+  let results : Array[(Int, Double)] = []
+  @core.push_top_k(results, (1, 0.5), 0, fn(x) { x.1 })
+  assert_eq(results.length(), 0)
+}
