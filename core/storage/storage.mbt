@@ -1,6 +1,6 @@
 ///|
 /// IO Error types for storage operations
-pub suberror IOError {
+pub(all) suberror IOError {
   NotFound(String)
   PermissionDenied(String)
   IoFailed(String)

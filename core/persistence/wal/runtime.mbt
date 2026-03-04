@@ -1,13 +1,16 @@
 ///|
 /// WAL Runtime - manages append, replay, and truncate operations
 pub struct WalRuntime {
-  storage : MemoryStorage
+  storage : @storage.MemoryStorage
   path : String
 }
 
 ///|
 /// Create a new WAL runtime with memory storage
-pub fn WalRuntime::new(storage : MemoryStorage, path : String) -> WalRuntime {
+pub fn WalRuntime::new(
+  storage : @storage.MemoryStorage,
+  path : String,
+) -> WalRuntime {
   { storage, path }
 }
 
@@ -59,7 +62,7 @@ fn get_safe_copy_length(data : Bytes) -> Int {
 pub fn WalRuntime::append(
   self : WalRuntime,
   records : Array[WalRecord],
-) -> Unit raise IOError {
+) -> Unit raise @storage.IOError {
   if records.is_empty() {
     return
   }
@@ -106,22 +109,22 @@ pub fn WalRuntime::append(
 pub fn WalRuntime::replay_into(
   self : WalRuntime,
   store : @core.CoreStore,
-) -> Int raise IOError {
+) -> Int raise @storage.IOError {
   if not(self.storage.exists(self.path)) {
     return 0
   }
   let data = self.storage.read(self.path)
   // Verify header first - reject non-WAL files
   if data.length() < 8 {
-    raise IoFailed("WAL file too short")
+    raise @storage.IoFailed("WAL file too short")
   }
   let header_reader = @core.BinaryReader::new(data)
   if not(verify_wal_header(header_reader)) {
-    raise IoFailed("WAL header invalid")
+    raise @storage.IoFailed("WAL header invalid")
   }
   // Verify checksum before applying records to prevent corruption
   if not(verify_wal_checksum(data)) {
-    raise IoFailed("WAL checksum verification failed")
+    raise @storage.IoFailed("WAL checksum verification failed")
   }
   let records = decode_wal_records(data)
   let mut applied = 0

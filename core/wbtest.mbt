@@ -938,7 +938,7 @@ test "math/cosine_zero_vectors" {
 
 ///|
 /// Test: ln() function edge cases
-test "math/ln_edge_cases" {
+test "math/ln_edge_cases_2" {
   // ln(1) = 0
   inspect(ln(1.0), content="0")
   // ln(e) ≈ 1
@@ -980,7 +980,7 @@ test "math/ln_small_values" {
 
 ///|
 /// Test: get_score_fn returns correct function for each metric
-test "math/get_score_fn_all" {
+test "math/get_score_fn_all_2" {
   let data = [1.0, 0.0, 0.0, 1.0]
   let q = [1.0, 0.0]
   // Cosine/Dot should return dot_at

@@ -161,11 +161,7 @@ test "spec/search/filter_reduces" {
   for i in 1..<=10 {
     let attrs = @core.empty_attrs()
     attrs.set("even", @core.Bool(i % 2 == 0))
-    db.add(
-      @core.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      attrs,
-    )
+    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], attrs)
   }
   let filter = fn(_id : @core.VectorId, attrs : @core.Attrs) -> Bool {
     match attrs.get("even") {
@@ -272,7 +268,10 @@ test "spec/recall/ivf_trained_recall" {
   let bf_results = bf_db.search([1.0, 0.0, 0.0, 0.0], 10, None)
   let ivf_results = ivf_db.search([1.0, 0.0, 0.0, 0.0], 10, None)
   // IVF should find at least 8/10 of the same results
-  let bf_ids : Array[Int64] = bf_results.iter().map(fn(h) { h.id.to_int64() }).collect()
+  let bf_ids : Array[Int64] = bf_results
+    .iter()
+    .map(fn(h) { h.id.to_int64() })
+    .collect()
   let mut overlap = 0
   for hit in ivf_results {
     if bf_ids.contains(hit.id.to_int64()) {
@@ -295,7 +294,11 @@ test "spec/recall/exact_match_all_strategies" {
       [10.0, 0.0, 0.0] // Exact match at id=7, highest dot = 100
     } else {
       // Other vectors have lower dot product with query
-      [i.to_double() % 5.0, (i.to_double() + 1.0) % 5.0, (i.to_double() + 2.0) % 5.0]
+      [
+        i.to_double() % 5.0,
+        (i.to_double() + 1.0) % 5.0,
+        (i.to_double() + 2.0) % 5.0,
+      ]
     }
     bf_db.add(@core.VectorId::from_int(i), v, @core.empty_attrs())
     hnsw_db.add(@core.VectorId::from_int(i), v, @core.empty_attrs())
@@ -348,7 +351,11 @@ test "spec/crud/upsert_search_correctness" {
   let r1 = db.find([1.0, 0.0], None)
   inspect(r1.unwrap().id.to_int64(), content="1")
   // Upsert id=1 to point in different direction
-  let _ = db.upsert(@core.VectorId::from_int(1), [0.0, 1.0], @core.empty_attrs())
+  let _ = db.upsert(
+    @core.VectorId::from_int(1),
+    [0.0, 1.0],
+    @core.empty_attrs(),
+  )
   // Now search for [1,0] should NOT find id=1 as best (both point to [0,1])
   // Search for [0,1] should find both equally
   let r2 = db.search([0.0, 1.0], 2, None)
@@ -369,7 +376,11 @@ test "spec/crud/remove_excludes_from_search" {
     strategy: @core.Bruteforce,
   })
   for i in 1..<=5 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
   // Remove id=5 (would be best match for [1, 0] due to highest dot = 5)
   let _ = db.remove(@core.VectorId::from_int(5))
@@ -461,7 +472,10 @@ test "spec/edge/duplicate_vectors" {
   inspect(results[1].score, content="1")
   inspect(results[2].score, content="1")
   // All three IDs should be present
-  let ids : Array[Int64] = results.iter().map(fn(h) { h.id.to_int64() }).collect()
+  let ids : Array[Int64] = results
+    .iter()
+    .map(fn(h) { h.id.to_int64() })
+    .collect()
   inspect(ids.contains(1L), content="true")
   inspect(ids.contains(2L), content="true")
   inspect(ids.contains(3L), content="true")
@@ -519,7 +533,10 @@ test "spec/serialization/search_preserved" {
   inspect(after.length(), content="5")
   for i in 0..<5 {
     inspect(after[i].id.to_int64() == before[i].id.to_int64(), content="true")
-    inspect((after[i].score - before[i].score).abs() < 0.0000000001, content="true")
+    inspect(
+      (after[i].score - before[i].score).abs() < 0.0000000001,
+      content="true",
+    )
   }
 }
 
@@ -546,7 +563,8 @@ test "spec/serialization/attrs_preserved" {
     _ => inspect(false, content="true")
   }
   match record.attrs.get("score") {
-    Some(@core.Float(f)) => inspect((f - 3.14159).abs() < 0.00001, content="true")
+    Some(@core.Float(f)) =>
+      inspect((f - 3.14159).abs() < 0.00001, content="true")
     _ => inspect(false, content="true")
   }
   match record.attrs.get("active") {
@@ -562,7 +580,11 @@ test "spec/serialization/hnsw_graph_preserved" {
   for i in 0..<30 {
     db.add(
       @core.VectorId::from_int(i),
-      [(i % 3).to_double(), ((i + 1) % 3).to_double(), ((i + 2) % 3).to_double()],
+      [
+        (i % 3).to_double(),
+        ((i + 1) % 3).to_double(),
+        ((i + 2) % 3).to_double(),
+      ],
       @core.empty_attrs(),
     )
   }
@@ -628,7 +650,10 @@ test "spec/filter/or_logic" {
   let db = @vcdb.VectorDB::with_dim(2)
   for i in 1..<=10 {
     let attrs = @core.empty_attrs()
-    attrs.set("category", @core.String(if i <= 3 { "A" } else if i <= 6 { "B" } else { "C" }))
+    attrs.set(
+      "category",
+      @core.String(if i <= 3 { "A" } else if i <= 6 { "B" } else { "C" }),
+    )
     db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], attrs)
   }
   // Filter: category = "A" OR category = "C"
@@ -673,7 +698,11 @@ test "spec/stress/interleaved_operations" {
   let db = @vcdb.VectorDB::with_dim(2)
   // Add initial vectors
   for i in 1..<=20 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
   // Remove some
   for i in [5, 10, 15] {
@@ -681,7 +710,11 @@ test "spec/stress/interleaved_operations" {
   }
   // Add more
   for i in 21..<=25 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
   // Verify size
   inspect(db.size(), content="22") // 20 - 3 + 5 = 22
@@ -736,7 +769,10 @@ test "spec/stress/large_dataset_recall" {
   let bf_results = bf_db.search(query, 10, None)
   let hnsw_results = hnsw_db.search(query, 10, None)
   // HNSW should achieve at least 70% recall
-  let bf_ids : Array[Int64] = bf_results.iter().map(fn(h) { h.id.to_int64() }).collect()
+  let bf_ids : Array[Int64] = bf_results
+    .iter()
+    .map(fn(h) { h.id.to_int64() })
+    .collect()
   let mut overlap = 0
   for hit in hnsw_results {
     if bf_ids.contains(hit.id.to_int64()) {
@@ -755,7 +791,11 @@ test "spec/stress/large_dataset_recall" {
 test "spec/hnsw/tombstone_exclusion" {
   let db = @vcdb.VectorDB::with_hnsw(2, metric=@core.Dot)
   for i in 1..<=10 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
   // Remove the best match for query [10, 0]
   let _ = db.remove(@core.VectorId::from_int(10))

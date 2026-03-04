@@ -1,7 +1,6 @@
 ///|
 /// vcdb CLI Demo - Vector Database functionality demonstration
 /// Run with `moon run cmd/main` from the project root.
-
 fn main {
   println("=== vcdb Vector Database Demo ===\n")
 
@@ -32,11 +31,11 @@ fn demo_bruteforce() -> Unit {
   // Add sample vectors representing documents/items
   // Simulating embeddings for: "apple", "banana", "orange", "grape", "melon"
   let items = [
-    (1, "apple",  [0.9, 0.1, 0.0]),
+    (1, "apple", [0.9, 0.1, 0.0]),
     (2, "banana", [0.1, 0.9, 0.0]),
     (3, "orange", [0.8, 0.2, 0.0]),
-    (4, "grape",  [0.2, 0.8, 0.0]),
-    (5, "melon",  [0.5, 0.5, 0.0]),
+    (4, "grape", [0.2, 0.8, 0.0]),
+    (5, "melon", [0.5, 0.5, 0.0]),
   ]
 
   for item in items {
@@ -74,7 +73,7 @@ fn demo_hnsw() -> Unit {
   for i in 0..<100 {
     let v = [
       (i % 10).to_double() / 10.0,
-      ((i / 10) % 10).to_double() / 10.0,
+      (i / 10 % 10).to_double() / 10.0,
       (i % 7).to_double() / 7.0,
       (i % 13).to_double() / 13.0,
     ]
@@ -96,7 +95,9 @@ fn demo_hnsw() -> Unit {
       Some(@core.Int(n)) => n.to_string()
       _ => "?"
     }
-    println("  \{i + 1}. index=\{idx} (id=\{hit.id.to_int64()}, score=\{format_score(hit.score)})")
+    println(
+      "  \{i + 1}. index=\{idx} (id=\{hit.id.to_int64()}, score=\{format_score(hit.score)})",
+    )
   }
   println("")
 }
@@ -109,12 +110,12 @@ fn demo_filtered_search() -> Unit {
 
   // Add products with categories
   let products = [
-    (1, "iPhone",    "electronics", [0.9, 0.1]),
-    (2, "Galaxy",    "electronics", [0.85, 0.15]),
-    (3, "T-shirt",   "clothing",    [0.1, 0.9]),
-    (4, "Jeans",     "clothing",    [0.15, 0.85]),
-    (5, "MacBook",   "electronics", [0.95, 0.05]),
-    (6, "Sneakers",  "clothing",    [0.2, 0.8]),
+    (1, "iPhone", "electronics", [0.9, 0.1]),
+    (2, "Galaxy", "electronics", [0.85, 0.15]),
+    (3, "T-shirt", "clothing", [0.1, 0.9]),
+    (4, "Jeans", "clothing", [0.15, 0.85]),
+    (5, "MacBook", "electronics", [0.95, 0.05]),
+    (6, "Sneakers", "clothing", [0.2, 0.8]),
   ]
 
   for product in products {
@@ -135,7 +136,7 @@ fn demo_filtered_search() -> Unit {
     }
   }
 
-  let query = [1.0, 0.0]  // Looking for electronics-like vector
+  let query = [1.0, 0.0] // Looking for electronics-like vector
   let results = db.search(query, 3, Some(filter))
 
   println("Query: [1.0, 0.0] with filter: category='electronics'")
@@ -169,7 +170,9 @@ fn demo_serialization() -> Unit {
 
   // Serialize
   let bytes = db.serialize()
-  println("Original DB: \{db.size()} vectors, serialized to \{bytes.length()} bytes")
+  println(
+    "Original DB: \{db.size()} vectors, serialized to \{bytes.length()} bytes",
+  )
 
   // Deserialize
   let db2 = @vcdb.VectorDB::deserialize(bytes)
@@ -197,8 +200,8 @@ fn demo_metrics() -> Unit {
   // Same vectors, different metrics
   let vectors = [
     (1, [1.0, 0.0, 0.0]),
-    (2, [2.0, 0.0, 0.0]),  // Same direction as 1, different magnitude
-    (3, [0.0, 1.0, 0.0]),  // Orthogonal
+    (2, [2.0, 0.0, 0.0]), // Same direction as 1, different magnitude
+    (3, [0.0, 1.0, 0.0]), // Orthogonal
   ]
 
   let query = [1.0, 0.0, 0.0]
@@ -262,7 +265,7 @@ fn format_score(score : Double) -> String {
   // Simple formatting: truncate to 4 decimal places
   let scaled = (score * 10000.0).to_int64()
   let integer = scaled / 10000L
-  let frac = if scaled >= 0L { scaled % 10000L } else { (-scaled) % 10000L }
+  let frac = if scaled >= 0L { scaled % 10000L } else { -scaled % 10000L }
   let sign = if score < 0.0 && integer == 0L { "-" } else { "" }
   let frac_str = frac.to_string()
   let padded = match frac_str.length() {

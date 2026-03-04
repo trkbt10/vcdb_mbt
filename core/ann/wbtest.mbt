@@ -649,7 +649,7 @@ test "ivf/retrain_no_bootstrap" {
   for i in 1..<=3 {
     ivf_add(state, store, @core.VectorId::from_int(i))
   }
-  let initial_centroid_count = state.centroid_count
+  let _initial_centroid_count = state.centroid_count
   // Retrain should use ivf_assign, not ivf_add
   let _ = ivf_retrain(state, store, 3)
   // After retrain, centroid count should be based on training only (not bootstrap)

@@ -43,21 +43,6 @@ pub(all) struct VectorRecord {
 } derive(Show)
 
 ///|
-/// Input for vector writes
-pub struct VectorInput {
-  vector : Array[Double]
-  attrs : Attrs
-} derive(Show)
-
-///|
-/// Input row for bulk writes
-pub struct RowInput {
-  id : VectorId
-  vector : Array[Double]
-  attrs : Attrs
-} derive(Show)
-
-///|
 /// HNSW algorithm parameters
 pub(all) struct HNSWParams {
   m : Int // default: 16

@@ -4,10 +4,10 @@
 
 ///|
 /// Memtable entry
-struct MemtableEntry {
-  key : Bytes
+priv struct MemtableEntry {
+  _key : Bytes
   value : Array[Int64]? // None = tombstone
-  seq : Int // Sequence number for ordering
+  _seq : Int // Sequence number for ordering
 }
 
 ///|
@@ -93,12 +93,12 @@ fn memtable_put(mt : Memtable, key : Bytes, value : Array[Int64]?) -> Unit {
   mt.next_seq = seq + 1
   match mt.entries.get(key_str) {
     None => {
-      mt.entries.set(key_str, { key, value, seq })
+      mt.entries.set(key_str, { _key: key, value, _seq: seq })
       mt.size = mt.size + 1
     }
     Some(_) =>
       // Update existing
-      mt.entries.set(key_str, { key, value, seq })
+      mt.entries.set(key_str, { _key: key, value, _seq: seq })
   }
 }
 

@@ -268,7 +268,7 @@ pub fn BasicAttrIndex::range(
 ) -> Array[@core.VectorId]? {
   match self.num_map.get(key) {
     None => Some([]) // Key doesn't exist, return empty
-    Some((arr, _)) => {
+    Some((_arr, _)) => {
       // Ensure array is sorted
       ensure_sorted(self.num_map, key)
       // Re-get after potential sort

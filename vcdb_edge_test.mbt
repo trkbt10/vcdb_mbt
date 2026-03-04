@@ -11,7 +11,7 @@ test "edge/numeric/int64_bounds" {
   let db = @vcdb.VectorDB::with_dim(2)
 
   let attrs = @core.empty_attrs()
-  attrs.set("max", @core.Int(9223372036854775807L))  // Int64.max
+  attrs.set("max", @core.Int(9223372036854775807L)) // Int64.max
   attrs.set("min", @core.Int(-9223372036854775808L)) // Int64.min
   attrs.set("zero", @core.Int(0L))
 
@@ -32,11 +32,12 @@ test "edge/numeric/int64_bounds" {
 /// Test: Float64 special values
 test "edge/numeric/float_special" {
   let db = @vcdb.VectorDB::new({
-    dim: 2,
-    metric: @core.Dot,  // Don't normalize to preserve values
-    capacity: 10,
-    strategy: @core.Bruteforce,
-  })
+      dim: 2,
+      metric: @core.Dot,
+      capacity: 10,
+      strategy: @core.Bruteforce,
+    }, // Don't normalize to preserve values
+  )
 
   let attrs = @core.empty_attrs()
   attrs.set("tiny", @core.Float(0.00000000001))
@@ -115,7 +116,7 @@ test "edge/dim/high_dimension" {
   // Create vectors with different "hot" positions
   for i in 0..<10 {
     let v : Array[Double] = Array::make(dim, 0.0)
-    v[i * 50] = 1.0  // Single hot at different positions
+    v[i * 50] = 1.0 // Single hot at different positions
     db.add(@core.VectorId::from_int(i), v, @core.empty_attrs())
   }
 
@@ -126,7 +127,7 @@ test "edge/dim/high_dimension" {
   query[100] = 1.0
 
   let results = db.search(query, 1, None)
-  inspect(results[0].id.to_int64(), content="2")  // id=2 has hot at 100
+  inspect(results[0].id.to_int64(), content="2") // id=2 has hot at 100
 }
 
 // =============================================================================
@@ -156,7 +157,10 @@ test "edge/score/identical_scores" {
   inspect(results[2].score, content="1")
 
   // All 3 IDs should be present
-  let ids : Array[Int64] = results.iter().map(fn(h) { h.id.to_int64() }).collect()
+  let ids : Array[Int64] = results
+    .iter()
+    .map(fn(h) { h.id.to_int64() })
+    .collect()
   inspect(ids.length(), content="3")
 }
 
@@ -269,7 +273,11 @@ test "edge/hnsw/high_tombstone_ratio" {
 
   // Add 20 nodes
   for i in 1..<=20 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
 
   // Remove 18 of them (90% tombstone)
@@ -293,9 +301,9 @@ test "edge/hnsw/high_tombstone_ratio" {
 /// Test: HNSW with minimal params
 test "edge/hnsw/minimal_params" {
   let params : @core.HNSWParams = {
-    m: 2,  // Minimum allowed
-    ef_construction: 1,  // Minimum
-    ef_search: 1,  // Minimum
+    m: 2, // Minimum allowed
+    ef_construction: 1, // Minimum
+    ef_search: 1, // Minimum
     level_mult: 1.0,
     seed: 42UL,
     allow_replace_deleted: false,
@@ -308,7 +316,11 @@ test "edge/hnsw/minimal_params" {
   })
 
   for i in 1..<=10 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
 
   // Should still work even with minimal params
@@ -323,7 +335,7 @@ test "edge/hnsw/minimal_params" {
 ///|
 /// Test: IVF with nprobe > nlist
 test "edge/ivf/nprobe_exceeds_nlist" {
-  let params : @core.IVFParams = { nlist: 4, nprobe: 100 }  // nprobe >> nlist
+  let params : @core.IVFParams = { nlist: 4, nprobe: 100 } // nprobe >> nlist
   let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @core.Dot,
@@ -332,7 +344,11 @@ test "edge/ivf/nprobe_exceeds_nlist" {
   })
 
   for i in 1..<=10 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
 
   db.train(iterations=5)
@@ -354,7 +370,11 @@ test "edge/ivf/minimal_nlist" {
   })
 
   for i in 1..<=10 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
 
   db.train(iterations=3)
@@ -381,7 +401,7 @@ test "edge/filter/none_match" {
 
   let filter = fn(_id : @core.VectorId, attrs : @core.Attrs) -> Bool {
     match attrs.get("type") {
-      Some(@core.String(s)) => s == "special"  // None have this
+      Some(@core.String(s)) => s == "special" // None have this
       _ => false
     }
   }
@@ -418,7 +438,7 @@ test "edge/filter/empty_must" {
   let attrs = @core.empty_attrs()
   attrs.set("val", @core.Int(1L))
 
-  let expr = @filter.FilterExpr::must([])  // Empty array
+  let expr = @filter.FilterExpr::must([]) // Empty array
   let filter = @filter.compile_filter(expr)
 
   // Empty Must should be vacuously true
@@ -431,7 +451,7 @@ test "edge/filter/empty_must_not" {
   let attrs = @core.empty_attrs()
   attrs.set("val", @core.Int(1L))
 
-  let expr = @filter.FilterExpr::must_not([])  // Empty array
+  let expr = @filter.FilterExpr::must_not([]) // Empty array
   let filter = @filter.compile_filter(expr)
 
   // Empty MustNot should be vacuously true
@@ -444,9 +464,10 @@ test "edge/filter/should_min_zero" {
   let attrs = @core.empty_attrs()
   attrs.set("val", @core.Int(1L))
 
-  let expr = @filter.FilterExpr::should([
-    @filter.FilterExpr::match_("nonexistent", @core.Bool(true)),
-  ], min=0)
+  let expr = @filter.FilterExpr::should(
+    [@filter.FilterExpr::match_("nonexistent", @core.Bool(true))],
+    min=0,
+  )
 
   let filter = @filter.compile_filter(expr)
 
@@ -461,10 +482,13 @@ test "edge/filter/should_min_exceeds" {
   attrs.set("a", @core.Bool(true))
   attrs.set("b", @core.Bool(true))
 
-  let expr = @filter.FilterExpr::should([
-    @filter.FilterExpr::match_("a", @core.Bool(true)),
-    @filter.FilterExpr::match_("b", @core.Bool(true)),
-  ], min=5)  // Need 5, but only 2 clauses
+  let expr = @filter.FilterExpr::should(
+    [
+      @filter.FilterExpr::match_("a", @core.Bool(true)),
+      @filter.FilterExpr::match_("b", @core.Bool(true)),
+    ],
+    min=5,
+  ) // Need 5, but only 2 clauses
 
   let filter = @filter.compile_filter(expr)
 
@@ -498,7 +522,7 @@ test "edge/string/empty" {
   let db = @vcdb.VectorDB::with_dim(2)
 
   let attrs = @core.empty_attrs()
-  attrs.set("", @core.String(""))  // Both empty
+  attrs.set("", @core.String("")) // Both empty
 
   db.add(@core.VectorId::from_int(1), [1.0, 0.0], attrs)
 
@@ -628,7 +652,11 @@ test "edge/serialize/hnsw_tombstones" {
   let db = @vcdb.VectorDB::with_hnsw(2, metric=@core.Dot)
 
   for i in 1..<=10 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
 
   // Remove some
@@ -652,15 +680,20 @@ test "edge/serialize/hnsw_tombstones" {
 /// Test: Exceed initial capacity
 test "edge/capacity/exceed_initial" {
   let db = @vcdb.VectorDB::new({
-    dim: 2,
-    metric: @core.Dot,
-    capacity: 5,  // Small initial capacity
-    strategy: @core.Bruteforce,
-  })
+      dim: 2,
+      metric: @core.Dot,
+      capacity: 5,
+      strategy: @core.Bruteforce,
+    }, // Small initial capacity
+  )
 
   // Add more than capacity
   for i in 1..<=20 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
 
   inspect(db.size(), content="20")
@@ -706,7 +739,11 @@ test "edge/k/one" {
   let db = @vcdb.VectorDB::with_dim(2)
 
   for i in 1..<=100 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
 
   let results = db.search([50.0, 0.0], 1, None)
@@ -719,11 +756,15 @@ test "edge/k/exceeds_size" {
   let db = @vcdb.VectorDB::with_dim(2)
 
   for i in 1..<=5 {
-    db.add(@core.VectorId::from_int(i), [i.to_double(), 0.0], @core.empty_attrs())
+    db.add(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      @core.empty_attrs(),
+    )
   }
 
   let results = db.search([3.0, 0.0], 1000, None)
-  inspect(results.length(), content="5")  // Can only return what exists
+  inspect(results.length(), content="5") // Can only return what exists
 }
 
 // =============================================================================
@@ -778,7 +819,11 @@ test "edge/ops/rapid_cycle" {
     // Add 10
     for i in 0..<10 {
       let id = cycle * 10 + i
-      db.add(@core.VectorId::from_int(id), [id.to_double(), 0.0], @core.empty_attrs())
+      db.add(
+        @core.VectorId::from_int(id),
+        [id.to_double(), 0.0],
+        @core.empty_attrs(),
+      )
     }
 
     // Search
@@ -803,7 +848,7 @@ test "edge/ops/upsert_search_interleave" {
   for i in 1..<=20 {
     // Upsert
     let _ = db.upsert(
-      @core.VectorId::from_int(i % 5 + 1),  // Only 5 unique IDs
+      @core.VectorId::from_int(i % 5 + 1), // Only 5 unique IDs
       [i.to_double(), 0.0],
       @core.empty_attrs(),
     )

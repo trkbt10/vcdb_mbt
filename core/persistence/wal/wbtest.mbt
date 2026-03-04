@@ -1,16 +1,6 @@
-// Whitebox tests for persistence module
+// Whitebox tests for wal module
 
 ///|
-/// Test: CRC32 checksum
-test "checksum/crc32" {
-  let data = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'][:])
-  let crc = @core.crc32(data)
-  // Known CRC32 for "hello"
-  inspect(crc == 0x3610A686U, content="true")
-}
-
-///|
-/// Test: WAL record encoding/decoding roundtrip
 test "wal/record_roundtrip" {
   let attrs = @core.empty_attrs()
   attrs.set("key", @core.String("value"))
@@ -36,7 +26,6 @@ test "wal/record_roundtrip" {
 }
 
 ///|
-/// Test: WAL segment encoding with header/footer
 test "wal/segment_encoding" {
   let records = [
     WalRecord::upsert(@core.VectorId::from_int(1), [1.0], @core.empty_attrs()),
@@ -50,7 +39,6 @@ test "wal/segment_encoding" {
 }
 
 ///|
-/// Test: WAL decode multiple records
 test "wal/decode_records" {
   let records = [
     WalRecord::upsert(
@@ -67,118 +55,8 @@ test "wal/decode_records" {
 }
 
 ///|
-/// Test: CRUSH deterministic placement
-test "crush/deterministic" {
-  let targets = [
-    CrushTarget::new("node1"),
-    CrushTarget::new("node2"),
-    CrushTarget::new("node3"),
-  ]
-  let map = CrushMap::new(16, 2, targets)
-  let id = @core.VectorId::from_int(12345)
-  // Same ID should always map to same placement
-  let result1 = crush_locate(id, map)
-  let result2 = crush_locate(id, map)
-  inspect(result1.pg == result2.pg, content="true")
-  inspect(result1.primaries[0] == result2.primaries[0], content="true")
-}
-
-///|
-/// Test: CRUSH primary selection
-test "crush/primary" {
-  let targets = [
-    CrushTarget::new("a"),
-    CrushTarget::new("b"),
-    CrushTarget::new("c"),
-  ]
-  let map = CrushMap::new(8, 1, targets)
-  let primary = crush_primary(@core.VectorId::from_int(100), map)
-  match primary {
-    Some(key) => inspect(key.length() > 0, content="true")
-    None => inspect(false, content="true")
-  }
-}
-
-///|
-/// Test: CRUSH empty targets
-test "crush/empty_targets" {
-  let map = CrushMap::new(8, 2, [])
-  let result = crush_locate(@core.VectorId::from_int(1), map)
-  inspect(result.primaries.is_empty(), content="true")
-}
-
-///|
-/// Test: MemoryStorage read/write
-test "storage/memory_readwrite" {
-  let storage = MemoryStorage::new()
-  let data = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'][:])
-  storage.write("test.txt", data) catch {
-    _ => ()
-  }
-  let result = storage.read("test.txt") catch { _ => Bytes::new(0) }
-  inspect(result.length(), content="5")
-}
-
-///|
-/// Test: MemoryStorage atomic write
-test "storage/memory_atomic" {
-  let storage = MemoryStorage::new()
-  let data = Bytes::from_array([b't', b'e', b's', b't'][:])
-  storage.atomic_write("atomic.dat", data) catch {
-    _ => ()
-  }
-  inspect(storage.exists("atomic.dat"), content="true")
-}
-
-///|
-/// Test: MemoryStorage append
-test "storage/memory_append" {
-  let storage = MemoryStorage::new()
-  let data1 = Bytes::from_array([b'a', b'b'][:])
-  let data2 = Bytes::from_array([b'c', b'd'][:])
-  storage.write("append.txt", data1) catch {
-    _ => ()
-  }
-  storage.append("append.txt", data2) catch {
-    _ => ()
-  }
-  let result = storage.read("append.txt") catch { _ => Bytes::new(0) }
-  inspect(result.length(), content="4")
-}
-
-///|
-/// Test: MemoryStorage delete
-test "storage/memory_delete" {
-  let storage = MemoryStorage::new()
-  let data = Bytes::from_array([b'x'][:])
-  storage.write("del.txt", data) catch {
-    _ => ()
-  }
-  inspect(storage.exists("del.txt"), content="true")
-  storage.del("del.txt") catch {
-    _ => ()
-  }
-  inspect(storage.exists("del.txt"), content="false")
-}
-
-///|
-/// Test: MemoryStorage list
-test "storage/memory_list" {
-  let storage = MemoryStorage::new()
-  storage.write("a.txt", Bytes::new(0)) catch {
-    _ => ()
-  }
-  storage.write("b.txt", Bytes::new(0)) catch {
-    _ => ()
-  }
-  let files = storage.list()
-  inspect(files.length(), content="2")
-}
-
-///|
-/// Test: WAL replay into CoreStore
 test "wal/replay" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "test.wal")
   // Create WAL records
   let records = [
@@ -206,9 +84,8 @@ test "wal/replay" {
 }
 
 ///|
-/// Test: WAL replay with remove record
 test "wal/replay_remove" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "test_remove.wal")
   let records = [
     WalRecord::upsert(
@@ -235,37 +112,8 @@ test "wal/replay_remove" {
 }
 
 ///|
-/// Test: CRUSH deterministic hash distribution
-test "crush/distribution" {
-  let targets = [
-    CrushTarget::new("node1"),
-    CrushTarget::new("node2"),
-    CrushTarget::new("node3"),
-    CrushTarget::new("node4"),
-  ]
-  let map = CrushMap::new(16, 2, targets)
-  // Check that different IDs are distributed across targets
-  let mut node1_count = 0
-  let mut node2_count = 0
-  for i in 1..<=100 {
-    let result = crush_locate(@core.VectorId::from_int(i), map)
-    if result.primaries.length() > 0 {
-      if result.primaries[0] == "node1" {
-        node1_count = node1_count + 1
-      } else if result.primaries[0] == "node2" {
-        node2_count = node2_count + 1
-      }
-    }
-  }
-  // Distribution should be somewhat even (not all on one node)
-  inspect(node1_count > 0, content="true")
-  inspect(node2_count > 0, content="true")
-}
-
-///|
-/// Test: E2E CRUD operations with WAL replay
 test "wal/e2e_crud_replay" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "e2e.wal")
   // Simulate CRUD operations
   let attrs1 = @core.empty_attrs()
@@ -315,9 +163,8 @@ test "wal/e2e_crud_replay" {
 }
 
 ///|
-/// Test: WAL with large batch of records
 test "wal/large_batch" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "large.wal")
   // Add 100 vectors
   let records : Array[WalRecord] = []
@@ -346,7 +193,6 @@ test "wal/large_batch" {
 }
 
 ///|
-/// Test: WAL record encoding/decoding with all attr types
 test "wal/attr_types_roundtrip" {
   let attrs = @core.empty_attrs()
   attrs.set("string_val", @core.String("hello world"))
@@ -398,123 +244,6 @@ test "wal/attr_types_roundtrip" {
 }
 
 ///|
-/// Test: CrushTarget with weight
-test "crush/target_with_weight" {
-  let target = CrushTarget::with_weight("node1", 2.0)
-  inspect(target.key, content="node1")
-  inspect(target.weight, content="2")
-  inspect(target.zone is None, content="true")
-}
-
-///|
-/// Test: CrushTarget with zone
-test "crush/target_with_zone" {
-  let target = CrushTarget::with_zone("node1", 1.5, "rack-a")
-  inspect(target.key, content="node1")
-  inspect(target.weight, content="1.5")
-  match target.zone {
-    Some(z) => inspect(z, content="rack-a")
-    None => inspect(false, content="true")
-  }
-}
-
-///|
-/// Test: CRUSH rebalance planning
-test "crush/plan_rebalance" {
-  let old_targets = [CrushTarget::new("node1"), CrushTarget::new("node2")]
-  let old_map = CrushMap::new(4, 1, old_targets)
-  let manifest : PlacementManifest = {
-    base: "db",
-    segments: [
-      SegmentEntry::{ name: "db.pg0.part0", target_key: "node1" },
-      SegmentEntry::{ name: "db.pg1.part0", target_key: "node2" },
-    ],
-    crush: old_map,
-    epoch: 1,
-    commit_ts: 1000L,
-  }
-  // New map with different targets
-  let new_targets = [
-    CrushTarget::new("node1"),
-    CrushTarget::new("node2"),
-    CrushTarget::new("node3"),
-  ]
-  let new_map = CrushMap::new(4, 1, new_targets)
-  let plan = plan_rebalance(manifest, new_map)
-  // Some segments may need to move
-  inspect(plan.length() >= 0, content="true")
-}
-
-///|
-/// Test: CRUSH update manifest after rebalance
-test "crush/update_manifest" {
-  let targets = [CrushTarget::new("node1")]
-  let map = CrushMap::new(2, 1, targets)
-  let manifest : PlacementManifest = {
-    base: "db",
-    segments: [SegmentEntry::{ name: "db.pg0.part0", target_key: "node1" }],
-    crush: map,
-    epoch: 1,
-    commit_ts: 1000L,
-  }
-  let plan : Array[MovePlan] = [
-    MovePlan::{ name: "db.pg0.part0", from: "node1", to: "node2" },
-  ]
-  let new_targets = [CrushTarget::new("node1"), CrushTarget::new("node2")]
-  let new_map = CrushMap::new(2, 1, new_targets)
-  let updated = update_manifest_after_rebalance(
-    manifest, plan, new_map, 2, 2000L,
-  )
-  inspect(updated.epoch, content="2")
-  inspect(updated.commit_ts, content="2000")
-  inspect(updated.segments[0].target_key, content="node2")
-}
-
-///|
-/// Test: CRUSH replicas less than targets
-test "crush/replicas_exceed_targets" {
-  let targets = [CrushTarget::new("node1")]
-  let map = CrushMap::new(8, 3, targets) // 3 replicas but only 1 target
-  let result = crush_locate(@core.VectorId::from_int(1), map)
-  // Should only return 1 primary (min of replicas and targets)
-  inspect(result.primaries.length(), content="1")
-}
-
-///|
-/// Test: Storage read non-existent file
-test "storage/read_not_found" {
-  let storage = MemoryStorage::new()
-  let result : Bytes = storage.read("nonexistent.txt") catch {
-    _ => Bytes::new(0)
-  }
-  inspect(result.length(), content="0")
-}
-
-///|
-/// Test: Storage append to new file
-test "storage/append_new_file" {
-  let storage = MemoryStorage::new()
-  let data = Bytes::from_array([b'n', b'e', b'w'][:])
-  storage.append("new.txt", data) catch {
-    _ => ()
-  }
-  let result = storage.read("new.txt") catch { _ => Bytes::new(0) }
-  inspect(result.length(), content="3")
-}
-
-///|
-/// Test: Storage delete non-existent file
-test "storage/delete_not_found" {
-  let storage = MemoryStorage::new()
-  // Should not raise error
-  storage.del("nonexistent.txt") catch {
-    _ => ()
-  }
-  inspect(storage.exists("nonexistent.txt"), content="false")
-}
-
-///|
-/// Test: WAL SetAttrs record
 test "wal/set_attrs_record" {
   let attrs = @core.empty_attrs()
   attrs.set("key", @core.String("value"))
@@ -534,7 +263,6 @@ test "wal/set_attrs_record" {
 }
 
 ///|
-/// Test: WAL Remove record
 test "wal/remove_record" {
   let record = WalRecord::remove(@core.VectorId::from_int(50))
   let encoded = encode_wal_record(record)
@@ -551,7 +279,6 @@ test "wal/remove_record" {
 }
 
 ///|
-/// Test: WAL record type conversion
 test "wal/record_type_conversion" {
   inspect(WalRecordType::Upsert.to_byte() == b'\x01', content="true")
   inspect(WalRecordType::Remove.to_byte() == b'\x02', content="true")
@@ -570,7 +297,6 @@ test "wal/record_type_conversion" {
 }
 
 ///|
-/// Test: WAL segment with corrupted checksum
 test "wal/corrupted_checksum" {
   let records = [
     WalRecord::upsert(@core.VectorId::from_int(1), [1.0], @core.empty_attrs()),
@@ -590,7 +316,6 @@ test "wal/corrupted_checksum" {
 }
 
 ///|
-/// Test: WAL with empty attrs
 test "wal/empty_attrs" {
   let record = WalRecord::upsert(
     @core.VectorId::from_int(1),
@@ -620,9 +345,8 @@ test "wal/empty_attrs" {
 }
 
 ///|
-/// Test: WAL truncate
 test "wal/truncate" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "truncate.wal")
   // Append some records
   let records = [
@@ -641,30 +365,6 @@ test "wal/truncate" {
 }
 
 ///|
-/// Test: Storage clear
-test "storage/clear" {
-  let storage = MemoryStorage::new()
-  storage.write("a.txt", Bytes::from_array([b'a'][:]))
-  storage.write("b.txt", Bytes::from_array([b'b'][:]))
-  inspect(storage.list().length(), content="2")
-  storage.clear()
-  inspect(storage.list().length(), content="0")
-}
-
-///|
-/// Test: Storage delete existing file
-test "storage/delete_existing" {
-  let storage = MemoryStorage::new()
-  storage.write("test.txt", Bytes::from_array([b'x'][:]))
-  inspect(storage.exists("test.txt"), content="true")
-  storage.del("test.txt") catch {
-    _ => ()
-  }
-  inspect(storage.exists("test.txt"), content="false")
-}
-
-///|
-/// Test: WAL JSON escaping special characters
 test "wal/json_escape_special" {
   let attrs = @core.empty_attrs()
   attrs.set("text", @core.String("hello\nworld\ttab\"quote\\backslash"))
@@ -692,7 +392,6 @@ test "wal/json_escape_special" {
 }
 
 ///|
-/// Test: WAL attrs with Float values
 test "wal/attrs_float" {
   let attrs = @core.empty_attrs()
   attrs.set("pi", @core.Float(3.14159))
@@ -717,7 +416,6 @@ test "wal/attrs_float" {
 }
 
 ///|
-/// Test: WAL attrs with Bool values
 test "wal/attrs_bool" {
   let attrs = @core.empty_attrs()
   attrs.set("active", @core.Bool(true))
@@ -746,7 +444,6 @@ test "wal/attrs_bool" {
 }
 
 ///|
-/// Test: WAL decode with invalid header
 test "wal/decode_invalid_header" {
   // Invalid magic number
   let bad_data = Bytes::from_array(
@@ -757,7 +454,6 @@ test "wal/decode_invalid_header" {
 }
 
 ///|
-/// Test: WAL decode with short data
 test "wal/decode_short_data" {
   let short_data = Bytes::from_array([b'V', b'L', b'W'][:])
   let records = decode_wal_records(short_data)
@@ -765,7 +461,6 @@ test "wal/decode_short_data" {
 }
 
 ///|
-/// Test: WAL header verification
 test "wal/verify_header" {
   // Valid header
   let valid = encode_wal_header()
@@ -780,7 +475,6 @@ test "wal/verify_header" {
 }
 
 ///|
-/// Test: WAL segment without footer
 test "wal/segment_no_footer" {
   // Create segment with only header (8 bytes)
   let header = encode_wal_header()
@@ -801,7 +495,6 @@ test "wal/segment_no_footer" {
 }
 
 ///|
-/// Test: WAL decode short record
 test "wal/decode_short_record" {
   // Create valid header but truncated record
   let w = @core.BinaryWriter::new()
@@ -815,50 +508,8 @@ test "wal/decode_short_record" {
 }
 
 ///|
-/// Test: CRUSH locate with different PG counts
-test "crush/pg_distribution" {
-  let targets = [
-    CrushTarget::new("node1"),
-    CrushTarget::new("node2"),
-    CrushTarget::new("node3"),
-    CrushTarget::new("node4"),
-  ]
-  let map = CrushMap::new(32, 2, targets)
-  // Test that different IDs get different PGs
-  let mut pg0_count = 0
-  let mut pg1_count = 0
-  for i in 1..<=100 {
-    let result = crush_locate(@core.VectorId::from_int(i), map)
-    if result.pg == 0 {
-      pg0_count = pg0_count + 1
-    } else if result.pg == 1 {
-      pg1_count = pg1_count + 1
-    }
-  }
-  // Should have some variance in distribution
-  inspect(pg0_count < 100, content="true")
-  inspect(pg1_count < 100, content="true")
-}
-
-///|
-/// Test: CRUSH zone-aware placement
-test "crush/zone_aware" {
-  let targets = [
-    CrushTarget::with_zone("node1", 1.0, "rack-a"),
-    CrushTarget::with_zone("node2", 1.0, "rack-a"),
-    CrushTarget::with_zone("node3", 1.0, "rack-b"),
-    CrushTarget::with_zone("node4", 1.0, "rack-b"),
-  ]
-  let map = CrushMap::new(8, 2, targets)
-  let result = crush_locate(@core.VectorId::from_int(42), map)
-  // Should have 2 primaries
-  inspect(result.primaries.length(), content="2")
-}
-
-///|
-/// Test: WAL runtime with corrupted data
 test "wal/runtime_corrupted" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   // Write corrupted WAL file
   let corrupted = Bytes::from_array(
     [b'X', b'X', b'X', b'X', b'X', b'X', b'X', b'X'][:],
@@ -871,9 +522,8 @@ test "wal/runtime_corrupted" {
 }
 
 ///|
-/// Test: WAL runtime empty file
 test "wal/runtime_empty" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "new.wal")
   let store = @core.CoreStore::new(3, @core.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
@@ -881,9 +531,8 @@ test "wal/runtime_empty" {
 }
 
 ///|
-/// Test: WAL runtime size and exists
 test "wal/runtime_size_exists" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "size.wal")
   // Not exists yet
   inspect(wal.exists(), content="false")
@@ -904,9 +553,8 @@ test "wal/runtime_size_exists" {
 }
 
 ///|
-/// Test: WAL runtime append empty array
 test "wal/runtime_append_empty" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "empty_append.wal")
   // Append empty should not create file
   wal.append([]) catch {
@@ -916,35 +564,8 @@ test "wal/runtime_append_empty" {
 }
 
 ///|
-/// Test: Storage read not found error
-test "storage/read_not_found_error" {
-  let storage = MemoryStorage::new()
-  let result : Bytes = storage.read("nonexistent.txt") catch {
-    IOError::NotFound(path) => {
-      inspect(path, content="nonexistent.txt")
-      Bytes::new(0)
-    }
-    _ => Bytes::new(0)
-  }
-  inspect(result.length(), content="0")
-}
-
-///|
-/// Test: Storage del not found error
-test "storage/del_not_found_error" {
-  let storage = MemoryStorage::new()
-  let mut caught = false
-  storage.del("nonexistent.txt") catch {
-    IOError::NotFound(_) => caught = true
-    _ => ()
-  }
-  inspect(caught, content="true")
-}
-
-///|
-/// Test: WAL runtime replay with SetAttrs for non-existent ID
 test "wal/runtime_setattrs_nonexistent" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "setattrs.wal")
   // SetAttrs for ID that doesn't exist in store
   let attrs = @core.empty_attrs()
@@ -961,9 +582,8 @@ test "wal/runtime_setattrs_nonexistent" {
 }
 
 ///|
-/// Test: WAL runtime replay Remove for non-existent ID
 test "wal/runtime_remove_nonexistent" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "remove.wal")
   // Remove ID that doesn't exist
   let records = [WalRecord::remove(@core.VectorId::from_int(999))]
@@ -977,9 +597,8 @@ test "wal/runtime_remove_nonexistent" {
 }
 
 ///|
-/// Test: WAL runtime append to existing WAL
 test "wal/runtime_append_existing" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "append.wal")
   // First append
   let records1 = [
@@ -1007,19 +626,9 @@ test "wal/runtime_append_existing" {
 }
 
 ///|
-/// Test: CRUSH with zero PGs
-test "crush/zero_pgs" {
-  let targets = [CrushTarget::new("node1")]
-  let map = CrushMap::new(0, 1, targets)
-  let result = crush_locate(@core.VectorId::from_int(1), map)
-  inspect(result.pg, content="0")
-}
-
-///|
-/// Test: WAL Upsert without attrs
 test "wal/upsert_no_attrs" {
-  let storage = MemoryStorage::new()
-  let wal = WalRuntime::new(storage, "no_attrs.wal")
+  let storage = @storage.MemoryStorage::new()
+  let _wal = WalRuntime::new(storage, "no_attrs.wal")
   // Create record manually without attrs
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
@@ -1035,144 +644,6 @@ test "wal/upsert_no_attrs" {
 }
 
 ///|
-/// Test: CRUSH apply_rebalance_memory
-test "crush/apply_rebalance" {
-  let storage1 = MemoryStorage::new()
-  let storage2 = MemoryStorage::new()
-  // Write some data to storage1
-  storage1.write(
-    "db.pg0.part0.data",
-    Bytes::from_array([b'h', b'e', b'l', b'l', b'o'][:]),
-  )
-  let storages : Map[String, MemoryStorage] = {}
-  storages.set("node1", storage1)
-  storages.set("node2", storage2)
-  // Create move plan
-  let plan : Array[MovePlan] = [
-    { name: "db.pg0.part0", from: "node1", to: "node2" },
-  ]
-  // Apply rebalance
-  apply_rebalance_memory(plan, storages) catch {
-    _ => ()
-  }
-  // Verify data moved
-  inspect(storage2.exists("db.pg0.part0.data"), content="true")
-  let data = storage2.read("db.pg0.part0.data") catch { _ => Bytes::new(0) }
-  inspect(data.length(), content="5")
-}
-
-///|
-/// Test: CRUSH apply_rebalance_memory source not found
-test "crush/apply_rebalance_no_source" {
-  let storages : Map[String, MemoryStorage] = {}
-  let plan : Array[MovePlan] = [{ name: "missing", from: "node1", to: "node2" }]
-  let mut caught = false
-  apply_rebalance_memory(plan, storages) catch {
-    IOError::IoFailed(msg) => {
-      inspect(msg.has_prefix("Source storage not found"), content="true")
-      caught = true
-    }
-    _ => ()
-  }
-  inspect(caught, content="true")
-}
-
-///|
-/// Test: CRUSH apply_rebalance_memory dest not found
-test "crush/apply_rebalance_no_dest" {
-  let storage1 = MemoryStorage::new()
-  storage1.write("test.data", Bytes::from_array([b'x'][:]))
-  let storages : Map[String, MemoryStorage] = {}
-  storages.set("node1", storage1)
-  let plan : Array[MovePlan] = [{ name: "test", from: "node1", to: "node2" }]
-  let mut caught = false
-  apply_rebalance_memory(plan, storages) catch {
-    IOError::IoFailed(msg) => {
-      inspect(msg.has_prefix("Destination storage not found"), content="true")
-      caught = true
-    }
-    _ => ()
-  }
-  inspect(caught, content="true")
-}
-
-///|
-/// Test: CRUSH plan_rebalance no changes
-test "crush/plan_rebalance_no_changes" {
-  let targets = [CrushTarget::new("node1")]
-  let map = CrushMap::new(4, 1, targets)
-  let manifest : PlacementManifest = {
-    base: "db",
-    segments: [SegmentEntry::{ name: "db.pg0.part0", target_key: "node1" }],
-    crush: map,
-    epoch: 1,
-    commit_ts: 1000L,
-  }
-  // Same map, no changes
-  let plan = plan_rebalance(manifest, map)
-  inspect(plan.length(), content="0")
-}
-
-///|
-/// Test: CRUSH target_for_pg with empty targets
-test "crush/target_for_pg_empty" {
-  let targets : Array[CrushTarget] = []
-  let map = CrushMap::new(4, 1, targets)
-  let manifest : PlacementManifest = {
-    base: "db",
-    segments: [],
-    crush: map,
-    epoch: 1,
-    commit_ts: 1000L,
-  }
-  let plan = plan_rebalance(manifest, map)
-  inspect(plan.length(), content="0")
-}
-
-///|
-/// Test: Storage trait implementation through interface
-test "storage/trait_impl" {
-  let storage : MemoryStorage = MemoryStorage::new()
-  // Test through trait interface
-  (storage as &Storage).write(
-    "trait_test.txt",
-    Bytes::from_array([b't', b'e', b's', b't'][:]),
-  )
-  inspect((storage as &Storage).exists("trait_test.txt"), content="true")
-  let data = (storage as &Storage).read("trait_test.txt") catch {
-    _ => Bytes::new(0)
-  }
-  inspect(data.length(), content="4")
-  let files = (storage as &Storage).list()
-  inspect(files.length(), content="1")
-  (storage as &Storage).del("trait_test.txt") catch {
-    _ => ()
-  }
-  inspect((storage as &Storage).exists("trait_test.txt"), content="false")
-}
-
-///|
-/// Test: Storage atomic_write trait
-test "storage/trait_atomic_write" {
-  let storage : MemoryStorage = MemoryStorage::new()
-  (storage as &Storage).atomic_write("atomic.txt", Bytes::from_array([b'a'][:]))
-  inspect((storage as &Storage).exists("atomic.txt"), content="true")
-}
-
-///|
-/// Test: Storage append trait
-test "storage/trait_append" {
-  let storage : MemoryStorage = MemoryStorage::new()
-  (storage as &Storage).write("append.txt", Bytes::from_array([b'a'][:]))
-  (storage as &Storage).append("append.txt", Bytes::from_array([b'b'][:]))
-  let data = (storage as &Storage).read("append.txt") catch {
-    _ => Bytes::new(0)
-  }
-  inspect(data.length(), content="2")
-}
-
-///|
-/// Test: WAL with UTF-8 multibyte characters
 test "wal/utf8_multibyte" {
   let attrs = @core.empty_attrs()
   attrs.set("emoji", @core.String("hello 👋"))
@@ -1197,7 +668,6 @@ test "wal/utf8_multibyte" {
 }
 
 ///|
-/// Test: WAL attrs with negative numbers
 test "wal/attrs_negative" {
   let attrs = @core.empty_attrs()
   attrs.set("neg_int", @core.Int(-42L))
@@ -1221,7 +691,6 @@ test "wal/attrs_negative" {
 }
 
 ///|
-/// Test: WAL segment encoding with multiple record types
 test "wal/segment_mixed_types" {
   let records = [
     WalRecord::upsert(
@@ -1248,7 +717,6 @@ test "wal/segment_mixed_types" {
 }
 
 ///|
-/// Test: WAL preserves full Int64 IDs (P1 fix)
 test "wal/large_int64_ids" {
   // Test with IDs that exceed 32-bit range
   let large_id = @core.VectorId(0x1_0000_0001L) // 4294967297, larger than u32 max
@@ -1279,9 +747,8 @@ test "wal/large_int64_ids" {
 }
 
 ///|
-/// Test: WAL replay with large IDs
 test "wal/replay_large_ids" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "large_ids.wal")
   let large_id = @core.VectorId(0x1_0000_0001L)
   let records = [
@@ -1297,56 +764,6 @@ test "wal/replay_large_ids" {
 }
 
 ///|
-/// Test: CRUSH hashing preserves full 64-bit IDs (P1 fix)
-/// IDs differing only in upper 32 bits should produce different placements
-test "crush/full_64bit_hashing" {
-  let targets = [
-    CrushTarget::new("node1"),
-    CrushTarget::new("node2"),
-    CrushTarget::new("node3"),
-    CrushTarget::new("node4"),
-  ]
-  let map = CrushMap::new(256, 2, targets)
-  // IDs that differ only in upper 32 bits
-  let id_low = @core.VectorId(1L) // Lower 32 bits: 1, Upper 32 bits: 0
-  let id_high = @core.VectorId(0x1_0000_0001L) // Lower 32 bits: 1, Upper 32 bits: 1
-  let result_low = crush_locate(id_low, map)
-  let result_high = crush_locate(id_high, map)
-  // These should produce different placement groups (hash includes upper bits)
-  // Note: They could theoretically collide but with 256 PGs it's unlikely
-  inspect(result_low.pg != result_high.pg, content="true")
-}
-
-///|
-/// Test: CRUSH hashing with various 64-bit ID patterns
-test "crush/64bit_id_patterns" {
-  let targets = [
-    CrushTarget::new("a"),
-    CrushTarget::new("b"),
-    CrushTarget::new("c"),
-    CrushTarget::new("d"),
-  ]
-  let map = CrushMap::new(1024, 1, targets)
-  // Test IDs with different upper/lower bit patterns
-  let ids = [
-    @core.VectorId(0L), // All zeros
-    @core.VectorId(0xFFFF_FFFF_FFFF_FFFFL), // All ones (negative in signed)
-    @core.VectorId(0x8000_0000_0000_0000L), // Only MSB set
-    @core.VectorId(0x0000_0000_8000_0000L), // Only bit 31 set (lower half MSB)
-    @core.VectorId(0x1234_5678_0000_0000L), // Upper 32 bits only
-    @core.VectorId(0x0000_0000_1234_5678L), // Lower 32 bits only
-  ]
-  // All should get valid placements
-  for id in ids {
-    let result = crush_locate(id, map)
-    inspect(result.pg >= 0, content="true")
-    inspect(result.pg < 1024, content="true")
-    inspect(result.primaries.length() > 0, content="true")
-  }
-}
-
-///|
-/// Test: WAL truncated record is handled gracefully
 test "wal/truncated_record" {
   // Create a valid WAL segment
   let attrs = @core.empty_attrs()
@@ -1372,9 +789,8 @@ test "wal/truncated_record" {
 }
 
 ///|
-/// Test: WAL corrupted checksum is rejected during replay
 test "wal/corrupted_checksum_rejected" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   // Create valid WAL segment with footer
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
@@ -1410,7 +826,6 @@ test "wal/corrupted_checksum_rejected" {
 }
 
 ///|
-/// Test: WAL with invalid attrs_len is rejected
 test "wal/invalid_attrs_len" {
   // Manually create a record with impossibly large attrs_len
   let w = @core.BinaryWriter::new()
@@ -1434,9 +849,8 @@ test "wal/invalid_attrs_len" {
 }
 
 ///|
-/// Test: Replay after truncate should succeed (header-only WAL is valid)
 test "wal/replay_after_truncate" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "truncate.wal")
   // Append some records
   let record : WalRecord = {
@@ -1457,7 +871,6 @@ test "wal/replay_after_truncate" {
 }
 
 ///|
-/// Test: JSON parsing handles exponent notation (e.g. 1e-7)
 test "wal/json_exponent_notation" {
   // Create attrs with a small float that serializes to exponent form
   let attrs = @core.empty_attrs()
@@ -1482,7 +895,6 @@ test "wal/json_exponent_notation" {
 }
 
 ///|
-/// Test: WAL rejects non-aligned vector payloads
 test "wal/reject_non_aligned_vector" {
   let w = @core.BinaryWriter::new()
   // Header
@@ -1509,26 +921,8 @@ test "wal/reject_non_aligned_vector" {
 }
 
 ///|
-/// Test: parse_pg_from_name handles base names containing "pg"
-test "crush/parse_pg_with_pg_in_base" {
-  // Base name "mypgdb" contains "pg" but should parse ".pg5" suffix
-  let name = "mypgdb.pg5.part0"
-  let pg = parse_pg_from_name(name)
-  inspect(pg, content="5")
-  // Another example: "postgres_backup.pg123.part2"
-  let name2 = "postgres_backup.pg123.part2"
-  let pg2 = parse_pg_from_name(name2)
-  inspect(pg2, content="123")
-  // No ".pg" should return 0
-  let name3 = "pgdata"
-  let pg3 = parse_pg_from_name(name3)
-  inspect(pg3, content="0")
-}
-
-///|
-/// Test: WAL append writes checksum footer
 test "wal/append_writes_footer" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "footer.wal")
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
@@ -1553,9 +947,8 @@ test "wal/append_writes_footer" {
 }
 
 ///|
-/// Test: WAL append reinitializes header for invalid/empty files
 test "wal/append_reinit_invalid_header" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   // Write garbage to WAL file (no valid header)
   let garbage = Bytes::new(4)
   storage.atomic_write("invalid.wal", garbage)
@@ -1580,9 +973,8 @@ test "wal/append_reinit_invalid_header" {
 }
 
 ///|
-/// Test: WAL append rejects corrupted checksum and starts fresh
 test "wal/append_rejects_corrupted_checksum" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   // Create valid WAL first
   let wal = WalRuntime::new(storage, "corrupt.wal")
   let record1 : WalRecord = {
@@ -1628,9 +1020,8 @@ test "wal/append_rejects_corrupted_checksum" {
 }
 
 ///|
-/// Test: WAL replay rejects invalid header
 test "wal/replay_rejects_invalid_header" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   // Write non-WAL data (valid checksum won't help)
   let garbage = Bytes::new(20) // >= 16 bytes but not a WAL
   storage.atomic_write("garbage.wal", garbage)
@@ -1650,9 +1041,8 @@ test "wal/replay_rejects_invalid_header" {
 }
 
 ///|
-/// Test: WAL append handles truncated tail (no footer)
 test "wal/append_truncated_tail" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   // Create valid WAL first
   let wal = WalRuntime::new(storage, "truncated.wal")
   let record1 : WalRecord = {
@@ -1689,48 +1079,8 @@ test "wal/append_truncated_tail" {
 }
 
 ///|
-/// Test: CRUSH plan_rebalance returns empty for empty targets
-test "crush/rebalance_empty_targets" {
-  let targets = [CrushTarget::new("a"), CrushTarget::new("b")]
-  let manifest : PlacementManifest = {
-    base: "db",
-    segments: [{ name: "db.pg0.part0", target_key: "a" }],
-    crush: CrushMap::new(8, 1, targets),
-    epoch: 1,
-    commit_ts: 0L,
-  }
-  // Empty next map - should return no moves
-  let empty_map = CrushMap::new(8, 1, [])
-  let plans = plan_rebalance(manifest, empty_map)
-  inspect(plans.length(), content="0")
-}
-
-///|
-/// Test: parse_pg_from_name uses last .pg marker with digits
-test "crush/parse_pg_last_marker" {
-  // Test case: base name contains ".pg" (e.g., "archive.pg_backup")
-  // Should parse PG 12 from the last ".pg12", not 0 from ".pg_backup"
-  let targets = [CrushTarget::new("a"), CrushTarget::new("b")]
-  let manifest : PlacementManifest = {
-    base: "archive.pg_backup",
-    segments: [{ name: "archive.pg_backup.pg12.part0", target_key: "a" }],
-    crush: CrushMap::new(16, 1, targets),
-    epoch: 1,
-    commit_ts: 0L,
-  }
-  // Target for PG 12 should be computed correctly
-  let next_map = CrushMap::new(16, 1, [CrushTarget::new("c")])
-  let plans = plan_rebalance(manifest, next_map)
-  // Should have one move (from "a" to "c")
-  inspect(plans.length(), content="1")
-  // The move should be for the segment with PG 12
-  inspect(plans[0].name, content="archive.pg_backup.pg12.part0")
-}
-
-///|
-/// Test: WAL JSON escapes all control characters
 test "wal/json_control_chars" {
-  let storage = MemoryStorage::new()
+  let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "control.wal")
   // Create attrs with control characters in value
   let attrs = @core.empty_attrs()
@@ -1763,372 +1113,3 @@ test "wal/json_control_chars" {
 // =============================================================================
 // Coverage improvement tests - index_file.mbt
 // =============================================================================
-
-///|
-/// Test: decode_metric for all codes
-test "index_file/decode_metric_all" {
-  inspect(decode_metric(0) == @core.Cosine, content="true")
-  inspect(decode_metric(1) == @core.L2, content="true")
-  inspect(decode_metric(2) == @core.Dot, content="true")
-  // Unknown codes default to Cosine
-  inspect(decode_metric(99) == @core.Cosine, content="true")
-}
-
-///|
-/// Test: encode_metric for all metrics
-test "index_file/encode_metric_all" {
-  inspect(encode_metric(@core.Cosine), content="0")
-  inspect(encode_metric(@core.L2), content="1")
-  inspect(encode_metric(@core.Dot), content="2")
-}
-
-///|
-/// Test: encode_strategy for all strategies
-test "index_file/encode_strategy_all" {
-  inspect(encode_strategy(@core.Bruteforce), content="0")
-  inspect(encode_strategy(@core.HNSW(@core.HNSWParams::default())), content="1")
-  inspect(encode_strategy(@core.IVF({ nlist: 4, nprobe: 2 })), content="2")
-}
-
-///|
-/// Test: decode_strategy_type returns raw code
-test "index_file/decode_strategy_type" {
-  inspect(decode_strategy_type(0), content="0")
-  inspect(decode_strategy_type(1), content="1")
-  inspect(decode_strategy_type(2), content="2")
-}
-
-///|
-/// Test: IndexHeader::from_store
-test "index_file/header_from_store" {
-  let store = @core.CoreStore::new(4, @core.L2, capacity=10)
-  for i in 1..=3 {
-    let _ = store.add_or_update(
-      @core.VectorId::from_int(i),
-      [1.0, 2.0, 3.0, 4.0],
-      @core.empty_attrs(),
-      upsert=false,
-    )
-  }
-  let header = IndexHeader::from_store(store, @core.IVF({ nlist: 8, nprobe: 2 }), true)
-  inspect(header.metric_code, content="1") // L2
-  inspect(header.dim, content="4")
-  inspect(header.count, content="3")
-  inspect(header.strategy_code, content="2") // IVF
-  inspect(header.has_ann, content="true")
-}
-
-///|
-/// Test: Index file with unicode segment names (UTF-8 multi-byte)
-test "index_file/utf8_segment_names" {
-  let header : IndexHeader = {
-    metric_code: 0,
-    dim: 2,
-    count: 2,
-    strategy_code: 0,
-    has_ann: false,
-  }
-  // Test segment names with various UTF-8 encodings
-  let entries = [
-    IndexEntry::{
-      id: @core.VectorId::from_int(1),
-      ptr: DataPointer::{ segment: "日本語セグメント", offset: 8, length: 32 },
-    },
-    IndexEntry::{
-      id: @core.VectorId::from_int(2),
-      ptr: DataPointer::{ segment: "emoji_🎉_test", offset: 8, length: 48 },
-    },
-  ]
-  let bytes = encode_index_file(header, entries, None)
-  let decoded = decode_index_file(bytes)
-  match decoded {
-    Some(d) => {
-      inspect(d.entries[0].ptr.segment, content="日本語セグメント")
-      inspect(d.entries[1].ptr.segment, content="emoji_🎉_test")
-    }
-    None => inspect(false, content="true")
-  }
-}
-
-///|
-/// Test: Index file with empty entries
-test "index_file/empty_entries" {
-  let header : IndexHeader = {
-    metric_code: 2,
-    dim: 10,
-    count: 0,
-    strategy_code: 1,
-    has_ann: false,
-  }
-  let entries : Array[IndexEntry] = []
-  let bytes = encode_index_file(header, entries, None)
-  let decoded = decode_index_file(bytes)
-  match decoded {
-    Some(d) => {
-      inspect(d.header.count, content="0")
-      inspect(d.entries.length(), content="0")
-    }
-    None => inspect(false, content="true")
-  }
-}
-
-///|
-/// Test: Index file decode with truncated entry
-test "index_file/truncated_entry" {
-  let header : IndexHeader = {
-    metric_code: 0,
-    dim: 2,
-    count: 1,
-    strategy_code: 0,
-    has_ann: false,
-  }
-  let entries = [
-    IndexEntry::{
-      id: @core.VectorId::from_int(1),
-      ptr: DataPointer::{ segment: "test", offset: 8, length: 32 },
-    },
-  ]
-  let bytes = encode_index_file(header, entries, None)
-  // Truncate to cut off part of the entry
-  let w = @core.BinaryWriter::new()
-  for i in 0..<40 {
-    // Only copy first 40 bytes (header + part of entry)
-    if i < bytes.length() {
-      w.push_byte(bytes[i])
-    }
-  }
-  let truncated = w.concat()
-  let decoded = decode_index_file(truncated)
-  // Should decode header but have 0 complete entries
-  match decoded {
-    Some(d) => inspect(d.entries.length(), content="0")
-    None => inspect(false, content="true")
-  }
-}
-
-// =============================================================================
-// Coverage improvement tests - distributed.mbt
-// =============================================================================
-
-///|
-/// Test: estimate_attrs_size for various attr types
-test "distributed/estimate_attrs_size" {
-  // Empty attrs
-  let empty = @core.empty_attrs()
-  let size1 = estimate_attrs_size(empty)
-  inspect(size1, content="2") // Just {}
-
-  // With string
-  let a1 = @core.empty_attrs()
-  a1.set("key", @core.String("value"))
-  let size2 = estimate_attrs_size(a1)
-  inspect(size2 > 10, content="true")
-
-  // With int
-  let a2 = @core.empty_attrs()
-  a2.set("num", @core.Int(12345L))
-  let size3 = estimate_attrs_size(a2)
-  inspect(size3 > 10, content="true")
-
-  // With float
-  let a3 = @core.empty_attrs()
-  a3.set("f", @core.Float(3.14))
-  let size4 = estimate_attrs_size(a3)
-  inspect(size4 > 10, content="true")
-
-  // With bool
-  let a4 = @core.empty_attrs()
-  a4.set("flag", @core.Bool(true))
-  let size5 = estimate_attrs_size(a4)
-  inspect(size5 > 5, content="true")
-
-  // With null
-  let a5 = @core.empty_attrs()
-  a5.set("null_val", @core.Null)
-  let size6 = estimate_attrs_size(a5)
-  inspect(size6 > 5, content="true")
-}
-
-///|
-/// Test: Segment part rotation when size exceeds limit
-test "distributed/segment_part_rotation" {
-  let store = @core.CoreStore::new(2, @core.Dot, capacity=20)
-  // Add vectors with large attrs to trigger rotation
-  for i in 1..=10 {
-    let attrs = @core.empty_attrs()
-    // Create a reasonably sized attr
-    attrs.set("data", @core.String("value_" + i.to_string()))
-    let _ = store.add_or_update(
-      @core.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      attrs,
-      upsert=false,
-    )
-  }
-
-  let crush = CrushMap::new(2, 1, [CrushTarget::new("node1")])
-  let storages : Map[String, MemoryStorage] = {}
-  storages.set("node1", MemoryStorage::new())
-
-  // Use very small segment_bytes to force rotation
-  let opts : SegmentOptions = {
-    base_name: "rotation_test",
-    crush,
-    segmented: true,
-    segment_bytes: 100, // Very small to force multiple parts
-  }
-
-  let result = write_segments_from_store(store, opts, storages) catch { _ => return }
-  // Should have created multiple segment parts
-  inspect(result.entries.length(), content="10")
-  let files = storages.get("node1").unwrap().list()
-  // Should have more than 1 file due to rotation
-  inspect(files.length() > 1, content="true")
-}
-
-///|
-/// Test: Load from segments when index file is missing (slow path)
-test "distributed/load_slow_path" {
-  let store = @core.CoreStore::new(3, @core.Cosine, capacity=10)
-  for i in 1..=3 {
-    let attrs = @core.empty_attrs()
-    attrs.set("idx", @core.Int(i.to_int64()))
-    let _ = store.add_or_update(
-      @core.VectorId::from_int(i),
-      [i.to_double(), 0.0, 0.0],
-      attrs,
-      upsert=false,
-    )
-  }
-
-  let crush = CrushMap::new(4, 1, [CrushTarget::new("disk")])
-  let storages : Map[String, MemoryStorage] = {}
-  storages.set("disk", MemoryStorage::new())
-  let index_storage = MemoryStorage::new()
-
-  let opts = SegmentOptions::default("slowpath", crush)
-  let _ = save_store_distributed(store, opts, storages, index_storage) catch {
-    _ => return
-  }
-
-  // Delete index file to force slow path
-  index_storage.del("slowpath.index") catch { _ => () }
-  inspect(index_storage.exists("slowpath.index"), content="false")
-  inspect(index_storage.exists("slowpath.manifest.json"), content="true")
-
-  // Load should work via segment scan
-  let restored = load_store_distributed("slowpath", storages, index_storage) catch {
-    _ => return
-  }
-  inspect(restored.size(), content="3")
-}
-
-///|
-/// Test: Manifest serialization/deserialization roundtrip
-test "distributed/manifest_roundtrip" {
-  let crush = CrushMap::new(16, 2, [
-    CrushTarget::new("node-a"),
-    CrushTarget::new("node-b"),
-  ])
-  let manifest : PlacementManifest = {
-    base: "test_db",
-    segments: [
-      { name: "test_db.pg0.part0", target_key: "node-a" },
-      { name: "test_db.pg1.part0", target_key: "node-b" },
-    ],
-    crush,
-    epoch: 5,
-    commit_ts: 1234567890L,
-  }
-  let bytes = serialize_manifest(manifest)
-  let decoded = deserialize_manifest(bytes)
-  match decoded {
-    Some(m) => {
-      inspect(m.base, content="test_db")
-      inspect(m.epoch, content="5")
-      inspect(m.commit_ts, content="1234567890")
-      inspect(m.segments.length(), content="2")
-      inspect(m.crush.pgs, content="16")
-      inspect(m.crush.replicas, content="2")
-      inspect(m.crush.targets.length(), content="2")
-    }
-    None => inspect(false, content="true")
-  }
-}
-
-///|
-/// Test: SaveDistributedOptions::default
-test "distributed/save_options_default" {
-  let crush = CrushMap::new(8, 1, [CrushTarget::new("x")])
-  let opts = SaveDistributedOptions::default("mydb", crush)
-  inspect(opts.segment_opts.base_name, content="mydb")
-  inspect(opts.include_ann, content="false")
-  inspect(opts.ann_bytes is None, content="true")
-}
-
-///|
-/// Test: Empty manifest segments causes error
-test "distributed/empty_manifest_error" {
-  let crush = CrushMap::new(4, 1, [CrushTarget::new("node")])
-  let storages : Map[String, MemoryStorage] = {}
-  storages.set("node", MemoryStorage::new())
-  let index_storage = MemoryStorage::new()
-
-  // Create empty manifest
-  let manifest : PlacementManifest = {
-    base: "empty",
-    segments: [],
-    crush,
-    epoch: 0,
-    commit_ts: 0L,
-  }
-  let bytes = serialize_manifest(manifest)
-  index_storage.atomic_write("empty.manifest.json", bytes)
-
-  // Load should fail with "Empty manifest"
-  let mut caught = false
-  let _ = load_store_distributed("empty", storages, index_storage) catch {
-    IoFailed(msg) => {
-      inspect(msg, content="Empty manifest")
-      caught = true
-      @core.CoreStore::new(1, @core.Cosine)
-    }
-    _ => @core.CoreStore::new(1, @core.Cosine)
-  }
-  inspect(caught, content="true")
-}
-
-///|
-/// Test: find_substr helper function
-test "distributed/find_substr" {
-  inspect(find_substr("hello world", "world") is Some(6), content="true")
-  inspect(find_substr("hello world", "foo") is None, content="true")
-  inspect(find_substr("abc", "") is Some(0), content="true")
-  inspect(find_substr("a", "abc") is None, content="true")
-}
-
-///|
-/// Test: extract_string_field handles missing field
-test "distributed/extract_string_missing" {
-  let json = "{\"foo\":\"bar\"}"
-  let result = extract_string_field(json, "missing")
-  inspect(result, content="")
-}
-
-///|
-/// Test: extract_int_field handles missing and invalid
-test "distributed/extract_int_edge" {
-  let json1 = "{\"foo\":\"bar\"}"
-  inspect(extract_int_field(json1, "missing"), content="0")
-
-  let json2 = "{\"num\":42}"
-  inspect(extract_int_field(json2, "num"), content="42")
-}
-
-///|
-/// Test: extract_int64_field handles negative numbers
-test "distributed/extract_int64_negative" {
-  let json = "{\"ts\":-1234567890}"
-  let result = extract_int64_field(json, "ts")
-  inspect(result, content="-1234567890")
-}

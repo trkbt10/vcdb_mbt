@@ -217,6 +217,7 @@ fn decode_attrs_from_segment(bytes : Bytes) -> @core.Attrs {
 
 // JSON encoding helpers (simplified versions of WAL)
 
+///|
 fn attrs_to_json_segment(attrs : @core.Attrs) -> String {
   let parts : Array[String] = []
   for key in attrs.keys() {
@@ -228,9 +229,12 @@ fn attrs_to_json_segment(attrs : @core.Attrs) -> String {
       }
     }
   }
-  "{" + parts.iter().intersperse(",").fold(init="", fn(acc, s) { acc + s }) + "}"
+  "{" +
+  parts.iter().intersperse(",").fold(init="", fn(acc, s) { acc + s }) +
+  "}"
 }
 
+///|
 fn attr_value_to_json_segment(value : @core.AttrValue) -> String {
   match value {
     Null => "null"
@@ -241,6 +245,7 @@ fn attr_value_to_json_segment(value : @core.AttrValue) -> String {
   }
 }
 
+///|
 fn escape_json_segment(s : String) -> String {
   let chars : Array[Char] = []
   for c in s {
@@ -271,7 +276,8 @@ fn escape_json_segment(s : String) -> String {
   String::from_array(chars)
 }
 
-fn string_to_utf8_segment(s : String) -> Bytes {
+///|
+pub fn string_to_utf8_segment(s : String) -> Bytes {
   let w = @core.BinaryWriter::new()
   for c in s {
     let code = c.to_uint()
@@ -294,7 +300,8 @@ fn string_to_utf8_segment(s : String) -> Bytes {
   w.concat()
 }
 
-fn utf8_to_string_segment(bytes : Bytes) -> String {
+///|
+pub fn utf8_to_string_segment(bytes : Bytes) -> String {
   let chars : Array[Char] = []
   let mut i = 0
   while i < bytes.length() {
@@ -330,6 +337,7 @@ fn utf8_to_string_segment(bytes : Bytes) -> String {
   String::from_array(chars)
 }
 
+///|
 fn parse_json_object_segment(json : String) -> @core.Attrs? {
   let json = json.trim(chars=" \t\n\r").to_string()
   if json == "null" || json == "{}" {
@@ -348,7 +356,12 @@ fn parse_json_object_segment(json : String) -> @core.Attrs? {
   while i < chars.length() {
     // Skip whitespace
     while i < chars.length() &&
-          (chars[i] == ' ' || chars[i] == '\t' || chars[i] == '\n' || chars[i] == '\r') {
+          (
+            chars[i] == ' ' ||
+            chars[i] == '\t' ||
+            chars[i] == '\n' ||
+            chars[i] == '\r'
+          ) {
       i = i + 1
     }
     if i >= chars.length() {
@@ -367,17 +380,21 @@ fn parse_json_object_segment(json : String) -> @core.Attrs? {
     i = new_i2
     attrs.set(key, value)
     while i < chars.length() &&
-          (chars[i] == ' ' || chars[i] == '\t' || chars[i] == ',' || chars[i] == '\n' || chars[i] == '\r') {
+          (
+            chars[i] == ' ' ||
+            chars[i] == '\t' ||
+            chars[i] == ',' ||
+            chars[i] == '\n' ||
+            chars[i] == '\r'
+          ) {
       i = i + 1
     }
   }
   Some(attrs)
 }
 
-fn parse_json_string_segment(
-  chars : Array[Char],
-  start : Int,
-) -> (String, Int) {
+///|
+fn parse_json_string_segment(chars : Array[Char], start : Int) -> (String, Int) {
   let mut i = start + 1
   let result : Array[Char] = []
   while i < chars.length() && chars[i] != '"' {
@@ -399,13 +416,19 @@ fn parse_json_string_segment(
   (String::from_array(result), i + 1)
 }
 
+///|
 fn parse_json_value_segment(
   chars : Array[Char],
   start : Int,
 ) -> (@core.AttrValue, Int) {
   let mut i = start
   while i < chars.length() &&
-        (chars[i] == ' ' || chars[i] == '\t' || chars[i] == '\n' || chars[i] == '\r') {
+        (
+          chars[i] == ' ' ||
+          chars[i] == '\t' ||
+          chars[i] == '\n' ||
+          chars[i] == '\r'
+        ) {
     i = i + 1
   }
   if i >= chars.length() {
@@ -423,9 +446,14 @@ fn parse_json_value_segment(
       let num_start = i
       let mut has_dot = false
       while i < chars.length() &&
-            (chars[i] == '-' || chars[i] == '+' || chars[i] == '.' ||
-             chars[i] == 'e' || chars[i] == 'E' ||
-             (chars[i] >= '0' && chars[i] <= '9')) {
+            (
+              chars[i] == '-' ||
+              chars[i] == '+' ||
+              chars[i] == '.' ||
+              chars[i] == 'e' ||
+              chars[i] == 'E' ||
+              (chars[i] >= '0' && chars[i] <= '9')
+            ) {
         if chars[i] == '.' || chars[i] == 'e' || chars[i] == 'E' {
           has_dot = true
         }

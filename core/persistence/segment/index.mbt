@@ -202,6 +202,7 @@ pub fn IndexHeader::from_store(
 
 // UTF-8 helpers (same as segment.mbt)
 
+///|
 fn string_to_utf8_index(s : String) -> Bytes {
   let w = @core.BinaryWriter::new()
   for c in s {
@@ -225,6 +226,7 @@ fn string_to_utf8_index(s : String) -> Bytes {
   w.concat()
 }
 
+///|
 fn utf8_to_string_index(bytes : Bytes) -> String {
   let chars : Array[Char] = []
   let mut i = 0

@@ -260,17 +260,17 @@ pub fn plan_rebalance(
 /// In production, this would use actual FileIO implementations
 pub fn apply_rebalance_memory(
   plan : Array[MovePlan],
-  storages : Map[String, MemoryStorage],
-) -> Unit raise IOError {
+  storages : Map[String, @storage.MemoryStorage],
+) -> Unit raise @storage.IOError {
   for mv in plan {
     // Get source storage
     let from_storage = match storages.get(mv.from) {
-      None => raise IoFailed("Source storage not found: " + mv.from)
+      None => raise @storage.IoFailed("Source storage not found: " + mv.from)
       Some(s) => s
     }
     // Get destination storage
     let to_storage = match storages.get(mv.to) {
-      None => raise IoFailed("Destination storage not found: " + mv.to)
+      None => raise @storage.IoFailed("Destination storage not found: " + mv.to)
       Some(s) => s
     }
     // Read from source

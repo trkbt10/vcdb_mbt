@@ -208,7 +208,7 @@ pub fn BitmapAttrIndex::exists(
 ///|
 /// Range queries not supported for Bitmap index
 pub fn BitmapAttrIndex::range(
-  self : BitmapAttrIndex,
+  _self : BitmapAttrIndex,
   key : String,
   range : @core.NumericRange,
 ) -> Array[@core.VectorId]? {
