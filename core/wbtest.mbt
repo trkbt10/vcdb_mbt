@@ -920,3 +920,106 @@ test "store/update_attrs_defensive_copy" {
       }
   }
 }
+
+// =============================================================================
+// Coverage improvement tests - math.mbt
+// =============================================================================
+
+///|
+/// Test: cosine_similarity with zero vectors
+test "math/cosine_zero_vectors" {
+  // Zero vector should return 0
+  let zero = [0.0, 0.0, 0.0]
+  let nonzero = [1.0, 0.0, 0.0]
+  inspect(cosine_similarity(zero, nonzero), content="0")
+  inspect(cosine_similarity(nonzero, zero), content="0")
+  inspect(cosine_similarity(zero, zero), content="0")
+}
+
+///|
+/// Test: ln() function edge cases
+test "math/ln_edge_cases" {
+  // ln(1) = 0
+  inspect(ln(1.0), content="0")
+  // ln(e) ≈ 1
+  let e = 2.718281828459045
+  let ln_e = ln(e)
+  inspect(ln_e > 0.99 && ln_e < 1.01, content="true")
+  // ln(0) should return very negative number
+  let ln_zero = ln(0.0)
+  inspect(ln_zero < -1.0e100, content="true")
+  // ln(negative) should return very negative number
+  let ln_neg = ln(-1.0)
+  inspect(ln_neg < -1.0e100, content="true")
+}
+
+///|
+/// Test: ln() range reduction for large values
+test "math/ln_large_values" {
+  // ln(2) ≈ 0.693
+  let ln2 = ln(2.0)
+  inspect(ln2 > 0.69 && ln2 < 0.70, content="true")
+  // ln(10) ≈ 2.303
+  let ln10 = ln(10.0)
+  inspect(ln10 > 2.29 && ln10 < 2.32, content="true")
+  // ln(100) ≈ 4.605
+  let ln100 = ln(100.0)
+  inspect(ln100 > 4.59 && ln100 < 4.62, content="true")
+}
+
+///|
+/// Test: ln() range reduction for small values
+test "math/ln_small_values" {
+  // ln(0.5) ≈ -0.693
+  let ln_half = ln(0.5)
+  inspect(ln_half > -0.70 && ln_half < -0.69, content="true")
+  // ln(0.1) ≈ -2.303
+  let ln_tenth = ln(0.1)
+  inspect(ln_tenth > -2.32 && ln_tenth < -2.29, content="true")
+}
+
+///|
+/// Test: get_score_fn returns correct function for each metric
+test "math/get_score_fn_all" {
+  let data = [1.0, 0.0, 0.0, 1.0]
+  let q = [1.0, 0.0]
+  // Cosine/Dot should return dot_at
+  let cosine_fn = get_score_fn(Cosine)
+  let dot_fn = get_score_fn(Dot)
+  inspect(cosine_fn(data, 0, q, 2), content="1")
+  inspect(dot_fn(data, 0, q, 2), content="1")
+  // L2 should return l2neg_at
+  let l2_fn = get_score_fn(L2)
+  inspect(l2_fn(data, 0, q, 2), content="0")
+}
+
+///|
+/// Test: normalize_in_place with zero vector
+test "math/normalize_zero_vector" {
+  let zero = [0.0, 0.0, 0.0]
+  normalize_in_place(zero)
+  // Zero vector should remain zero (not NaN)
+  inspect(zero[0], content="0")
+  inspect(zero[1], content="0")
+  inspect(zero[2], content="0")
+}
+
+///|
+/// Test: l2_squared with different length vectors
+test "math/l2_squared_diff_lengths" {
+  let a = [1.0, 2.0, 3.0]
+  let b = [1.0, 2.0]
+  // Should use min length
+  let result = l2_squared(a, b)
+  inspect(result, content="0")
+}
+
+///|
+/// Test: dot with different length vectors
+test "math/dot_diff_lengths" {
+  let a = [1.0, 2.0, 3.0]
+  let b = [1.0, 2.0]
+  // Should use min length
+  let result = dot(a, b)
+  inspect(result, content="5")
+}

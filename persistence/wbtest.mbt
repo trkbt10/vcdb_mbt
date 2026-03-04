@@ -1759,3 +1759,376 @@ test "wal/json_control_chars" {
       }
   }
 }
+
+// =============================================================================
+// Coverage improvement tests - index_file.mbt
+// =============================================================================
+
+///|
+/// Test: decode_metric for all codes
+test "index_file/decode_metric_all" {
+  inspect(decode_metric(0) == @core.Cosine, content="true")
+  inspect(decode_metric(1) == @core.L2, content="true")
+  inspect(decode_metric(2) == @core.Dot, content="true")
+  // Unknown codes default to Cosine
+  inspect(decode_metric(99) == @core.Cosine, content="true")
+}
+
+///|
+/// Test: encode_metric for all metrics
+test "index_file/encode_metric_all" {
+  inspect(encode_metric(@core.Cosine), content="0")
+  inspect(encode_metric(@core.L2), content="1")
+  inspect(encode_metric(@core.Dot), content="2")
+}
+
+///|
+/// Test: encode_strategy for all strategies
+test "index_file/encode_strategy_all" {
+  inspect(encode_strategy(@core.Bruteforce), content="0")
+  inspect(encode_strategy(@core.HNSW(@core.HNSWParams::default())), content="1")
+  inspect(encode_strategy(@core.IVF({ nlist: 4, nprobe: 2 })), content="2")
+}
+
+///|
+/// Test: decode_strategy_type returns raw code
+test "index_file/decode_strategy_type" {
+  inspect(decode_strategy_type(0), content="0")
+  inspect(decode_strategy_type(1), content="1")
+  inspect(decode_strategy_type(2), content="2")
+}
+
+///|
+/// Test: IndexHeader::from_store
+test "index_file/header_from_store" {
+  let store = @core.CoreStore::new(4, @core.L2, capacity=10)
+  for i in 1..=3 {
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i),
+      [1.0, 2.0, 3.0, 4.0],
+      @core.empty_attrs(),
+      upsert=false,
+    )
+  }
+  let header = IndexHeader::from_store(store, @core.IVF({ nlist: 8, nprobe: 2 }), true)
+  inspect(header.metric_code, content="1") // L2
+  inspect(header.dim, content="4")
+  inspect(header.count, content="3")
+  inspect(header.strategy_code, content="2") // IVF
+  inspect(header.has_ann, content="true")
+}
+
+///|
+/// Test: Index file with unicode segment names (UTF-8 multi-byte)
+test "index_file/utf8_segment_names" {
+  let header : IndexHeader = {
+    metric_code: 0,
+    dim: 2,
+    count: 2,
+    strategy_code: 0,
+    has_ann: false,
+  }
+  // Test segment names with various UTF-8 encodings
+  let entries = [
+    IndexEntry::{
+      id: @core.VectorId::from_int(1),
+      ptr: DataPointer::{ segment: "日本語セグメント", offset: 8, length: 32 },
+    },
+    IndexEntry::{
+      id: @core.VectorId::from_int(2),
+      ptr: DataPointer::{ segment: "emoji_🎉_test", offset: 8, length: 48 },
+    },
+  ]
+  let bytes = encode_index_file(header, entries, None)
+  let decoded = decode_index_file(bytes)
+  match decoded {
+    Some(d) => {
+      inspect(d.entries[0].ptr.segment, content="日本語セグメント")
+      inspect(d.entries[1].ptr.segment, content="emoji_🎉_test")
+    }
+    None => inspect(false, content="true")
+  }
+}
+
+///|
+/// Test: Index file with empty entries
+test "index_file/empty_entries" {
+  let header : IndexHeader = {
+    metric_code: 2,
+    dim: 10,
+    count: 0,
+    strategy_code: 1,
+    has_ann: false,
+  }
+  let entries : Array[IndexEntry] = []
+  let bytes = encode_index_file(header, entries, None)
+  let decoded = decode_index_file(bytes)
+  match decoded {
+    Some(d) => {
+      inspect(d.header.count, content="0")
+      inspect(d.entries.length(), content="0")
+    }
+    None => inspect(false, content="true")
+  }
+}
+
+///|
+/// Test: Index file decode with truncated entry
+test "index_file/truncated_entry" {
+  let header : IndexHeader = {
+    metric_code: 0,
+    dim: 2,
+    count: 1,
+    strategy_code: 0,
+    has_ann: false,
+  }
+  let entries = [
+    IndexEntry::{
+      id: @core.VectorId::from_int(1),
+      ptr: DataPointer::{ segment: "test", offset: 8, length: 32 },
+    },
+  ]
+  let bytes = encode_index_file(header, entries, None)
+  // Truncate to cut off part of the entry
+  let w = @core.BinaryWriter::new()
+  for i in 0..<40 {
+    // Only copy first 40 bytes (header + part of entry)
+    if i < bytes.length() {
+      w.push_byte(bytes[i])
+    }
+  }
+  let truncated = w.concat()
+  let decoded = decode_index_file(truncated)
+  // Should decode header but have 0 complete entries
+  match decoded {
+    Some(d) => inspect(d.entries.length(), content="0")
+    None => inspect(false, content="true")
+  }
+}
+
+// =============================================================================
+// Coverage improvement tests - distributed.mbt
+// =============================================================================
+
+///|
+/// Test: estimate_attrs_size for various attr types
+test "distributed/estimate_attrs_size" {
+  // Empty attrs
+  let empty = @core.empty_attrs()
+  let size1 = estimate_attrs_size(empty)
+  inspect(size1, content="2") // Just {}
+
+  // With string
+  let a1 = @core.empty_attrs()
+  a1.set("key", @core.String("value"))
+  let size2 = estimate_attrs_size(a1)
+  inspect(size2 > 10, content="true")
+
+  // With int
+  let a2 = @core.empty_attrs()
+  a2.set("num", @core.Int(12345L))
+  let size3 = estimate_attrs_size(a2)
+  inspect(size3 > 10, content="true")
+
+  // With float
+  let a3 = @core.empty_attrs()
+  a3.set("f", @core.Float(3.14))
+  let size4 = estimate_attrs_size(a3)
+  inspect(size4 > 10, content="true")
+
+  // With bool
+  let a4 = @core.empty_attrs()
+  a4.set("flag", @core.Bool(true))
+  let size5 = estimate_attrs_size(a4)
+  inspect(size5 > 5, content="true")
+
+  // With null
+  let a5 = @core.empty_attrs()
+  a5.set("null_val", @core.Null)
+  let size6 = estimate_attrs_size(a5)
+  inspect(size6 > 5, content="true")
+}
+
+///|
+/// Test: Segment part rotation when size exceeds limit
+test "distributed/segment_part_rotation" {
+  let store = @core.CoreStore::new(2, @core.Dot, capacity=20)
+  // Add vectors with large attrs to trigger rotation
+  for i in 1..=10 {
+    let attrs = @core.empty_attrs()
+    // Create a reasonably sized attr
+    attrs.set("data", @core.String("value_" + i.to_string()))
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0],
+      attrs,
+      upsert=false,
+    )
+  }
+
+  let crush = CrushMap::new(2, 1, [CrushTarget::new("node1")])
+  let storages : Map[String, MemoryStorage] = {}
+  storages.set("node1", MemoryStorage::new())
+
+  // Use very small segment_bytes to force rotation
+  let opts : SegmentOptions = {
+    base_name: "rotation_test",
+    crush,
+    segmented: true,
+    segment_bytes: 100, // Very small to force multiple parts
+  }
+
+  let result = write_segments_from_store(store, opts, storages) catch { _ => return }
+  // Should have created multiple segment parts
+  inspect(result.entries.length(), content="10")
+  let files = storages.get("node1").unwrap().list()
+  // Should have more than 1 file due to rotation
+  inspect(files.length() > 1, content="true")
+}
+
+///|
+/// Test: Load from segments when index file is missing (slow path)
+test "distributed/load_slow_path" {
+  let store = @core.CoreStore::new(3, @core.Cosine, capacity=10)
+  for i in 1..=3 {
+    let attrs = @core.empty_attrs()
+    attrs.set("idx", @core.Int(i.to_int64()))
+    let _ = store.add_or_update(
+      @core.VectorId::from_int(i),
+      [i.to_double(), 0.0, 0.0],
+      attrs,
+      upsert=false,
+    )
+  }
+
+  let crush = CrushMap::new(4, 1, [CrushTarget::new("disk")])
+  let storages : Map[String, MemoryStorage] = {}
+  storages.set("disk", MemoryStorage::new())
+  let index_storage = MemoryStorage::new()
+
+  let opts = SegmentOptions::default("slowpath", crush)
+  let _ = save_store_distributed(store, opts, storages, index_storage) catch {
+    _ => return
+  }
+
+  // Delete index file to force slow path
+  index_storage.del("slowpath.index") catch { _ => () }
+  inspect(index_storage.exists("slowpath.index"), content="false")
+  inspect(index_storage.exists("slowpath.manifest.json"), content="true")
+
+  // Load should work via segment scan
+  let restored = load_store_distributed("slowpath", storages, index_storage) catch {
+    _ => return
+  }
+  inspect(restored.size(), content="3")
+}
+
+///|
+/// Test: Manifest serialization/deserialization roundtrip
+test "distributed/manifest_roundtrip" {
+  let crush = CrushMap::new(16, 2, [
+    CrushTarget::new("node-a"),
+    CrushTarget::new("node-b"),
+  ])
+  let manifest : PlacementManifest = {
+    base: "test_db",
+    segments: [
+      { name: "test_db.pg0.part0", target_key: "node-a" },
+      { name: "test_db.pg1.part0", target_key: "node-b" },
+    ],
+    crush,
+    epoch: 5,
+    commit_ts: 1234567890L,
+  }
+  let bytes = serialize_manifest(manifest)
+  let decoded = deserialize_manifest(bytes)
+  match decoded {
+    Some(m) => {
+      inspect(m.base, content="test_db")
+      inspect(m.epoch, content="5")
+      inspect(m.commit_ts, content="1234567890")
+      inspect(m.segments.length(), content="2")
+      inspect(m.crush.pgs, content="16")
+      inspect(m.crush.replicas, content="2")
+      inspect(m.crush.targets.length(), content="2")
+    }
+    None => inspect(false, content="true")
+  }
+}
+
+///|
+/// Test: SaveDistributedOptions::default
+test "distributed/save_options_default" {
+  let crush = CrushMap::new(8, 1, [CrushTarget::new("x")])
+  let opts = SaveDistributedOptions::default("mydb", crush)
+  inspect(opts.segment_opts.base_name, content="mydb")
+  inspect(opts.include_ann, content="false")
+  inspect(opts.ann_bytes is None, content="true")
+}
+
+///|
+/// Test: Empty manifest segments causes error
+test "distributed/empty_manifest_error" {
+  let crush = CrushMap::new(4, 1, [CrushTarget::new("node")])
+  let storages : Map[String, MemoryStorage] = {}
+  storages.set("node", MemoryStorage::new())
+  let index_storage = MemoryStorage::new()
+
+  // Create empty manifest
+  let manifest : PlacementManifest = {
+    base: "empty",
+    segments: [],
+    crush,
+    epoch: 0,
+    commit_ts: 0L,
+  }
+  let bytes = serialize_manifest(manifest)
+  index_storage.atomic_write("empty.manifest.json", bytes)
+
+  // Load should fail with "Empty manifest"
+  let mut caught = false
+  let _ = load_store_distributed("empty", storages, index_storage) catch {
+    IoFailed(msg) => {
+      inspect(msg, content="Empty manifest")
+      caught = true
+      @core.CoreStore::new(1, @core.Cosine)
+    }
+    _ => @core.CoreStore::new(1, @core.Cosine)
+  }
+  inspect(caught, content="true")
+}
+
+///|
+/// Test: find_substr helper function
+test "distributed/find_substr" {
+  inspect(find_substr("hello world", "world") is Some(6), content="true")
+  inspect(find_substr("hello world", "foo") is None, content="true")
+  inspect(find_substr("abc", "") is Some(0), content="true")
+  inspect(find_substr("a", "abc") is None, content="true")
+}
+
+///|
+/// Test: extract_string_field handles missing field
+test "distributed/extract_string_missing" {
+  let json = "{\"foo\":\"bar\"}"
+  let result = extract_string_field(json, "missing")
+  inspect(result, content="")
+}
+
+///|
+/// Test: extract_int_field handles missing and invalid
+test "distributed/extract_int_edge" {
+  let json1 = "{\"foo\":\"bar\"}"
+  inspect(extract_int_field(json1, "missing"), content="0")
+
+  let json2 = "{\"num\":42}"
+  inspect(extract_int_field(json2, "num"), content="42")
+}
+
+///|
+/// Test: extract_int64_field handles negative numbers
+test "distributed/extract_int64_negative" {
+  let json = "{\"ts\":-1234567890}"
+  let result = extract_int64_field(json, "ts")
+  inspect(result, content="-1234567890")
+}
