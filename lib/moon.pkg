@@ -25,6 +25,8 @@ options(
         "vcdb_serialize",
         "vcdb_deserialize",
         "gateway_request",
+        "gateway_register_storage",
+        "gateway_clear_storage_callbacks",
         "gateway_storage_list",
         "gateway_storage_read",
         "gateway_storage_write",

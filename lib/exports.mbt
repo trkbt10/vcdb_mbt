@@ -1,6 +1,5 @@
 ///|
 /// FFI exports for JavaScript interop.
-/// These functions are exported for use from JavaScript.
 ///
 
 ///|
@@ -8,7 +7,6 @@
 let instances : @hashmap.HashMap[Int, @vcdb.VectorDB] = @hashmap.new()
 
 ///|
-/// Mutable counter for instance IDs
 priv struct Counter {
   mut value : Int
 }
@@ -17,8 +15,6 @@ priv struct Counter {
 let counter : Counter = { value: 1 }
 
 ///|
-/// Create a new VectorDB instance with bruteforce strategy.
-/// Returns instance ID (>0) on success.
 pub fn vcdb_create(dim : Int) -> Int {
   let db = @vcdb.VectorDB::with_dim(dim)
   let id = counter.value
@@ -28,7 +24,6 @@ pub fn vcdb_create(dim : Int) -> Int {
 }
 
 ///|
-/// Create with HNSW strategy.
 pub fn vcdb_create_hnsw(dim : Int) -> Int {
   let db = @vcdb.VectorDB::with_hnsw(dim)
   let id = counter.value
@@ -38,7 +33,6 @@ pub fn vcdb_create_hnsw(dim : Int) -> Int {
 }
 
 ///|
-/// Create with IVF strategy.
 pub fn vcdb_create_ivf(dim : Int) -> Int {
   let db = @vcdb.VectorDB::with_ivf(dim)
   let id = counter.value
@@ -48,13 +42,11 @@ pub fn vcdb_create_ivf(dim : Int) -> Int {
 }
 
 ///|
-/// Destroy a VectorDB instance.
 pub fn vcdb_destroy(instance_id : Int) -> Unit {
   instances.remove(instance_id)
 }
 
 ///|
-/// Get the number of vectors.
 pub fn vcdb_size(instance_id : Int) -> Int {
   match instances.get(instance_id) {
     Some(db) => db.size()
@@ -63,7 +55,6 @@ pub fn vcdb_size(instance_id : Int) -> Int {
 }
 
 ///|
-/// Get the dimension.
 pub fn vcdb_dim(instance_id : Int) -> Int {
   match instances.get(instance_id) {
     Some(db) => db.dim()
@@ -72,7 +63,6 @@ pub fn vcdb_dim(instance_id : Int) -> Int {
 }
 
 ///|
-/// Add a vector with empty attrs (fails if exists).
 pub fn vcdb_add(
   instance_id : Int,
   vector_id : Int,
@@ -82,7 +72,7 @@ pub fn vcdb_add(
     Some(db) => {
       let id = @core.VectorId(vector_id.to_int64())
       if db.has(id) {
-        return -2 // Already exists
+        return -2
       }
       let attrs = @core.empty_attrs()
       db.add(id, vector, attrs)
@@ -93,7 +83,6 @@ pub fn vcdb_add(
 }
 
 ///|
-/// Upsert a vector (add or update).
 pub fn vcdb_upsert(
   instance_id : Int,
   vector_id : Int,
@@ -110,7 +99,6 @@ pub fn vcdb_upsert(
 }
 
 ///|
-/// Get a vector by ID. Returns (vector, found) where found is 1 if exists, 0 if not.
 pub fn vcdb_get(instance_id : Int, vector_id : Int) -> (Array[Double], Int) {
   match instances.get(instance_id) {
     Some(db) =>
@@ -123,8 +111,6 @@ pub fn vcdb_get(instance_id : Int, vector_id : Int) -> (Array[Double], Int) {
 }
 
 ///|
-/// Search for nearest neighbors.
-/// Returns an array of (id, score) pairs.
 pub fn vcdb_search(
   instance_id : Int,
   query : Array[Double],
@@ -144,7 +130,6 @@ pub fn vcdb_search(
 }
 
 ///|
-/// Check if a vector exists. Returns 1 if exists, 0 if not, -1 on error.
 pub fn vcdb_has(instance_id : Int, vector_id : Int) -> Int {
   match instances.get(instance_id) {
     Some(db) => if db.has(@core.VectorId(vector_id.to_int64())) { 1 } else { 0 }
@@ -153,7 +138,6 @@ pub fn vcdb_has(instance_id : Int, vector_id : Int) -> Int {
 }
 
 ///|
-/// Remove a vector. Returns 1 if removed, 0 if not found, -1 on error.
 pub fn vcdb_remove(instance_id : Int, vector_id : Int) -> Int {
   match instances.get(instance_id) {
     Some(db) =>
@@ -167,7 +151,6 @@ pub fn vcdb_remove(instance_id : Int, vector_id : Int) -> Int {
 }
 
 ///|
-/// Serialize the database. Returns serialized bytes.
 pub fn vcdb_serialize(instance_id : Int) -> Bytes {
   match instances.get(instance_id) {
     Some(db) => db.serialize()
@@ -176,7 +159,6 @@ pub fn vcdb_serialize(instance_id : Int) -> Bytes {
 }
 
 ///|
-/// Deserialize a database. Returns new instance ID on success, 0 on error.
 pub fn vcdb_deserialize(data : Bytes) -> Int {
   let db = @vcdb.VectorDB::deserialize(data)
   let id = counter.value
@@ -186,59 +168,145 @@ pub fn vcdb_deserialize(data : Bytes) -> Int {
 }
 
 // ============================================================================
-// Gateway API - single entry point for HTTP requests
+// Gateway API
 // ============================================================================
 
 ///|
-/// Global storage for persistence
-let gateway_storage : @storage.MemoryStorage = @storage.MemoryStorage::new()
+/// Global storage (MemoryStorage or CallbackStorage based on registration)
+let gateway_memory_storage : @storage.MemoryStorage = @storage.MemoryStorage::new()
 
 ///|
-/// Global collection manager for gateway API (with storage)
-let gateway_manager : @gateway.CollectionManager[@storage.MemoryStorage] = @gateway.CollectionManager::with_storage(
-  gateway_storage,
+/// Manager with MemoryStorage
+let gateway_manager_memory : @gateway.CollectionManager[@storage.MemoryStorage] = @gateway.CollectionManager::with_storage(
+  gateway_memory_storage,
 )
 
 ///|
-/// Execute a gateway API request.
-///
-/// @param http_method - HTTP method (GET, POST, PUT, DELETE)
-/// @param path - URL path segments as array (e.g., ["collections", "mydb", "points"])
-/// @param body - Request body as JSON string
-/// @returns JSON response string
+/// Callback storage instance
+let gateway_callback_storage : @storage.CallbackStorage = @storage.CallbackStorage::new()
+
+///|
+/// Manager with CallbackStorage (used when callbacks registered)
+let gateway_manager_callback : @gateway.CollectionManager[
+  @storage.CallbackStorage,
+] = @gateway.CollectionManager::with_storage(gateway_callback_storage)
+
+///|
+/// Convert Int to StorageKind (0=Config, 1=Index, 2=Data)
+fn int_to_kind(kind : Int) -> @storage.StorageKind {
+  match kind {
+    0 => @storage.Config
+    1 => @storage.Index
+    _ => @storage.Data
+  }
+}
+
+///|
+/// Convert StorageKind to Int
+fn kind_to_int(kind : @storage.StorageKind) -> Int {
+  match kind {
+    @storage.Config => 0
+    @storage.Index => 1
+    @storage.Data => 2
+  }
+}
+
+///|
+/// Execute gateway request
 pub fn gateway_request(
   http_method : String,
   path : Array[String],
   body : String,
 ) -> String {
-  let response = @gateway.execute_request(
-    gateway_manager, http_method, path, body,
-  )
+  let response = if @storage.has_callbacks() {
+    @gateway.execute_request(gateway_manager_callback, http_method, path, body)
+  } else {
+    @gateway.execute_request(gateway_manager_memory, http_method, path, body)
+  }
   response.to_json().to_string()
 }
 
+// ============================================================================
+// Storage Registration (app handles routing via kind parameter)
+// ============================================================================
+
 ///|
-/// List all files in storage (for persistence sync)
-pub fn gateway_storage_list() -> Array[String] {
-  gateway_storage.list()
+/// Register storage callbacks
+/// kind parameter: 0=Config, 1=Index, 2=Data
+pub fn gateway_register_storage(
+  read_fn : (String, Int) -> Bytes,
+  write_fn : (String, Bytes, Int) -> Unit,
+  exists_fn : (String, Int) -> Bool,
+  del_fn : (String, Int) -> Unit,
+  list_fn : (Int) -> Array[String],
+) -> Unit {
+  let callbacks = @storage.StorageCallbacks::new(
+    fn(path, kind) { read_fn(path, kind_to_int(kind)) },
+    fn(path, data, kind) { write_fn(path, data, kind_to_int(kind)) },
+    fn(path, kind) { exists_fn(path, kind_to_int(kind)) },
+    fn(path, kind) { del_fn(path, kind_to_int(kind)) },
+    fn(kind) { list_fn(kind_to_int(kind)) },
+  )
+  @storage.register_callbacks(callbacks)
 }
 
 ///|
-/// Read a file from storage
-pub fn gateway_storage_read(path : String) -> Bytes {
-  gateway_storage.read(path) catch {
-    _ => b""
+/// Clear storage callbacks
+pub fn gateway_clear_storage_callbacks() -> Unit {
+  @storage.clear_callbacks()
+}
+
+///|
+/// Check if callbacks registered
+pub fn gateway_has_storage_callbacks() -> Bool {
+  @storage.has_callbacks()
+}
+
+// ============================================================================
+// Direct Storage Access (for app-level routing in distributed mode)
+// kind: 0=Config, 1=Index, 2=Data
+// ============================================================================
+
+///|
+pub fn gateway_storage_list(kind : Int) -> Array[String] {
+  let k = int_to_kind(kind)
+  if @storage.has_callbacks() {
+    gateway_callback_storage.list(k)
+  } else {
+    gateway_memory_storage.list()
   }
 }
 
 ///|
-/// Write a file to storage (called from JS to sync back)
-pub fn gateway_storage_write(path : String, data : Bytes) -> Unit {
-  gateway_storage.write(path, data)
+pub fn gateway_storage_read(path : String, kind : Int) -> Bytes {
+  let k = int_to_kind(kind)
+  if @storage.has_callbacks() {
+    gateway_callback_storage.read(path, k) catch {
+      _ => b""
+    }
+  } else {
+    gateway_memory_storage.read(path) catch {
+      _ => b""
+    }
+  }
 }
 
 ///|
-/// Check if a file exists in storage
-pub fn gateway_storage_exists(path : String) -> Bool {
-  gateway_storage.exists(path)
+pub fn gateway_storage_write(path : String, data : Bytes, kind : Int) -> Unit {
+  let k = int_to_kind(kind)
+  if @storage.has_callbacks() {
+    gateway_callback_storage.write(path, data, k)
+  } else {
+    gateway_memory_storage.write(path, data)
+  }
+}
+
+///|
+pub fn gateway_storage_exists(path : String, kind : Int) -> Bool {
+  let k = int_to_kind(kind)
+  if @storage.has_callbacks() {
+    gateway_callback_storage.exists(path, k)
+  } else {
+    gateway_memory_storage.exists(path)
+  }
 }

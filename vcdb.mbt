@@ -178,6 +178,56 @@ pub fn VectorDB::metric(self : VectorDB) -> @core.Metric {
 }
 
 ///|
+/// Get access to the underlying CoreStore (for distributed storage operations)
+pub fn VectorDB::store(self : VectorDB) -> @core.CoreStore {
+  self.store
+}
+
+///|
+/// Create VectorDB from an existing CoreStore (for loading from distributed storage)
+pub fn VectorDB::from_store(
+  store : @core.CoreStore,
+  options : @core.DatabaseOptions,
+) -> VectorDB {
+  match options.strategy {
+    Bruteforce =>
+      {
+        bruteforce: Some(@ann.BruteforceState::new(store.metric)),
+        hnsw: None,
+        ivf: None,
+        store,
+        strategy: options.strategy,
+      }
+    HNSW(params) => {
+      let hnsw = @ann.HNSWState::new(params, store.metric, options.capacity)
+      // Rebuild HNSW index from store
+      for i in 0..<store.size() {
+        let id = store.ids[i]
+        @ann.hnsw_add(hnsw, store, id)
+      }
+      {
+        bruteforce: None,
+        hnsw: Some(hnsw),
+        ivf: None,
+        store,
+        strategy: options.strategy,
+      }
+    }
+    IVF(params) => {
+      let ivf = @ann.IVFState::new(params, store.metric, store.dim)
+      // IVF requires training
+      {
+        bruteforce: None,
+        hnsw: None,
+        ivf: Some(ivf),
+        store,
+        strategy: options.strategy,
+      }
+    }
+  }
+}
+
+///|
 /// Check if an id is tombstoned in HNSW (internal helper).
 ///
 /// HNSW uses tombstones for soft-delete to maintain graph connectivity.

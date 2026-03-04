@@ -1,18 +1,18 @@
 ///|
-/// Collection manager for multi-collection support
-/// Manages multiple VectorDB instances with optional persistence
+/// CollectionManager - manages multiple VectorDB collections
 ///
-/// Generic over Storage trait - allows pluggable storage backends
+/// Simple storage: uses single Storage for all data.
+/// Distributed storage: app layer handles routing via placement/io.mbt functions.
 
 ///|
-/// Collection entry with config and database instance
+/// Collection entry
 pub struct Collection {
   config : CollectionConfig
   db : @vcdb.VectorDB
 }
 
 ///|
-/// Collection manager with pluggable storage backend
+/// Collection manager with optional storage
 pub struct CollectionManager[S] {
   collections : Map[String, Collection]
   storage : S?
@@ -20,7 +20,7 @@ pub struct CollectionManager[S] {
 }
 
 ///|
-/// Create a new collection manager without storage
+/// Create without storage (in-memory only)
 pub fn[S : @storage.Storage] CollectionManager::new(
   base_path? : String = "",
 ) -> CollectionManager[S] {
@@ -28,7 +28,7 @@ pub fn[S : @storage.Storage] CollectionManager::new(
 }
 
 ///|
-/// Create a new collection manager with storage
+/// Create with storage
 pub fn[S : @storage.Storage] CollectionManager::with_storage(
   storage : S,
   base_path? : String = "",
@@ -37,27 +37,15 @@ pub fn[S : @storage.Storage] CollectionManager::with_storage(
 }
 
 ///|
-/// Get path for collection data
-fn collection_data_path(base_path : String, name : String) -> String {
+fn make_path(base_path : String, path : String) -> String {
   if base_path.length() == 0 {
-    name + "/data.json"
+    path
   } else {
-    base_path + "/" + name + "/data.json"
+    base_path + "/" + path
   }
 }
 
 ///|
-/// Get path for collection config
-fn collection_config_path(base_path : String, name : String) -> String {
-  if base_path.length() == 0 {
-    name + "/config.json"
-  } else {
-    base_path + "/" + name + "/config.json"
-  }
-}
-
-///|
-/// Persist a collection to storage
 fn[S : @storage.Storage] CollectionManager::persist_collection(
   self : CollectionManager[S],
   name : String,
@@ -71,26 +59,71 @@ fn[S : @storage.Storage] CollectionManager::persist_collection(
     None => return
   }
 
-  // Save config as JSON
-  let config_path = collection_config_path(self.base_path, name)
+  // Save config
+  let config_path = make_path(
+    self.base_path,
+    @storage.collection_config_path(name),
+  )
   let config_json = col.config.to_json().to_string()
   let config_bytes = Bytes::from_array(
     config_json.to_array().map(fn(c) { c.to_int().to_byte() }),
   )
-  S::write(storage, config_path, config_bytes) catch {
+  storage.write(config_path, config_bytes, @storage.Config) catch {
     _ => ()
   }
 
-  // Save data as binary
-  let data_path = collection_data_path(self.base_path, name)
+  // Save data
+  let data_path = make_path(self.base_path, @storage.collection_data_path(name))
   let data = col.db.serialize()
-  S::write(storage, data_path, data) catch {
+  storage.write(data_path, data, @storage.Data) catch {
     _ => ()
   }
 }
 
 ///|
-/// Remove persisted collection data
+fn[S : @storage.Storage] CollectionManager::load_collection_from_storage(
+  self : CollectionManager[S],
+  name : String,
+) -> Collection? {
+  let storage = match self.storage {
+    Some(s) => s
+    None => return None
+  }
+
+  // Load config
+  let config_path = make_path(
+    self.base_path,
+    @storage.collection_config_path(name),
+  )
+  let config_bytes = storage.read(config_path, @storage.Config) catch {
+    _ => return None
+  }
+  let config_str = bytes_to_string(config_bytes)
+  let config = match parse_json(config_str) {
+    Some(json) =>
+      CollectionConfig::from_json(json).unwrap_or(
+        CollectionConfig::default(name, 128),
+      )
+    None => return None
+  }
+
+  // Load data
+  let data_path = make_path(self.base_path, @storage.collection_data_path(name))
+  let data = storage.read(data_path, @storage.Data) catch { _ => return None }
+  let db = @vcdb.VectorDB::deserialize(data)
+  Some({ config, db })
+}
+
+///|
+fn bytes_to_string(bytes : Bytes) -> String {
+  let chars : Array[Char] = []
+  for i in 0..<bytes.length() {
+    chars.push(Char::from_int(bytes[i].to_int()))
+  }
+  String::from_array(chars)
+}
+
+///|
 fn[S : @storage.Storage] CollectionManager::remove_persisted_collection(
   self : CollectionManager[S],
   name : String,
@@ -100,23 +133,25 @@ fn[S : @storage.Storage] CollectionManager::remove_persisted_collection(
     None => return
   }
 
-  let config_path = collection_config_path(self.base_path, name)
-  let data_path = collection_data_path(self.base_path, name)
+  let config_path = make_path(
+    self.base_path,
+    @storage.collection_config_path(name),
+  )
+  let data_path = make_path(self.base_path, @storage.collection_data_path(name))
 
-  if S::exists(storage, config_path) {
-    S::del(storage, config_path) catch {
+  if storage.exists(config_path, @storage.Config) {
+    storage.del(config_path, @storage.Config) catch {
       _ => ()
     }
   }
-  if S::exists(storage, data_path) {
-    S::del(storage, data_path) catch {
+  if storage.exists(data_path, @storage.Data) {
+    storage.del(data_path, @storage.Data) catch {
       _ => ()
     }
   }
 }
 
 ///|
-/// Create a new collection
 pub fn[S : @storage.Storage] CollectionManager::create(
   self : CollectionManager[S],
   config : CollectionConfig,
@@ -133,27 +168,29 @@ pub fn[S : @storage.Storage] CollectionManager::create(
   let db = @vcdb.VectorDB::new(options)
   let collection : Collection = { config, db }
   self.collections[config.name] = collection
-
-  // Auto-persist
   self.persist_collection(config.name)
-
   Ok(())
 }
 
 ///|
-/// Get a collection by name
 pub fn[S : @storage.Storage] CollectionManager::get(
   self : CollectionManager[S],
   name : String,
 ) -> @vcdb.VectorDB? {
   match self.collections.get(name) {
     Some(c) => Some(c.db)
-    None => None
+    None =>
+      match self.load_collection_from_storage(name) {
+        Some(col) => {
+          self.collections[name] = col
+          Some(col.db)
+        }
+        None => None
+      }
   }
 }
 
 ///|
-/// Get collection info
 pub fn[S : @storage.Storage] CollectionManager::get_info(
   self : CollectionManager[S],
   name : String,
@@ -183,7 +220,6 @@ pub fn[S : @storage.Storage] CollectionManager::get_info(
 }
 
 ///|
-/// Delete a collection
 pub fn[S : @storage.Storage] CollectionManager::delete(
   self : CollectionManager[S],
   name : String,
@@ -192,15 +228,11 @@ pub fn[S : @storage.Storage] CollectionManager::delete(
     return Err(CollectionNotFound(name))
   }
   self.collections.remove(name)
-
-  // Remove persisted data
   self.remove_persisted_collection(name)
-
   Ok(())
 }
 
 ///|
-/// Notify that a collection was modified (for persistence)
 pub fn[S : @storage.Storage] CollectionManager::notify_modified(
   self : CollectionManager[S],
   name : String,
@@ -209,20 +241,13 @@ pub fn[S : @storage.Storage] CollectionManager::notify_modified(
 }
 
 ///|
-/// List all collection names
 pub fn[S : @storage.Storage] CollectionManager::list(
   self : CollectionManager[S],
 ) -> Array[String] {
-  let names : Array[String] = []
-  for kv in self.collections {
-    let (name, _) = kv
-    names.push(name)
-  }
-  names
+  self.collections.keys().collect()
 }
 
 ///|
-/// List all collections with info
 pub fn[S : @storage.Storage] CollectionManager::list_info(
   self : CollectionManager[S],
 ) -> Array[CollectionInfo] {
@@ -237,7 +262,6 @@ pub fn[S : @storage.Storage] CollectionManager::list_info(
 }
 
 ///|
-/// Check if a collection exists
 pub fn[S : @storage.Storage] CollectionManager::exists(
   self : CollectionManager[S],
   name : String,
@@ -246,7 +270,6 @@ pub fn[S : @storage.Storage] CollectionManager::exists(
 }
 
 ///|
-/// Get the number of collections
 pub fn[S : @storage.Storage] CollectionManager::count(
   self : CollectionManager[S],
 ) -> Int {
@@ -254,7 +277,6 @@ pub fn[S : @storage.Storage] CollectionManager::count(
 }
 
 ///|
-/// Serialize a collection to bytes (for persistence)
 pub fn[S : @storage.Storage] CollectionManager::serialize_collection(
   self : CollectionManager[S],
   name : String,
@@ -266,7 +288,6 @@ pub fn[S : @storage.Storage] CollectionManager::serialize_collection(
 }
 
 ///|
-/// Deserialize and load a collection
 pub fn[S : @storage.Storage] CollectionManager::load_collection(
   self : CollectionManager[S],
   config : CollectionConfig,
@@ -282,7 +303,6 @@ pub fn[S : @storage.Storage] CollectionManager::load_collection(
 }
 
 ///|
-/// Export collections metadata as JSON
 pub fn[S : @storage.Storage] CollectionManager::export_metadata(
   self : CollectionManager[S],
 ) -> JsonValue {

@@ -4,7 +4,8 @@
  *
  * Thin HTTP layer over MoonBit gateway implementation.
  * All business logic is handled by the WASM gateway.
- * Storage sync is handled via gateway storage API.
+ * Storage is handled via Storage trait callbacks - when --storage is provided,
+ * filesystem callbacks are registered so WASM writes directly to disk.
  */
 
 import { Hono } from "hono";
@@ -13,40 +14,99 @@ import { serve } from "@hono/node-server";
 import {
   loadWasm,
   gatewayRequest,
-  gatewayStorageList,
-  gatewayStorageRead,
+  registerStorageCallbacks,
+  StorageKind,
   type GatewayResponse,
+  type StorageCallbacks,
+  type StorageKindType,
 } from "./wasm/vcdb.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-// ============================================================================
-// Storage Sync - syncs WASM MemoryStorage to disk
-// ============================================================================
+/**
+ * Get subdirectory name for each storage kind
+ */
+function kindToDir(kind: StorageKindType): string {
+  switch (kind) {
+    case StorageKind.Config:
+      return "config";
+    case StorageKind.Index:
+      return "index";
+    case StorageKind.Data:
+      return "data";
+    default:
+      return "data";
+  }
+}
 
-let storagePath: string | null = null;
+// ============================================================================
+// Filesystem Storage Callbacks
+// ============================================================================
 
 /**
- * Sync gateway storage to disk.
- * Called after mutations to persist changes.
+ * Create filesystem storage callbacks for a given base path.
+ * These callbacks are registered with the WASM gateway so all storage
+ * operations go directly to the filesystem.
  */
-function syncStorageToDisk(): void {
-  if (!storagePath) return;
-
-  const files = gatewayStorageList();
-  for (const file of files) {
-    const data = gatewayStorageRead(file);
-    if (data.length === 0) continue;
-
-    const fullPath = path.join(storagePath, file);
-    const dir = path.dirname(fullPath);
-
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    fs.writeFileSync(fullPath, data);
+function createFilesystemStorage(basePath: string): StorageCallbacks {
+  // Ensure base directory exists
+  if (!fs.existsSync(basePath)) {
+    fs.mkdirSync(basePath, { recursive: true });
   }
+
+  // Helper to get full path with kind-based subdirectory
+  const getFullPath = (filePath: string, kind: StorageKindType): string => {
+    return path.join(basePath, kindToDir(kind), filePath);
+  };
+
+  return {
+    read: (filePath: string, kind: StorageKindType): Uint8Array => {
+      const fullPath = getFullPath(filePath, kind);
+      if (!fs.existsSync(fullPath)) {
+        return new Uint8Array(0);
+      }
+      return new Uint8Array(fs.readFileSync(fullPath));
+    },
+
+    write: (filePath: string, data: Uint8Array, kind: StorageKindType): void => {
+      const fullPath = getFullPath(filePath, kind);
+      const dir = path.dirname(fullPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(fullPath, data);
+    },
+
+    exists: (filePath: string, kind: StorageKindType): boolean => {
+      const fullPath = getFullPath(filePath, kind);
+      return fs.existsSync(fullPath);
+    },
+
+    del: (filePath: string, kind: StorageKindType): void => {
+      const fullPath = getFullPath(filePath, kind);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    },
+
+    list: (kind: StorageKindType): string[] => {
+      const kindDir = path.join(basePath, kindToDir(kind));
+      const files: string[] = [];
+      const walk = (dir: string, prefix: string) => {
+        if (!fs.existsSync(dir)) return;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) {
+            walk(path.join(dir, entry.name), relativePath);
+          } else {
+            files.push(relativePath);
+          }
+        }
+      };
+      walk(kindDir, "");
+      return files;
+    },
+  };
 }
 
 // ============================================================================
@@ -76,26 +136,12 @@ function createApp() {
 
     const response = gatewayRequest(method, pathSegments, body);
 
-    // Sync storage after successful mutations
-    if (response.status === "ok" && isMutation(method, pathSegments)) {
-      syncStorageToDisk();
-    }
+    // No manual sync needed - storage callbacks handle persistence directly
 
     return formatResponse(c, response);
   });
 
   return app;
-}
-
-/**
- * Check if the request is a mutation that needs persistence
- */
-function isMutation(method: string, path: string[]): boolean {
-  if (method === "POST" || method === "PUT" || method === "DELETE") {
-    // All collection/point operations
-    return path[0] === "collections";
-  }
-  return false;
 }
 
 /**
@@ -178,12 +224,14 @@ async function main() {
 
   await loadWasm();
 
+  // Register filesystem storage callbacks if --storage is provided
   if (config.storage) {
-    storagePath = config.storage;
-    if (!fs.existsSync(storagePath)) {
-      fs.mkdirSync(storagePath, { recursive: true });
-    }
-    console.log(`Storage path: ${storagePath}`);
+    const storagePath = config.storage;
+    const callbacks = createFilesystemStorage(storagePath);
+    registerStorageCallbacks(callbacks);
+    console.log(`Storage: filesystem (${storagePath})`);
+  } else {
+    console.log("Storage: in-memory (no persistence)");
   }
 
   const app = createApp();

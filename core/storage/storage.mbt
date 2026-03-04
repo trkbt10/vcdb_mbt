@@ -7,15 +7,25 @@ pub(all) suberror IOError {
 }
 
 ///|
+/// Storage kind - tells app what type of data is being stored
+/// App uses this to route to appropriate backend (e.g., index→DynamoDB, data→S3)
+pub(all) enum StorageKind {
+  Config // Collection configuration (.config.json)
+  Index // Index structures, manifests (.index, .manifest.json)
+  Data // Vector data, segments (.data.bin, segment files)
+}
+
+///|
 /// Storage trait - abstraction for file-like storage operations
+/// kind parameter allows app to route different data types to different backends
 pub trait Storage {
-  read(Self, String) -> Bytes raise IOError
-  write(Self, String, Bytes) -> Unit raise IOError
-  append(Self, String, Bytes) -> Unit raise IOError
-  atomic_write(Self, String, Bytes) -> Unit raise IOError
-  del(Self, String) -> Unit raise IOError
-  exists(Self, String) -> Bool
-  list(Self) -> Array[String]
+  read(Self, String, StorageKind) -> Bytes raise IOError
+  write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  append(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  del(Self, String, StorageKind) -> Unit raise IOError
+  exists(Self, String, StorageKind) -> Bool
+  list(Self, StorageKind) -> Array[String]
 }
 
 ///|
@@ -114,36 +124,37 @@ pub fn MemoryStorage::clear(self : MemoryStorage) -> Unit {
 
 ///|
 /// Storage trait implementation for MemoryStorage
-pub impl Storage for MemoryStorage with read(self, path) {
+/// MemoryStorage ignores kind - stores all data in single map
+pub impl Storage for MemoryStorage with read(self, path, _kind) {
   self.read(path)
 }
 
 ///|
-pub impl Storage for MemoryStorage with write(self, path, data) {
+pub impl Storage for MemoryStorage with write(self, path, data, _kind) {
   self.write(path, data)
 }
 
 ///|
-pub impl Storage for MemoryStorage with append(self, path, data) {
+pub impl Storage for MemoryStorage with append(self, path, data, _kind) {
   self.append(path, data)
 }
 
 ///|
-pub impl Storage for MemoryStorage with atomic_write(self, path, data) {
+pub impl Storage for MemoryStorage with atomic_write(self, path, data, _kind) {
   self.atomic_write(path, data)
 }
 
 ///|
-pub impl Storage for MemoryStorage with del(self, path) {
+pub impl Storage for MemoryStorage with del(self, path, _kind) {
   self.del(path)
 }
 
 ///|
-pub impl Storage for MemoryStorage with exists(self, path) {
+pub impl Storage for MemoryStorage with exists(self, path, _kind) {
   self.exists(path)
 }
 
 ///|
-pub impl Storage for MemoryStorage with list(self) {
+pub impl Storage for MemoryStorage with list(self, _kind) {
   self.list()
 }

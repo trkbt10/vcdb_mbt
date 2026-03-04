@@ -256,11 +256,10 @@ pub fn plan_rebalance(
 }
 
 ///|
-/// Execute rebalance plan using memory storage
-/// In production, this would use actual FileIO implementations
-pub fn apply_rebalance_memory(
+/// Execute rebalance plan using any Storage implementation
+pub fn[S : @storage.Storage] apply_rebalance(
   plan : Array[MovePlan],
-  storages : Map[String, @storage.MemoryStorage],
+  storages : Map[String, S],
 ) -> Unit raise @storage.IOError {
   for mv in plan {
     // Get source storage
@@ -274,14 +273,23 @@ pub fn apply_rebalance_memory(
       Some(s) => s
     }
     // Read from source
-    let data = from_storage.read(mv.name + ".data")
+    let data = S::read(from_storage, mv.name + ".data", @storage.Data)
     // Write to destination
-    to_storage.atomic_write(mv.name + ".data", data)
+    S::atomic_write(to_storage, mv.name + ".data", data, @storage.Data)
     // Delete from source (optional cleanup)
-    from_storage.del(mv.name + ".data") catch {
+    S::del(from_storage, mv.name + ".data", @storage.Data) catch {
       _ => () // Ignore delete errors
     }
   }
+}
+
+///|
+/// Backward compatibility alias
+pub fn apply_rebalance_memory(
+  plan : Array[MovePlan],
+  storages : Map[String, @storage.MemoryStorage],
+) -> Unit raise @storage.IOError {
+  apply_rebalance(plan, storages)
 }
 
 ///|

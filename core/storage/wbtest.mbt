@@ -125,37 +125,46 @@ test "storage/del_not_found_error" {
 ///|
 test "storage/trait_impl" {
   let storage : MemoryStorage = MemoryStorage::new()
-  // Test through trait interface
+  // Test through trait interface - kind is ignored for MemoryStorage
   (storage as &Storage).write(
     "trait_test.txt",
     Bytes::from_array([b't', b'e', b's', b't'][:]),
+    Data,
   )
-  inspect((storage as &Storage).exists("trait_test.txt"), content="true")
-  let data = (storage as &Storage).read("trait_test.txt") catch {
+  inspect((storage as &Storage).exists("trait_test.txt", Data), content="true")
+  let data = (storage as &Storage).read("trait_test.txt", Data) catch {
     _ => Bytes::new(0)
   }
   inspect(data.length(), content="4")
-  let files = (storage as &Storage).list()
+  let files = (storage as &Storage).list(Data)
   inspect(files.length(), content="1")
-  (storage as &Storage).del("trait_test.txt") catch {
+  (storage as &Storage).del("trait_test.txt", Data) catch {
     _ => ()
   }
-  inspect((storage as &Storage).exists("trait_test.txt"), content="false")
+  inspect((storage as &Storage).exists("trait_test.txt", Data), content="false")
 }
 
 ///|
 test "storage/trait_atomic_write" {
   let storage : MemoryStorage = MemoryStorage::new()
-  (storage as &Storage).atomic_write("atomic.txt", Bytes::from_array([b'a'][:]))
-  inspect((storage as &Storage).exists("atomic.txt"), content="true")
+  (storage as &Storage).atomic_write(
+    "atomic.txt",
+    Bytes::from_array([b'a'][:]),
+    Config,
+  )
+  inspect((storage as &Storage).exists("atomic.txt", Config), content="true")
 }
 
 ///|
 test "storage/trait_append" {
   let storage : MemoryStorage = MemoryStorage::new()
-  (storage as &Storage).write("append.txt", Bytes::from_array([b'a'][:]))
-  (storage as &Storage).append("append.txt", Bytes::from_array([b'b'][:]))
-  let data = (storage as &Storage).read("append.txt") catch {
+  (storage as &Storage).write("append.txt", Bytes::from_array([b'a'][:]), Index)
+  (storage as &Storage).append(
+    "append.txt",
+    Bytes::from_array([b'b'][:]),
+    Index,
+  )
+  let data = (storage as &Storage).read("append.txt", Index) catch {
     _ => Bytes::new(0)
   }
   inspect(data.length(), content="2")

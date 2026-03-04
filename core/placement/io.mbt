@@ -41,10 +41,10 @@ priv struct SegState {
 ///|
 /// Write vectors to segments using CRUSH placement
 /// Returns index entries and manifest for index building
-pub fn write_segments_from_store(
+pub fn[S : @storage.Storage] write_segments_from_store(
   store : @core.CoreStore,
   opts : SegmentOptions,
-  storages : Map[String, @storage.MemoryStorage],
+  storages : Map[String, S],
 ) -> SegmentResult raise @storage.IOError {
   let base = opts.base_name
   let seg_limit = if opts.segment_bytes > 0 {
@@ -106,7 +106,11 @@ pub fn write_segments_from_store(
         None => raise @storage.IoFailed("Storage not found: " + seg.target_key)
         Some(s) => s
       }
-      storage.atomic_write(seg.writer.get_name() + ".data", seg_data)
+      storage.atomic_write(
+        seg.writer.get_name() + ".data",
+        seg_data,
+        @storage.Data,
+      )
 
       // Start new part
       seg.part = seg.part + 1
@@ -133,7 +137,11 @@ pub fn write_segments_from_store(
             raise @storage.IoFailed("Storage not found: " + seg.target_key)
           Some(s) => s
         }
-        storage.atomic_write(seg.writer.get_name() + ".data", seg_data)
+        storage.atomic_write(
+          seg.writer.get_name() + ".data",
+          seg_data,
+          @storage.Data,
+        )
         segment_entries.push({
           name: seg.writer.get_name(),
           target_key: seg.target_key,
@@ -172,9 +180,9 @@ fn estimate_attrs_size(attrs : @core.Attrs) -> Int {
 
 ///|
 /// Read vectors from distributed segments using manifest
-pub fn read_segments_from_manifest(
+pub fn[S : @storage.Storage] read_segments_from_manifest(
   manifest : PlacementManifest,
-  storages : Map[String, @storage.MemoryStorage],
+  storages : Map[String, S],
 ) -> Array[(@core.VectorId, Array[Double], @core.Attrs)] raise @storage.IOError {
   let results : Array[(@core.VectorId, Array[Double], @core.Attrs)] = []
 
@@ -186,7 +194,7 @@ pub fn read_segments_from_manifest(
       Some(s) => s
     }
 
-    let data = storage.read(segment.name + ".data")
+    let data = storage.read(segment.name + ".data", @storage.Data)
     let reader = match @segment.SegmentReader::from_bytes(segment.name, data) {
       None => raise @storage.IoFailed("Invalid segment: " + segment.name)
       Some(r) => r
@@ -226,11 +234,11 @@ pub fn SaveDistributedOptions::default(
 ///|
 /// Save CoreStore to distributed storage using CRUSH
 /// Writes: data segments (to data storages), .index file, .manifest.json (to index storage)
-pub fn save_store_distributed(
+pub fn[S : @storage.Storage] save_store_distributed(
   store : @core.CoreStore,
   opts : SegmentOptions,
-  storages : Map[String, @storage.MemoryStorage],
-  index_storage : @storage.MemoryStorage,
+  storages : Map[String, S],
+  index_storage : S,
 ) -> PlacementManifest raise @storage.IOError {
   save_store_distributed_with_ann(
     store,
@@ -244,11 +252,11 @@ pub fn save_store_distributed(
 
 ///|
 /// Save CoreStore with ANN state to distributed storage
-pub fn save_store_distributed_with_ann(
+pub fn[S : @storage.Storage] save_store_distributed_with_ann(
   store : @core.CoreStore,
   opts : SegmentOptions,
-  storages : Map[String, @storage.MemoryStorage],
-  index_storage : @storage.MemoryStorage,
+  storages : Map[String, S],
+  index_storage : S,
   strategy : @core.Strategy,
   ann_bytes : Bytes?,
 ) -> PlacementManifest raise @storage.IOError {
@@ -263,11 +271,19 @@ pub fn save_store_distributed_with_ann(
     result.entries,
     ann_bytes,
   )
-  index_storage.atomic_write(opts.base_name + ".index", index_bytes)
+  index_storage.atomic_write(
+    opts.base_name + ".index",
+    index_bytes,
+    @storage.Index,
+  )
 
   // 3. Write manifest (segment locations)
   let manifest_bytes = serialize_manifest(result.manifest)
-  index_storage.atomic_write(opts.base_name + ".manifest.json", manifest_bytes)
+  index_storage.atomic_write(
+    opts.base_name + ".manifest.json",
+    manifest_bytes,
+    @storage.Index,
+  )
 
   result.manifest
 }
@@ -284,10 +300,10 @@ pub struct LoadDistributedResult {
 /// Load CoreStore from distributed storage using index file
 /// Fast path: use .index file with entry pointers
 /// Slow path: scan segments from manifest
-pub fn load_store_distributed(
+pub fn[S : @storage.Storage] load_store_distributed(
   base_name : String,
-  storages : Map[String, @storage.MemoryStorage],
-  index_storage : @storage.MemoryStorage,
+  storages : Map[String, S],
+  index_storage : S,
 ) -> @core.CoreStore raise @storage.IOError {
   let result = load_store_distributed_full(base_name, storages, index_storage)
   result.store
@@ -295,21 +311,24 @@ pub fn load_store_distributed(
 
 ///|
 /// Load CoreStore with full metadata (including ANN bytes)
-pub fn load_store_distributed_full(
+pub fn[S : @storage.Storage] load_store_distributed_full(
   base_name : String,
-  storages : Map[String, @storage.MemoryStorage],
-  index_storage : @storage.MemoryStorage,
+  storages : Map[String, S],
+  index_storage : S,
 ) -> LoadDistributedResult raise @storage.IOError {
   // Try to load from index file (fast path with pointers)
-  if index_storage.exists(base_name + ".index") {
-    let index_bytes = index_storage.read(base_name + ".index")
+  if index_storage.exists(base_name + ".index", @storage.Index) {
+    let index_bytes = index_storage.read(base_name + ".index", @storage.Index)
     let decoded = match @segment.decode_index_file(index_bytes) {
       None => raise @storage.IoFailed("Invalid index file")
       Some(d) => d
     }
 
     // Load manifest for segment locations
-    let manifest_bytes = index_storage.read(base_name + ".manifest.json")
+    let manifest_bytes = index_storage.read(
+      base_name + ".manifest.json",
+      @storage.Index,
+    )
     let manifest = match deserialize_manifest(manifest_bytes) {
       None => raise @storage.IoFailed("Invalid manifest")
       Some(m) => m
@@ -353,7 +372,7 @@ pub fn load_store_distributed_full(
             None => raise @storage.IoFailed("Storage not found: " + target_key)
             Some(s) => s
           }
-          let data = storage.read(entry.ptr.segment + ".data")
+          let data = storage.read(entry.ptr.segment + ".data", @storage.Data)
           let r = match
             @segment.SegmentReader::from_bytes(entry.ptr.segment, data) {
             None =>
@@ -378,7 +397,10 @@ pub fn load_store_distributed_full(
   }
 
   // Fall back to reading from segments (slow path - no index file)
-  let manifest_bytes = index_storage.read(base_name + ".manifest.json")
+  let manifest_bytes = index_storage.read(
+    base_name + ".manifest.json",
+    @storage.Index,
+  )
   let manifest = match deserialize_manifest(manifest_bytes) {
     None => raise @storage.IoFailed("Invalid manifest")
     Some(m) => m
@@ -394,7 +416,7 @@ pub fn load_store_distributed_full(
     None => raise @storage.IoFailed("Storage not found")
     Some(s) => s
   }
-  let data = storage.read(first_segment.name + ".data")
+  let data = storage.read(first_segment.name + ".data", @storage.Data)
   let reader = match
     @segment.SegmentReader::from_bytes(first_segment.name, data) {
     None => raise @storage.IoFailed("Invalid segment")
