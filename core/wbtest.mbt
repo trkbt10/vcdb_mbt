@@ -5,8 +5,8 @@ test "math/normalize" {
   let v = [3.0, 4.0]
   normalize_in_place(v)
   // Should be [0.6, 0.8] (3/5, 4/5)
-  inspect!((v[0] - 0.6).abs() < 0.0001, content="true")
-  inspect!((v[1] - 0.8).abs() < 0.0001, content="true")
+  inspect((v[0] - 0.6).abs() < 0.0001, content="true")
+  inspect((v[1] - 0.8).abs() < 0.0001, content="true")
 }
 
 ///|
@@ -15,10 +15,10 @@ test "math/dot_at" {
   let q = [1.0, 1.0, 1.0]
   // dot([1,2,3], [1,1,1]) = 6
   let result = dot_at(data, 0, q, 3)
-  inspect!(result, content="6")
+  inspect(result, content="6")
   // dot([4,5,6], [1,1,1]) = 15
   let result2 = dot_at(data, 3, q, 3)
-  inspect!(result2, content="15")
+  inspect(result2, content="15")
 }
 
 ///|
@@ -27,28 +27,28 @@ test "math/l2neg_at" {
   let q = [4.0, 5.0, 6.0]
   // l2neg = -(9+9+9) = -27
   let result = l2neg_at(data, 0, q, 3)
-  inspect!(result, content="-27")
+  inspect(result, content="-27")
 }
 
 ///|
 test "store/basic_operations" {
   let store = CoreStore::new(3, Metric::Dot)
-  inspect!(store.size(), content="0")
+  inspect(store.size(), content="0")
   // Add vector
   let (idx, created) = store.add_or_update(
     VectorId::from_int(1),
     [1.0, 2.0, 3.0],
     empty_attrs(),
   )
-  inspect!(idx, content="0")
-  inspect!(created, content="true")
-  inspect!(store.size(), content="1")
+  inspect(idx, content="0")
+  inspect(created, content="true")
+  inspect(store.size(), content="1")
   // Check has
-  inspect!(store.has(VectorId::from_int(1)), content="true")
-  inspect!(store.has(VectorId::from_int(2)), content="false")
+  inspect(store.has(VectorId::from_int(1)), content="true")
+  inspect(store.has(VectorId::from_int(2)), content="false")
   // Get
   let record = store.get(VectorId::from_int(1))
-  inspect!(record.unwrap().vector[0], content="1")
+  inspect(record.unwrap().vector[0], content="1")
 }
 
 ///|
@@ -62,10 +62,10 @@ test "store/upsert" {
     empty_attrs(),
     upsert=true,
   )
-  inspect!(idx, content="0")
-  inspect!(created, content="false")
+  inspect(idx, content="0")
+  inspect(created, content="false")
   let record = store.get(VectorId::from_int(1))
-  inspect!(record.unwrap().vector[0], content="3")
+  inspect(record.unwrap().vector[0], content="3")
 }
 
 ///|
@@ -74,14 +74,14 @@ test "store/remove" {
   let _ = store.add_or_update(VectorId::from_int(1), [1.0, 2.0], empty_attrs())
   let _ = store.add_or_update(VectorId::from_int(2), [3.0, 4.0], empty_attrs())
   let _ = store.add_or_update(VectorId::from_int(3), [5.0, 6.0], empty_attrs())
-  inspect!(store.size(), content="3")
+  inspect(store.size(), content="3")
   // Remove middle element - should swap with last
   let info = store.remove_by_id(VectorId::from_int(2))
-  inspect!(info is None, content="false")
-  inspect!(store.size(), content="2")
+  inspect(info is None, content="false")
+  inspect(store.size(), content="2")
   // ID 3 should now be at index 1
-  inspect!(store.has(VectorId::from_int(2)), content="false")
-  inspect!(store.has(VectorId::from_int(3)), content="true")
+  inspect(store.has(VectorId::from_int(2)), content="false")
+  inspect(store.has(VectorId::from_int(3)), content="true")
 }
 
 ///|
@@ -92,21 +92,21 @@ test "store/cosine_normalization" {
   let record = store.get(VectorId::from_int(1))
   let v = record.unwrap().vector
   // Should be normalized: [0.6, 0.8]
-  inspect!((v[0] - 0.6).abs() < 0.0001, content="true")
-  inspect!((v[1] - 0.8).abs() < 0.0001, content="true")
+  inspect((v[0] - 0.6).abs() < 0.0001, content="true")
+  inspect((v[1] - 0.8).abs() < 0.0001, content="true")
 }
 
 ///|
 test "math/ln" {
   // ln(1) = 0
-  inspect!((ln(1.0) - 0.0).abs() < 0.0001, content="true")
+  inspect((ln(1.0) - 0.0).abs() < 0.0001, content="true")
   // ln(e) ≈ 1
   let e = 2.718281828459045
-  inspect!((ln(e) - 1.0).abs() < 0.0001, content="true")
+  inspect((ln(e) - 1.0).abs() < 0.0001, content="true")
   // ln(2) ≈ 0.693
-  inspect!((ln(2.0) - 0.6931471805599453).abs() < 0.0001, content="true")
+  inspect((ln(2.0) - 0.6931471805599453).abs() < 0.0001, content="true")
   // ln(0.5) ≈ -0.693
-  inspect!((ln(0.5) - -0.6931471805599453).abs() < 0.0001, content="true")
+  inspect((ln(0.5) - -0.6931471805599453).abs() < 0.0001, content="true")
 }
 
 ///|
@@ -121,39 +121,39 @@ test "store/serialization" {
   let _ = store.add_or_update(VectorId::from_int(2), [0.0, 1.0, 0.0], attrs2)
   // Serialize
   let bytes = store.serialize()
-  inspect!(bytes.length() > 0, content="true")
+  inspect(bytes.length() > 0, content="true")
   // Deserialize
   let store2 = CoreStore::deserialize(bytes)
-  inspect!(store2.size(), content="2")
-  inspect!(store2.dim, content="3")
+  inspect(store2.size(), content="2")
+  inspect(store2.dim, content="3")
   // Check data
   let record1 = store2.get(VectorId::from_int(1))
-  inspect!(record1 is None, content="false")
+  inspect(record1 is None, content="false")
   // Cosine normalized: [3,4,0] -> [0.6, 0.8, 0]
   let v = record1.unwrap().vector
-  inspect!((v[0] - 0.6).abs() < 0.0001, content="true")
+  inspect((v[0] - 0.6).abs() < 0.0001, content="true")
   // Check attrs
   let name = record1.unwrap().attrs.get("name")
-  inspect!(name is None, content="false")
+  inspect(name is None, content="false")
 }
 
 ///|
 /// Test: NumericRange matching
 test "range/matching" {
   let gt = NumericRange::gt(10.0)
-  inspect!(gt.matches(15.0), content="true")
-  inspect!(gt.matches(10.0), content="false")
+  inspect(gt.matches(15.0), content="true")
+  inspect(gt.matches(10.0), content="false")
   let gte = NumericRange::gte(10.0)
-  inspect!(gte.matches(10.0), content="true")
+  inspect(gte.matches(10.0), content="true")
   let lt = NumericRange::lt(10.0)
-  inspect!(lt.matches(5.0), content="true")
-  inspect!(lt.matches(10.0), content="false")
+  inspect(lt.matches(5.0), content="true")
+  inspect(lt.matches(10.0), content="false")
   // between uses gte/lte by default (inclusive bounds)
   let between = NumericRange::between(5.0, 10.0)
-  inspect!(between.matches(7.0), content="true")
-  inspect!(between.matches(5.0), content="true")
-  inspect!(between.matches(10.0), content="true")
-  inspect!(between.matches(10.01), content="false")
+  inspect(between.matches(7.0), content="true")
+  inspect(between.matches(5.0), content="true")
+  inspect(between.matches(10.0), content="true")
+  inspect(between.matches(10.01), content="false")
 }
 
 ///|
@@ -167,15 +167,15 @@ test "math/similarity_metrics" {
   // Cosine similarity: vec1 dot q = 1, vec2 dot q = 0
   // vec1 = [1,0,0], q = [1,0,0] -> cos = 1
   let cos1 = dot_at(data, 0, q, dim)
-  inspect!(cos1, content="1")
+  inspect(cos1, content="1")
   // vec2 = [0,1,0], q = [1,0,0] -> cos = 0
   let cos2 = dot_at(data, 3, q, dim)
-  inspect!(cos2, content="0")
+  inspect(cos2, content="0")
   // L2 distance: vec1 to q = 0, vec2 to q = sqrt(2)
   let l2_1 = l2neg_at(data, 0, q, dim)
-  inspect!(l2_1, content="0") // -((1-1)^2 + 0 + 0) = 0
+  inspect(l2_1, content="0") // -((1-1)^2 + 0 + 0) = 0
   let l2_2 = l2neg_at(data, 3, q, dim)
-  inspect!(l2_2, content="-2") // -((0-1)^2 + (1-0)^2 + 0) = -2
+  inspect(l2_2, content="-2") // -((0-1)^2 + (1-0)^2 + 0) = -2
 }
 
 ///|
@@ -186,15 +186,15 @@ test "math/get_score_fn" {
   // Cosine metric (uses dot after normalization)
   let cos_fn = get_score_fn(Metric::Cosine)
   let score_cos = cos_fn(data, 0, q, 3)
-  inspect!(score_cos, content="1")
+  inspect(score_cos, content="1")
   // Dot product metric
   let dot_fn = get_score_fn(Metric::Dot)
   let score_dot = dot_fn(data, 3, q, 3)
-  inspect!(score_dot, content="2")
+  inspect(score_dot, content="2")
   // L2 metric
   let l2_fn = get_score_fn(Metric::L2)
   let score_l2 = l2_fn(data, 0, q, 3)
-  inspect!(score_l2, content="0")
+  inspect(score_l2, content="0")
 }
 
 ///|
@@ -229,9 +229,9 @@ test "store/search_scoring" {
   // vec3 dot query = 0.0
   // vec4 dot query = 0.5
   let score1 = score_fn(store.data, 0, query, 3)
-  inspect!(score1, content="1")
+  inspect(score1, content="1")
   let score2 = score_fn(store.data, 3, query, 3)
-  inspect!(score2, content="0.9")
+  inspect(score2, content="0.9")
 }
 
 ///|
@@ -246,11 +246,11 @@ test "store/capacity" {
       empty_attrs(),
     )
   }
-  inspect!(store.size(), content="100")
+  inspect(store.size(), content="100")
   // All vectors should be accessible
-  inspect!(store.has(VectorId::from_int(1)), content="true")
-  inspect!(store.has(VectorId::from_int(50)), content="true")
-  inspect!(store.has(VectorId::from_int(100)), content="true")
+  inspect(store.has(VectorId::from_int(1)), content="true")
+  inspect(store.has(VectorId::from_int(50)), content="true")
+  inspect(store.has(VectorId::from_int(100)), content="true")
 }
 
 ///|
@@ -264,25 +264,25 @@ test "attr/value_equality" {
   attrs1.set("null", AttrValue::Null)
   // Get and verify
   match attrs1.get("int") {
-    Some(AttrValue::Int(n)) => inspect!(n, content="42")
-    _ => inspect!(false, content="true")
+    Some(AttrValue::Int(n)) => inspect(n, content="42")
+    _ => inspect(false, content="true")
   }
   match attrs1.get("float") {
     Some(AttrValue::Float(f)) =>
-      inspect!((f - 3.14).abs() < 0.001, content="true")
-    _ => inspect!(false, content="true")
+      inspect((f - 3.14).abs() < 0.001, content="true")
+    _ => inspect(false, content="true")
   }
   match attrs1.get("string") {
-    Some(AttrValue::String(s)) => inspect!(s, content="test")
-    _ => inspect!(false, content="true")
+    Some(AttrValue::String(s)) => inspect(s, content="test")
+    _ => inspect(false, content="true")
   }
   match attrs1.get("bool") {
-    Some(AttrValue::Bool(b)) => inspect!(b, content="true")
-    _ => inspect!(false, content="true")
+    Some(AttrValue::Bool(b)) => inspect(b, content="true")
+    _ => inspect(false, content="true")
   }
   match attrs1.get("null") {
-    Some(AttrValue::Null) => inspect!(true, content="true")
-    _ => inspect!(false, content="true")
+    Some(AttrValue::Null) => inspect(true, content="true")
+    _ => inspect(false, content="true")
   }
 }
 
@@ -291,10 +291,10 @@ test "attr/value_equality" {
 test "math/l2_norm" {
   let v = [3.0, 4.0]
   let norm = l2_norm(v)
-  inspect!((norm - 5.0).abs() < 0.0001, content="true")
+  inspect((norm - 5.0).abs() < 0.0001, content="true")
   // Zero vector
   let zero = [0.0, 0.0]
-  inspect!(l2_norm(zero), content="0")
+  inspect(l2_norm(zero), content="0")
 }
 
 ///|
@@ -303,10 +303,10 @@ test "math/dot" {
   let a = [1.0, 2.0, 3.0]
   let b = [4.0, 5.0, 6.0]
   // 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
-  inspect!(dot(a, b), content="32")
+  inspect(dot(a, b), content="32")
   // Different lengths - use min
   let short = [1.0, 1.0]
-  inspect!(dot(a, short), content="3") // 1*1 + 2*1 = 3
+  inspect(dot(a, short), content="3") // 1*1 + 2*1 = 3
 }
 
 ///|
@@ -315,7 +315,7 @@ test "math/l2_squared" {
   let a = [1.0, 2.0, 3.0]
   let b = [4.0, 5.0, 6.0]
   // (4-1)^2 + (5-2)^2 + (6-3)^2 = 9 + 9 + 9 = 27
-  inspect!(l2_squared(a, b), content="27")
+  inspect(l2_squared(a, b), content="27")
 }
 
 ///|
@@ -324,13 +324,13 @@ test "math/cosine_similarity" {
   let a = [1.0, 0.0]
   let b = [1.0, 0.0]
   // Same direction = 1.0
-  inspect!((cosine_similarity(a, b) - 1.0).abs() < 0.0001, content="true")
+  inspect((cosine_similarity(a, b) - 1.0).abs() < 0.0001, content="true")
   // Perpendicular = 0.0
   let c = [0.0, 1.0]
-  inspect!(cosine_similarity(a, c).abs() < 0.0001, content="true")
+  inspect(cosine_similarity(a, c).abs() < 0.0001, content="true")
   // Zero vector
   let zero = [0.0, 0.0]
-  inspect!(cosine_similarity(a, zero), content="0")
+  inspect(cosine_similarity(a, zero), content="0")
 }
 
 ///|
@@ -339,8 +339,8 @@ test "math/normalize_zero" {
   let zero = [0.0, 0.0, 0.0]
   let normalized = normalize(zero)
   // Zero vector should remain zero (no division by zero)
-  inspect!(normalized[0], content="0")
-  inspect!(normalized[1], content="0")
+  inspect(normalized[0], content="0")
+  inspect(normalized[1], content="0")
 }
 
 ///|
@@ -348,14 +348,14 @@ test "math/normalize_zero" {
 test "math/ln_edge_cases" {
   // ln(0) should return very negative number
   let ln_zero = ln(0.0)
-  inspect!(ln_zero < -1.0e307, content="true")
+  inspect(ln_zero < -1.0e307, content="true")
   // ln(negative) should return very negative number
   let ln_neg = ln(-1.0)
-  inspect!(ln_neg < -1.0e307, content="true")
+  inspect(ln_neg < -1.0e307, content="true")
   // ln(large number)
   let ln_1000 = ln(1000.0)
   // ln(1000) ≈ 6.907755
-  inspect!((ln_1000 - 6.907755).abs() < 0.001, content="true")
+  inspect((ln_1000 - 6.907755).abs() < 0.001, content="true")
 }
 
 ///|
@@ -365,11 +365,11 @@ test "math/get_score_fn_all" {
   let q = [1.0, 0.0, 0.0]
   // Cosine
   let cos_fn = get_score_fn(Cosine)
-  inspect!(cos_fn(data, 0, q, 3), content="1")
+  inspect(cos_fn(data, 0, q, 3), content="1")
   // L2
   let l2_fn = get_score_fn(L2)
-  inspect!(l2_fn(data, 0, q, 3), content="0")
-  inspect!(l2_fn(data, 3, q, 3), content="-2")
+  inspect(l2_fn(data, 0, q, 3), content="0")
+  inspect(l2_fn(data, 3, q, 3), content="-2")
 }
 
 ///|
@@ -380,8 +380,8 @@ test "store/get_by_index" {
   attrs.set("tag", String("test"))
   let _ = store.add_or_update(VectorId::from_int(1), [3.0, 4.0], attrs)
   let record = store.get_by_index(0)
-  inspect!(record.vector[0], content="3")
-  inspect!(record.vector[1], content="4")
+  inspect(record.vector[0], content="3")
+  inspect(record.vector[1], content="4")
 }
 
 ///|
@@ -390,20 +390,20 @@ test "store/get_index" {
   let store = CoreStore::new(2, Metric::Dot)
   let _ = store.add_or_update(VectorId::from_int(42), [1.0, 2.0], empty_attrs())
   let idx = store.get_index(VectorId::from_int(42))
-  inspect!(idx is Some(_), content="true")
+  inspect(idx is Some(_), content="true")
   match idx {
-    Some(i) => inspect!(i, content="0")
+    Some(i) => inspect(i, content="0")
     None => ()
   }
   // Non-existent ID
-  inspect!(store.get_index(VectorId::from_int(99)) is None, content="true")
+  inspect(store.get_index(VectorId::from_int(99)) is None, content="true")
 }
 
 ///|
 /// Test: CoreStore ensure_capacity
 test "store/ensure_capacity" {
   let store = CoreStore::new(2, Metric::Dot, capacity=2)
-  inspect!(store.capacity(), content="2")
+  inspect(store.capacity(), content="2")
   // Add elements to trigger resize
   for i in 1..<=5 {
     let _ = store.add_or_update(
@@ -413,8 +413,8 @@ test "store/ensure_capacity" {
     )
   }
   // Capacity should have grown
-  inspect!(store.capacity() >= 5, content="true")
-  inspect!(store.size(), content="5")
+  inspect(store.capacity() >= 5, content="true")
+  inspect(store.size(), content="5")
 }
 
 ///|
@@ -423,13 +423,13 @@ test "store/remove_last" {
   let store = CoreStore::new(2, Metric::Dot)
   let _ = store.add_or_update(VectorId::from_int(1), [1.0, 0.0], empty_attrs())
   let _ = store.add_or_update(VectorId::from_int(2), [0.0, 1.0], empty_attrs())
-  inspect!(store.size(), content="2")
+  inspect(store.size(), content="2")
   // Remove last element
   let info = store.remove_by_id(VectorId::from_int(2))
-  inspect!(info is Some(_), content="true")
-  inspect!(store.size(), content="1")
+  inspect(info is Some(_), content="true")
+  inspect(store.size(), content="1")
   // First element should still exist
-  inspect!(store.has(VectorId::from_int(1)), content="true")
+  inspect(store.has(VectorId::from_int(1)), content="true")
 }
 
 ///|
@@ -438,8 +438,8 @@ test "store/normalize_query" {
   let store = CoreStore::new(2, Metric::Cosine)
   let query = store.normalize_query([3.0, 4.0])
   // Should be normalized to [0.6, 0.8]
-  inspect!((query[0] - 0.6).abs() < 0.0001, content="true")
-  inspect!((query[1] - 0.8).abs() < 0.0001, content="true")
+  inspect((query[0] - 0.6).abs() < 0.0001, content="true")
+  inspect((query[1] - 0.8).abs() < 0.0001, content="true")
 }
 
 ///|
@@ -448,8 +448,8 @@ test "store/normalize_query_dot" {
   let store = CoreStore::new(2, Metric::Dot)
   let query = store.normalize_query([3.0, 4.0])
   // Should remain unchanged
-  inspect!(query[0], content="3")
-  inspect!(query[1], content="4")
+  inspect(query[0], content="3")
+  inspect(query[1], content="4")
 }
 
 ///|
@@ -464,9 +464,9 @@ test "store/iteration" {
     )
   }
   // Access by index
-  inspect!(store.size(), content="5")
-  inspect!(store.ids[0].to_int64(), content="1")
-  inspect!(store.ids[4].to_int64(), content="5")
+  inspect(store.size(), content="5")
+  inspect(store.ids[0].to_int64(), content="1")
+  inspect(store.ids[4].to_int64(), content="5")
 }
 
 ///|
@@ -475,27 +475,27 @@ test "types/vector_id" {
   let id1 = VectorId::from_int(42)
   let id2 = VectorId::from_int(42)
   let id3 = VectorId::from_int(100)
-  inspect!(id1.to_int64(), content="42")
-  inspect!(id1.to_int64() == id2.to_int64(), content="true")
-  inspect!(id1.to_int64() == id3.to_int64(), content="false")
+  inspect(id1.to_int64(), content="42")
+  inspect(id1.to_int64() == id2.to_int64(), content="true")
+  inspect(id1.to_int64() == id3.to_int64(), content="false")
 }
 
 ///|
 /// Test: NumericRange gt/gte/lt/lte
 test "types/numeric_range" {
   let gt = NumericRange::gt(10.0)
-  inspect!(gt.matches(15.0), content="true")
-  inspect!(gt.matches(10.0), content="false")
-  inspect!(gt.matches(5.0), content="false")
+  inspect(gt.matches(15.0), content="true")
+  inspect(gt.matches(10.0), content="false")
+  inspect(gt.matches(5.0), content="false")
   let gte = NumericRange::gte(10.0)
-  inspect!(gte.matches(10.0), content="true")
-  inspect!(gte.matches(9.99), content="false")
+  inspect(gte.matches(10.0), content="true")
+  inspect(gte.matches(9.99), content="false")
   let lt = NumericRange::lt(10.0)
-  inspect!(lt.matches(5.0), content="true")
-  inspect!(lt.matches(10.0), content="false")
+  inspect(lt.matches(5.0), content="true")
+  inspect(lt.matches(10.0), content="false")
   let lte = NumericRange::lte(10.0)
-  inspect!(lte.matches(10.0), content="true")
-  inspect!(lte.matches(10.01), content="false")
+  inspect(lte.matches(10.0), content="true")
+  inspect(lte.matches(10.01), content="false")
 }
 
 ///|
@@ -503,20 +503,20 @@ test "types/numeric_range" {
 test "types/attr_value_to_number" {
   // Int
   match attr_value_to_number(Int(42L)) {
-    Some(n) => inspect!(n, content="42")
-    None => inspect!(false, content="true")
+    Some(n) => inspect(n, content="42")
+    None => inspect(false, content="true")
   }
   // Float
   match attr_value_to_number(Float(3.14)) {
-    Some(n) => inspect!((n - 3.14).abs() < 0.001, content="true")
-    None => inspect!(false, content="true")
+    Some(n) => inspect((n - 3.14).abs() < 0.001, content="true")
+    None => inspect(false, content="true")
   }
   // Bool (not a number)
-  inspect!(attr_value_to_number(Bool(true)) is None, content="true")
+  inspect(attr_value_to_number(Bool(true)) is None, content="true")
   // String (not a number)
-  inspect!(attr_value_to_number(String("hello")) is None, content="true")
+  inspect(attr_value_to_number(String("hello")) is None, content="true")
   // Null
-  inspect!(attr_value_to_number(Null) is None, content="true")
+  inspect(attr_value_to_number(Null) is None, content="true")
 }
 
 ///|
@@ -538,19 +538,19 @@ test "store/serialize_all_attr_types" {
   match record {
     Some(r) => {
       match r.attrs.get("str") {
-        Some(String(s)) => inspect!(s, content="hello")
-        _ => inspect!(false, content="true")
+        Some(String(s)) => inspect(s, content="hello")
+        _ => inspect(false, content="true")
       }
       match r.attrs.get("int") {
-        Some(Int(n)) => inspect!(n, content="42")
-        _ => inspect!(false, content="true")
+        Some(Int(n)) => inspect(n, content="42")
+        _ => inspect(false, content="true")
       }
       match r.attrs.get("bool") {
-        Some(Bool(b)) => inspect!(b, content="true")
-        _ => inspect!(false, content="true")
+        Some(Bool(b)) => inspect(b, content="true")
+        _ => inspect(false, content="true")
       }
     }
-    None => inspect!(false, content="true")
+    None => inspect(false, content="true")
   }
 }
 
@@ -560,21 +560,21 @@ test "store/update_attrs" {
   let store = CoreStore::new(2, Metric::Dot)
   let id = VectorId::from_int(1)
   // Update non-existent returns false
-  inspect!(store.update_attrs(id, empty_attrs()), content="false")
+  inspect(store.update_attrs(id, empty_attrs()), content="false")
   // Add vector
   let _ = store.add_or_update(id, [1.0, 2.0], empty_attrs())
   // Update existing returns true
   let new_attrs = empty_attrs()
   new_attrs.set("updated", Bool(true))
-  inspect!(store.update_attrs(id, new_attrs), content="true")
+  inspect(store.update_attrs(id, new_attrs), content="true")
   // Verify update
   match store.get(id) {
     Some(r) =>
       match r.attrs.get("updated") {
-        Some(Bool(b)) => inspect!(b, content="true")
-        _ => inspect!(false, content="true")
+        Some(Bool(b)) => inspect(b, content="true")
+        _ => inspect(false, content="true")
       }
-    None => inspect!(false, content="true")
+    None => inspect(false, content="true")
   }
 }
 
@@ -583,7 +583,7 @@ test "store/update_attrs" {
 test "store/remove_nonexistent" {
   let store = CoreStore::new(2, Metric::Dot)
   let result = store.remove_by_id(VectorId::from_int(999))
-  inspect!(result is None, content="true")
+  inspect(result is None, content="true")
 }
 
 ///|
@@ -595,10 +595,10 @@ test "store/l2_metric" {
   let record = store.get(VectorId::from_int(1))
   match record {
     Some(r) => {
-      inspect!(r.vector[0], content="3")
-      inspect!(r.vector[1], content="4")
+      inspect(r.vector[0], content="3")
+      inspect(r.vector[1], content="4")
     }
-    None => inspect!(false, content="true")
+    None => inspect(false, content="true")
   }
 }
 
@@ -609,11 +609,11 @@ test "store/add_no_upsert" {
   let id = VectorId::from_int(1)
   // First add
   let (idx1, created1) = store.add_or_update(id, [1.0, 0.0], empty_attrs())
-  inspect!(idx1, content="0")
-  inspect!(created1, content="true")
+  inspect(idx1, content="0")
+  inspect(created1, content="true")
   // Add again with upsert=false should fail (abort)
   // We can't test abort directly, but we can test that size stays 1
-  inspect!(store.size(), content="1")
+  inspect(store.size(), content="1")
 }
 
 ///|
@@ -628,11 +628,11 @@ test "store/attrs_defensive_copy" {
   attrs.set("tag", String("B"))
   // Stored attrs should still have "A"
   match store.get(id) {
-    None => inspect!(false, content="true") // Should not reach here
+    None => inspect(false, content="true") // Should not reach here
     Some(record) =>
       match record.attrs.get("tag") {
-        Some(String(s)) => inspect!(s, content="A")
-        _ => inspect!(false, content="true") // Should not reach here
+        Some(String(s)) => inspect(s, content="A")
+        _ => inspect(false, content="true") // Should not reach here
       }
   }
 }
@@ -653,11 +653,11 @@ test "store/update_attrs_defensive_copy" {
   updated.set("tag", String("Y"))
   // Stored attrs should still have "X"
   match store.get(id) {
-    None => inspect!(false, content="true")
+    None => inspect(false, content="true")
     Some(record) =>
       match record.attrs.get("tag") {
-        Some(String(s)) => inspect!(s, content="X")
-        _ => inspect!(false, content="true")
+        Some(String(s)) => inspect(s, content="X")
+        _ => inspect(false, content="true")
       }
   }
 }
@@ -672,26 +672,26 @@ test "math/cosine_zero_vectors" {
   // Zero vector should return 0
   let zero = [0.0, 0.0, 0.0]
   let nonzero = [1.0, 0.0, 0.0]
-  inspect!(cosine_similarity(zero, nonzero), content="0")
-  inspect!(cosine_similarity(nonzero, zero), content="0")
-  inspect!(cosine_similarity(zero, zero), content="0")
+  inspect(cosine_similarity(zero, nonzero), content="0")
+  inspect(cosine_similarity(nonzero, zero), content="0")
+  inspect(cosine_similarity(zero, zero), content="0")
 }
 
 ///|
 /// Test: ln() function edge cases
 test "math/ln_edge_cases_2" {
   // ln(1) = 0
-  inspect!(ln(1.0), content="0")
+  inspect(ln(1.0), content="0")
   // ln(e) ≈ 1
   let e = 2.718281828459045
   let ln_e = ln(e)
-  inspect!(ln_e > 0.99 && ln_e < 1.01, content="true")
+  inspect(ln_e > 0.99 && ln_e < 1.01, content="true")
   // ln(0) should return very negative number
   let ln_zero = ln(0.0)
-  inspect!(ln_zero < -1.0e100, content="true")
+  inspect(ln_zero < -1.0e100, content="true")
   // ln(negative) should return very negative number
   let ln_neg = ln(-1.0)
-  inspect!(ln_neg < -1.0e100, content="true")
+  inspect(ln_neg < -1.0e100, content="true")
 }
 
 ///|
@@ -699,13 +699,13 @@ test "math/ln_edge_cases_2" {
 test "math/ln_large_values" {
   // ln(2) ≈ 0.693
   let ln2 = ln(2.0)
-  inspect!(ln2 > 0.69 && ln2 < 0.70, content="true")
+  inspect(ln2 > 0.69 && ln2 < 0.70, content="true")
   // ln(10) ≈ 2.303
   let ln10 = ln(10.0)
-  inspect!(ln10 > 2.29 && ln10 < 2.32, content="true")
+  inspect(ln10 > 2.29 && ln10 < 2.32, content="true")
   // ln(100) ≈ 4.605
   let ln100 = ln(100.0)
-  inspect!(ln100 > 4.59 && ln100 < 4.62, content="true")
+  inspect(ln100 > 4.59 && ln100 < 4.62, content="true")
 }
 
 ///|
@@ -713,10 +713,10 @@ test "math/ln_large_values" {
 test "math/ln_small_values" {
   // ln(0.5) ≈ -0.693
   let ln_half = ln(0.5)
-  inspect!(ln_half > -0.70 && ln_half < -0.69, content="true")
+  inspect(ln_half > -0.70 && ln_half < -0.69, content="true")
   // ln(0.1) ≈ -2.303
   let ln_tenth = ln(0.1)
-  inspect!(ln_tenth > -2.32 && ln_tenth < -2.29, content="true")
+  inspect(ln_tenth > -2.32 && ln_tenth < -2.29, content="true")
 }
 
 ///|
@@ -727,11 +727,11 @@ test "math/get_score_fn_all_2" {
   // Cosine/Dot should return dot_at
   let cosine_fn = get_score_fn(Cosine)
   let dot_fn = get_score_fn(Dot)
-  inspect!(cosine_fn(data, 0, q, 2), content="1")
-  inspect!(dot_fn(data, 0, q, 2), content="1")
+  inspect(cosine_fn(data, 0, q, 2), content="1")
+  inspect(dot_fn(data, 0, q, 2), content="1")
   // L2 should return l2neg_at
   let l2_fn = get_score_fn(L2)
-  inspect!(l2_fn(data, 0, q, 2), content="0")
+  inspect(l2_fn(data, 0, q, 2), content="0")
 }
 
 ///|
@@ -740,9 +740,9 @@ test "math/normalize_zero_vector" {
   let zero = [0.0, 0.0, 0.0]
   normalize_in_place(zero)
   // Zero vector should remain zero (not NaN)
-  inspect!(zero[0], content="0")
-  inspect!(zero[1], content="0")
-  inspect!(zero[2], content="0")
+  inspect(zero[0], content="0")
+  inspect(zero[1], content="0")
+  inspect(zero[2], content="0")
 }
 
 ///|
@@ -752,7 +752,7 @@ test "math/l2_squared_diff_lengths" {
   let b = [1.0, 2.0]
   // Should use min length
   let result = l2_squared(a, b)
-  inspect!(result, content="0")
+  inspect(result, content="0")
 }
 
 ///|
@@ -762,5 +762,5 @@ test "math/dot_diff_lengths" {
   let b = [1.0, 2.0]
   // Should use min length
   let result = dot(a, b)
-  inspect!(result, content="5")
+  inspect(result, content="5")
 }

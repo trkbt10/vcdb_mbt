@@ -44,7 +44,9 @@ pub fn bf_search(
     }
     let base = i * store.dim
     let s = score_fn(store.data, base, query, store.dim)
-    @collection.push_top_k(out, @core.SearchHit::{ id, score: s, attrs }, k, fn(hit) {
+    @collection.push_top_k(out, @core.SearchHit::{ id, score: s, attrs }, k, fn(
+      hit,
+    ) {
       hit.score
     })
   }

@@ -514,11 +514,12 @@ fn VectorDB::search_candidates(
         let base = idx * dim
         let score = score_fn(self.store.data, base, q, dim)
         let attrs = self.store.attrs[idx]
-        @collection.push_top_k(results, @core.SearchHit::{ id, score, attrs }, k, fn(
-          hit,
-        ) {
-          hit.score
-        })
+        @collection.push_top_k(
+          results,
+          @core.SearchHit::{ id, score, attrs },
+          k,
+          fn(hit) { hit.score },
+        )
       }
     }
   }

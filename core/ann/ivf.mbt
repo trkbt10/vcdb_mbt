@@ -213,11 +213,12 @@ pub fn ivf_search(
           }
           let base = at * dim
           let s = score_fn(store.data, base, query, dim)
-          @collection.push_top_k(out, @core.SearchHit::{ id, score: s, attrs }, k, fn(
-            hit,
-          ) {
-            hit.score
-          })
+          @collection.push_top_k(
+            out,
+            @core.SearchHit::{ id, score: s, attrs },
+            k,
+            fn(hit) { hit.score },
+          )
         }
       }
     }

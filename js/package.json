@@ -1,0 +1,21 @@
+{
+  "name": "@vcdb/server",
+  "version": "0.1.0",
+  "description": "vcdb vector database HTTP server",
+  "type": "module",
+  "main": "server.js",
+  "bin": {
+    "vcdb-server": "./server.js"
+  },
+  "scripts": {
+    "start": "bun run server.js",
+    "start:node": "node server.js",
+    "build:wasm": "cd .. && moon build --target wasm-gc"
+  },
+  "keywords": [
+    "vector-database",
+    "moonbit",
+    "wasm"
+  ],
+  "license": "Apache-2.0"
+}
