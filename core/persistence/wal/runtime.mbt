@@ -22,7 +22,7 @@ fn get_wal_body_length(data : Bytes) -> Int {
   }
   // Check for footer magic at end
   let footer_start = data.length() - 8
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   let _ = r.read_bytes(footer_start)
   let footer_magic = r.read_u32()
   if footer_magic == wal_footer_magic {
@@ -39,7 +39,7 @@ fn get_safe_copy_length(data : Bytes) -> Int {
   if data.length() < 8 {
     return 0
   }
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   // Verify header first
   if not(verify_wal_header(r)) {
     return 0
@@ -66,7 +66,7 @@ pub fn WalRuntime::append(
   if records.is_empty() {
     return
   }
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Read existing WAL and copy only up to last decodable record
   let mut use_existing = false
   if self.storage.exists(self.path) {
@@ -97,7 +97,7 @@ pub fn WalRuntime::append(
   let body = w.concat()
   let footer = encode_wal_footer(body)
   // Write complete WAL atomically
-  let final_w = @core.BinaryWriter::new()
+  let final_w = @binary.BinaryWriter::new()
   final_w.push_bytes(body)
   final_w.push_bytes(footer)
   self.storage.atomic_write(self.path, final_w.concat())
@@ -118,7 +118,7 @@ pub fn WalRuntime::replay_into(
   if data.length() < 8 {
     raise @storage.IoFailed("WAL file too short")
   }
-  let header_reader = @core.BinaryReader::new(data)
+  let header_reader = @binary.BinaryReader::new(data)
   if not(verify_wal_header(header_reader)) {
     raise @storage.IoFailed("WAL header invalid")
   }

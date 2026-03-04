@@ -126,7 +126,7 @@ test "index_file/truncated_entry" {
   ]
   let bytes = encode_index_file(header, entries, None)
   // Truncate to cut off part of the entry
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   for i in 0..<40 {
     // Only copy first 40 bytes (header + part of entry)
     if i < bytes.length() {

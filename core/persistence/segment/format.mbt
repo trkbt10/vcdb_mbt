@@ -31,14 +31,14 @@ pub(all) struct IndexEntry {
 /// Segment writer - builds a segment in memory
 pub struct SegmentWriter {
   name : String
-  buffer : @core.BinaryWriter
+  buffer : @binary.BinaryWriter
   mut size : Int
 }
 
 ///|
 /// Create a new segment writer
 pub fn SegmentWriter::new(name : String) -> SegmentWriter {
-  let buffer = @core.BinaryWriter::new()
+  let buffer = @binary.BinaryWriter::new()
   // Write header
   buffer.push_u32(segment_magic)
   buffer.push_u32(segment_version)
@@ -55,7 +55,7 @@ pub fn SegmentWriter::append(
   attrs : @core.Attrs,
 ) -> DataPointer {
   let offset = self.size
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
 
   // Write ID (8 bytes)
   w.push_u64(id.to_int64().reinterpret_as_uint64())
@@ -110,7 +110,7 @@ pub fn SegmentReader::from_bytes(name : String, data : Bytes) -> SegmentReader? 
   if data.length() < 8 {
     return None
   }
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   let magic = r.read_u32()
   let version = r.read_u32()
   if magic != segment_magic || version != segment_version {
@@ -135,7 +135,7 @@ pub fn SegmentReader::read_at(
   for i in offset..<(offset + length) {
     record_bytes.push(self.data[i])
   }
-  let r = @core.BinaryReader::new(Bytes::from_array(record_bytes))
+  let r = @binary.BinaryReader::new(Bytes::from_array(record_bytes))
 
   // Read ID
   let id = @core.VectorId(r.read_u64().reinterpret_as_int64())
@@ -174,7 +174,7 @@ pub fn SegmentReader::collect(
     if pos + 16 > self.data.length() {
       break
     }
-    let r = @core.BinaryReader::new(self.data)
+    let r = @binary.BinaryReader::new(self.data)
     let _ = r.read_bytes(pos)
     let _ = r.read_u64() // id
     let attrs_len = r.read_u32().reinterpret_as_int()
@@ -278,7 +278,7 @@ fn escape_json_segment(s : String) -> String {
 
 ///|
 pub fn string_to_utf8_segment(s : String) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   for c in s {
     let code = c.to_uint()
     if code < 0x80U {

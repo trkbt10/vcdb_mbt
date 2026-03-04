@@ -63,7 +63,7 @@ fn lsm_bytes_to_hex(b : Bytes) -> String {
 ///|
 /// Encode memtable key: attrKey + 0x00 + encoded value
 fn lsm_encode_memtable_key(attr_key : String, value : @core.AttrValue) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Write attr_key as full UTF-8 to preserve Unicode
   w.push_bytes(attr_key.to_bytes())
   // Separator
@@ -76,7 +76,7 @@ fn lsm_encode_memtable_key(attr_key : String, value : @core.AttrValue) -> Bytes 
 ///|
 /// Encode exists key: 0xFF + "exists" + 0x00 + attrKey
 fn lsm_encode_exists_key(attr_key : String) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_byte(b'\xFF')
   w.push_bytes("exists".to_bytes())
   w.push_byte(b'\x00')

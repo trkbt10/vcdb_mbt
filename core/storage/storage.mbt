@@ -63,7 +63,7 @@ pub fn MemoryStorage::append(
     None => self.data.set(path, data)
     Some(existing) => {
       // Concatenate existing and new data using BinaryWriter
-      let w = @core.BinaryWriter::new()
+      let w = @binary.BinaryWriter::new()
       w.push_bytes(existing)
       w.push_bytes(data)
       self.data.set(path, w.concat())

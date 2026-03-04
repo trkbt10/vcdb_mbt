@@ -514,7 +514,7 @@ fn VectorDB::search_candidates(
         let base = idx * dim
         let score = score_fn(self.store.data, base, q, dim)
         let attrs = self.store.attrs[idx]
-        @core.push_top_k(results, @core.SearchHit::{ id, score, attrs }, k, fn(
+        @collection.push_top_k(results, @core.SearchHit::{ id, score, attrs }, k, fn(
           hit,
         ) {
           hit.score
@@ -564,7 +564,7 @@ pub fn VectorDB::train(self : VectorDB, iterations? : Int = 10) -> Unit {
 ///
 /// Returns: Binary representation of the database
 pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Write strategy type and params
   match self.strategy {
     Bruteforce => w.push_u32(0U)
@@ -627,7 +627,7 @@ pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
 ///
 /// Returns: The restored VectorDB instance
 pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   let strategy_type = r.read_u32()
   let (hnsw_params, ivf_params) : (@core.HNSWParams?, @core.IVFParams?) = match
     strategy_type {

@@ -192,7 +192,7 @@ fn hex_digit(n : UInt) -> Char {
 ///|
 /// Convert string to UTF-8 bytes
 fn string_to_utf8(s : String) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   for c in s {
     let code = c.to_uint()
     if code < 0x80U {
@@ -452,7 +452,7 @@ fn parse_json_value(chars : Array[Char], start : Int) -> (@core.AttrValue, Int) 
 /// Encode a WAL record to bytes
 /// Note: Uses 64-bit IDs to preserve full VectorId range
 pub fn encode_wal_record(record : WalRecord) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Type (1 byte)
   w.push_byte(record.record_type.to_byte())
   // Reserved (1 byte)
@@ -465,7 +465,7 @@ pub fn encode_wal_record(record : WalRecord) -> Bytes {
   let vector_bytes = match record.vector {
     None => Bytes::new(0)
     Some(v) => {
-      let vw = @core.BinaryWriter::new()
+      let vw = @binary.BinaryWriter::new()
       for val in v {
         vw.push_f32(Float::from_double(val))
       }
@@ -484,7 +484,7 @@ pub fn encode_wal_record(record : WalRecord) -> Bytes {
 ///|
 /// Decode a WAL record from reader
 /// Note: Uses 64-bit IDs to preserve full VectorId range
-pub fn decode_wal_record(r : @core.BinaryReader) -> WalRecord? {
+pub fn decode_wal_record(r : @binary.BinaryReader) -> WalRecord? {
   if r.remaining() < 18 {
     // Minimum: type(1) + reserved(1) + id(8) + attrs_len(4) + vector_len(4)
     return None
@@ -534,7 +534,7 @@ pub fn decode_wal_record(r : @core.BinaryReader) -> WalRecord? {
 ///|
 /// Encode WAL header
 pub fn encode_wal_header() -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_u32(wal_magic)
   w.push_u32(wal_version)
   w.concat()
@@ -543,16 +543,16 @@ pub fn encode_wal_header() -> Bytes {
 ///|
 /// Encode WAL footer with CRC32
 pub fn encode_wal_footer(body : Bytes) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_u32(wal_footer_magic)
-  w.push_u32(@core.crc32(body))
+  w.push_u32(@binary.crc32(body))
   w.concat()
 }
 
 ///|
 /// Encode multiple records to a complete WAL segment
 pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Write header
   w.push_bytes(encode_wal_header())
   // Write records
@@ -564,7 +564,7 @@ pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
   // Add footer with CRC32
   let footer = encode_wal_footer(body)
   // Combine
-  let result = @core.BinaryWriter::new()
+  let result = @binary.BinaryWriter::new()
   result.push_bytes(body)
   result.push_bytes(footer)
   result.concat()
@@ -572,7 +572,7 @@ pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
 
 ///|
 /// Verify WAL header
-pub fn verify_wal_header(r : @core.BinaryReader) -> Bool {
+pub fn verify_wal_header(r : @binary.BinaryReader) -> Bool {
   let magic = r.read_u32()
   let version = r.read_u32()
   magic == wal_magic && version == wal_version
@@ -592,16 +592,16 @@ pub fn verify_wal_checksum(data : Bytes) -> Bool {
   }
   // Check footer magic
   let footer_start = data.length() - 8
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   let _ = r.read_bytes(footer_start)
   let footer_magic = r.read_u32()
   if footer_magic != wal_footer_magic {
     return true // No footer, assume valid
   }
   let stored_crc = r.read_u32()
-  let body_reader = @core.BinaryReader::new(data)
+  let body_reader = @binary.BinaryReader::new(data)
   let body = body_reader.read_bytes(footer_start)
-  let computed_crc = @core.crc32(body)
+  let computed_crc = @binary.crc32(body)
   stored_crc == computed_crc
 }
 
@@ -612,14 +612,14 @@ pub fn decode_wal_records(data : Bytes) -> Array[WalRecord] {
   if data.length() < 8 {
     return records
   }
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   // Verify header
   if not(verify_wal_header(r)) {
     return records
   }
   // Calculate body length
   let body_len = if data.length() >= 16 {
-    let footer_check = @core.BinaryReader::new(data)
+    let footer_check = @binary.BinaryReader::new(data)
     let _ = footer_check.read_bytes(data.length() - 8)
     let footer_magic = footer_check.read_u32()
     if footer_magic == wal_footer_magic {

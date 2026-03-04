@@ -278,7 +278,7 @@ pub fn CoreStore::normalize_query(
 ///|
 /// Serialize CoreStore to bytes
 pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
-  let w = BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Write header: dim, metric, count
   w.push_u32(self.dim.reinterpret_as_uint())
   w.push_u32(
@@ -342,7 +342,7 @@ pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
 ///|
 /// Deserialize CoreStore from bytes
 pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
-  let r = BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   // Read header
   let dim = r.read_u32().reinterpret_as_int()
   let metric = match r.read_u32() {

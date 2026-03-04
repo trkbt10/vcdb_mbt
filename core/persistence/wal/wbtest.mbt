@@ -10,7 +10,7 @@ test "wal/record_roundtrip" {
     attrs,
   )
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) => {
@@ -206,7 +206,7 @@ test "wal/attr_types_roundtrip" {
     attrs,
   )
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) => {
@@ -249,7 +249,7 @@ test "wal/set_attrs_record" {
   attrs.set("key", @core.String("value"))
   let record = WalRecord::set_attrs(@core.VectorId::from_int(100), attrs)
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) => {
@@ -266,7 +266,7 @@ test "wal/set_attrs_record" {
 test "wal/remove_record" {
   let record = WalRecord::remove(@core.VectorId::from_int(50))
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) => {
@@ -323,7 +323,7 @@ test "wal/empty_attrs" {
     @core.empty_attrs(),
   )
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) => {
@@ -371,7 +371,7 @@ test "wal/json_escape_special" {
   attrs.set("cr", @core.String("line\rwith\rCR"))
   let record = WalRecord::upsert(@core.VectorId::from_int(1), [1.0], attrs)
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) =>
@@ -398,7 +398,7 @@ test "wal/attrs_float" {
   attrs.set("neg", @core.Float(-2.5))
   let record = WalRecord::set_attrs(@core.VectorId::from_int(1), attrs)
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) =>
@@ -422,7 +422,7 @@ test "wal/attrs_bool" {
   attrs.set("deleted", @core.Bool(false))
   let record = WalRecord::set_attrs(@core.VectorId::from_int(1), attrs)
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) =>
@@ -464,13 +464,13 @@ test "wal/decode_short_data" {
 test "wal/verify_header" {
   // Valid header
   let valid = encode_wal_header()
-  let reader = @core.BinaryReader::new(valid)
+  let reader = @binary.BinaryReader::new(valid)
   inspect(verify_wal_header(reader), content="true")
   // Invalid magic
   let invalid = Bytes::from_array(
     [b'X', b'X', b'X', b'X', b'\x02', b'\x00', b'\x00', b'\x00'][:],
   )
-  let reader2 = @core.BinaryReader::new(invalid)
+  let reader2 = @binary.BinaryReader::new(invalid)
   inspect(verify_wal_header(reader2), content="false")
 }
 
@@ -481,7 +481,7 @@ test "wal/segment_no_footer" {
   // Header-only WAL is valid (used after truncate)
   inspect(verify_wal_checksum(header), content="true")
   // Create larger segment without footer
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_bytes(header)
   // Add some padding to make it >= 16 bytes
   for _ in 0..<8 {
@@ -497,7 +497,7 @@ test "wal/segment_no_footer" {
 ///|
 test "wal/decode_short_record" {
   // Create valid header but truncated record
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_bytes(encode_wal_header())
   w.push_byte(b'\x01') // Record type
   w.push_byte(b'\x00') // Reserved
@@ -638,7 +638,7 @@ test "wal/upsert_no_attrs" {
   }
   let encoded = encode_wal_record(record)
   // Should still encode/decode
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   inspect(decoded is Some(_), content="true")
 }
@@ -651,7 +651,7 @@ test "wal/utf8_multibyte" {
   attrs.set("mixed", @core.String("abc日本語123"))
   let record = WalRecord::upsert(@core.VectorId::from_int(1), [1.0], attrs)
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) =>
@@ -674,7 +674,7 @@ test "wal/attrs_negative" {
   attrs.set("neg_float", @core.Float(-3.14))
   let record = WalRecord::set_attrs(@core.VectorId::from_int(1), attrs)
   let encoded = encode_wal_record(record)
-  let reader = @core.BinaryReader::new(encoded)
+  let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) =>
@@ -727,19 +727,19 @@ test "wal/large_int64_ids" {
   let record3 = WalRecord::set_attrs(max_id, @core.empty_attrs())
   // Encode and decode
   let encoded1 = encode_wal_record(record1)
-  let decoded1 = decode_wal_record(@core.BinaryReader::new(encoded1))
+  let decoded1 = decode_wal_record(@binary.BinaryReader::new(encoded1))
   match decoded1 {
     Some(r) => inspect(r.id.to_int64(), content="4294967297")
     None => inspect(false, content="true")
   }
   let encoded2 = encode_wal_record(record2)
-  let decoded2 = decode_wal_record(@core.BinaryReader::new(encoded2))
+  let decoded2 = decode_wal_record(@binary.BinaryReader::new(encoded2))
   match decoded2 {
     Some(r) => inspect(r.id.to_int64(), content="-1")
     None => inspect(false, content="true")
   }
   let encoded3 = encode_wal_record(record3)
-  let decoded3 = decode_wal_record(@core.BinaryReader::new(encoded3))
+  let decoded3 = decode_wal_record(@binary.BinaryReader::new(encoded3))
   match decoded3 {
     Some(r) => inspect(r.id.to_int64(), content="9223372036854775807")
     None => inspect(false, content="true")
@@ -777,7 +777,7 @@ test "wal/truncated_record" {
   let full_segment = encode_wal_segment([record])
   // Truncate in the middle of the record body - copy first half
   let truncate_len = full_segment.length() / 2
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   for i in 0..<truncate_len {
     w.push_byte(full_segment[i])
   }
@@ -800,7 +800,7 @@ test "wal/corrupted_checksum_rejected" {
   }
   let segment = encode_wal_segment([record])
   // Corrupt a byte in the body (before footer) - flip bit at position 10
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   for i in 0..<segment.length() {
     if i == 10 {
       w.push_byte((segment[i].to_int() ^ 0xFF).to_byte())
@@ -828,7 +828,7 @@ test "wal/corrupted_checksum_rejected" {
 ///|
 test "wal/invalid_attrs_len" {
   // Manually create a record with impossibly large attrs_len
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Header
   w.push_u32(wal_magic)
   w.push_u32(wal_version)
@@ -896,7 +896,7 @@ test "wal/json_exponent_notation" {
 
 ///|
 test "wal/reject_non_aligned_vector" {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Header
   w.push_u32(wal_magic)
   w.push_u32(wal_version)
@@ -938,7 +938,7 @@ test "wal/append_writes_footer" {
   // Check footer magic at end
   inspect(data.length() >= 16, content="true")
   let footer_start = data.length() - 8
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   let _ = r.read_bytes(footer_start)
   let footer_magic = r.read_u32()
   inspect(footer_magic == wal_footer_magic, content="true")
@@ -965,7 +965,7 @@ test "wal/append_reinit_invalid_header" {
   }
   // Read and verify header is valid now
   let data = storage.read("invalid.wal") catch { _ => Bytes::new(0) }
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   inspect(verify_wal_header(r), content="true")
   // Should be able to decode the record
   let records = decode_wal_records(data)
@@ -988,7 +988,7 @@ test "wal/append_rejects_corrupted_checksum" {
   }
   // Corrupt the body (flip byte in middle, before footer)
   let data = storage.read("corrupt.wal") catch { _ => Bytes::new(0) }
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   for i in 0..<data.length() {
     if i == 10 {
       w.push_byte((data[i].to_int() ^ 0xFF).to_byte())
@@ -1056,7 +1056,7 @@ test "wal/append_truncated_tail" {
   }
   // Remove footer to simulate truncation
   let data = storage.read("truncated.wal") catch { _ => Bytes::new(0) }
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Copy without footer (last 8 bytes)
   for i in 0..<(data.length() - 8) {
     w.push_byte(data[i])

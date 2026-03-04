@@ -179,22 +179,22 @@ fn hnsw_search_layer(
   target : Array[Double],
   level : Int,
   ef : Int,
-) -> Array[@core.ScoredItem] {
+) -> Array[@collection.ScoredItem] {
   // Use max of store.count and tombstone.length for visited array
   // to handle cases where HNSW indices exceed current store size after removals
   let visited_size = @cmp.maximum(store.count, state.tombstone.length())
   let visited_size = @cmp.maximum(visited_size, entry + 1)
   let visited = Array::make(visited_size, false)
-  let heap : @core.MaxHeap[@core.ScoredItem] = @core.MaxHeap::for_scored()
-  let results : Array[@core.ScoredItem] = []
+  let heap : @collection.MaxHeap[@collection.ScoredItem] = @collection.MaxHeap::for_scored()
+  let results : Array[@collection.ScoredItem] = []
   // Guard: entry might be out of bounds or tombstoned
   if entry >= store.count ||
     (entry < state.tombstone.length() && state.tombstone[entry]) {
     return []
   }
   let entry_score = hnsw_score(state, store, entry, target)
-  heap.push(@core.ScoredItem::{ idx: entry, s: entry_score })
-  results.push(@core.ScoredItem::{ idx: entry, s: entry_score })
+  heap.push(@collection.ScoredItem::{ idx: entry, s: entry_score })
+  results.push(@collection.ScoredItem::{ idx: entry, s: entry_score })
   visited[entry] = true
   while heap.length() > 0 {
     let cur = heap.pop().unwrap()
@@ -230,14 +230,14 @@ fn hnsw_search_layer(
       }
       let sc = hnsw_score(state, store, nb, target)
       // Always add to heap for exploration (even tombstoned)
-      heap.push(@core.ScoredItem::{ idx: nb, s: sc })
+      heap.push(@collection.ScoredItem::{ idx: nb, s: sc })
       // Only add to results if not tombstoned
       if is_tombstoned {
         continue
       }
-      @core.push_sorted_desc(
+      @collection.push_sorted_desc(
         results,
-        @core.ScoredItem::{ idx: nb, s: sc },
+        @collection.ScoredItem::{ idx: nb, s: sc },
         Some(ef),
       )
     }
@@ -504,7 +504,7 @@ pub fn hnsw_search(
       Some(f) => if not(f(id, attrs)) { continue }
       None => ()
     }
-    @core.push_top_k(out, @core.SearchHit::{ id, score: c.s, attrs }, k, fn(
+    @collection.push_top_k(out, @core.SearchHit::{ id, score: c.s, attrs }, k, fn(
       hit,
     ) {
       hit.score
@@ -532,7 +532,7 @@ pub fn hnsw_find(
 ///|
 /// Serialize HNSW state to bytes
 pub fn hnsw_serialize(state : HNSWState) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Write enter_point and max_level
   w.push_i32(state.enter_point)
   w.push_i32(state.max_level)
@@ -563,7 +563,7 @@ pub fn hnsw_serialize(state : HNSWState) -> Bytes {
 ///|
 /// Deserialize HNSW state from bytes
 pub fn hnsw_deserialize(state : HNSWState, data : Bytes) -> Unit {
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   // Read enter_point and max_level
   state.enter_point = r.read_i32()
   state.max_level = r.read_i32()

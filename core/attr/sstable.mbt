@@ -130,7 +130,7 @@ pub fn BloomFilter::might_contain(self : BloomFilter, key : Bytes) -> Bool {
 ///|
 /// Encode a single record to bytes
 pub fn SSTableRecord::encode(self : SSTableRecord) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_u32(self.key.length().reinterpret_as_uint())
   w.push_u32(self.value.length().reinterpret_as_uint())
   w.push_bytes(self.key)
@@ -147,7 +147,7 @@ pub fn SSTableRecord::decode(
   if offset + 8 > buf.length() {
     return None
   }
-  let r = @core.BinaryReader::new(buf)
+  let r = @binary.BinaryReader::new(buf)
   r.skip(offset)
   let key_len = r.read_u32().reinterpret_as_int()
   let val_len = r.read_u32().reinterpret_as_int()
@@ -162,7 +162,7 @@ pub fn SSTableRecord::decode(
 ///|
 /// Encode footer to bytes
 pub fn SSTableFooter::encode(self : SSTableFooter) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_u32(self.magic)
   w.push_u32(self.version)
   w.push_u32(self.data_offset.reinterpret_as_uint())
@@ -181,7 +181,7 @@ pub fn SSTableFooter::decode(buf : Bytes) -> SSTableFooter? {
     return None
   }
   let offset = buf.length() - footer_size
-  let r = @core.BinaryReader::new(buf)
+  let r = @binary.BinaryReader::new(buf)
   r.skip(offset)
   let magic = r.read_u32()
   if magic != sstable_magic {
@@ -202,7 +202,7 @@ pub fn SSTableFooter::decode(buf : Bytes) -> SSTableFooter? {
 ///|
 /// Encode bloom filter to bytes
 pub fn BloomFilter::encode(self : BloomFilter) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_u32(self.hash_count.reinterpret_as_uint())
   w.push_u32(self.bit_count.reinterpret_as_uint())
   w.push_bytes(self.bits)
@@ -215,7 +215,7 @@ pub fn BloomFilter::decode(buf : Bytes) -> BloomFilter? {
   if buf.length() < 8 {
     return None
   }
-  let r = @core.BinaryReader::new(buf)
+  let r = @binary.BinaryReader::new(buf)
   let hash_count = r.read_u32().reinterpret_as_int()
   let bit_count = r.read_u32().reinterpret_as_int()
   let bits = r.read_bytes(buf.length() - 8)
@@ -225,7 +225,7 @@ pub fn BloomFilter::decode(buf : Bytes) -> BloomFilter? {
 ///|
 /// Encode sparse index entries to bytes
 fn encode_index(entries : Array[SparseIndexEntry]) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   for entry in entries {
     w.push_u32(entry.key.length().reinterpret_as_uint())
     w.push_u32(entry.offset.reinterpret_as_uint())
@@ -238,7 +238,7 @@ fn encode_index(entries : Array[SparseIndexEntry]) -> Bytes {
 /// Decode sparse index from bytes
 fn decode_index(buf : Bytes) -> Array[SparseIndexEntry] {
   let entries : Array[SparseIndexEntry] = []
-  let r = @core.BinaryReader::new(buf)
+  let r = @binary.BinaryReader::new(buf)
   while r.remaining() >= 8 {
     let key_len = r.read_u32().reinterpret_as_int()
     let offset = r.read_u32().reinterpret_as_int()
@@ -272,7 +272,7 @@ pub fn SSTable::build(
     data_offset = data_offset + encoded.length()
   }
   // Concatenate data section
-  let data_w = @core.BinaryWriter::new()
+  let data_w = @binary.BinaryWriter::new()
   for part in data_parts {
     data_w.push_bytes(part)
   }
@@ -296,7 +296,7 @@ pub fn SSTable::build(
   }
   let footer_section = footer.encode()
   // Combine all sections
-  let result_w = @core.BinaryWriter::new()
+  let result_w = @binary.BinaryWriter::new()
   result_w.push_bytes(data_section)
   result_w.push_bytes(index_section)
   result_w.push_bytes(bloom_section)

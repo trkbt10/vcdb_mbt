@@ -213,7 +213,7 @@ pub fn ivf_search(
           }
           let base = at * dim
           let s = score_fn(store.data, base, query, dim)
-          @core.push_top_k(out, @core.SearchHit::{ id, score: s, attrs }, k, fn(
+          @collection.push_top_k(out, @core.SearchHit::{ id, score: s, attrs }, k, fn(
             hit,
           ) {
             hit.score
@@ -244,7 +244,7 @@ pub fn ivf_find(
 ///|
 /// Serialize IVF state to bytes
 pub fn ivf_serialize(state : IVFState, dim : Int) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   // Write centroid_count
   w.push_i32(state.centroid_count)
   // Write centroids (flattened array)
@@ -266,7 +266,7 @@ pub fn ivf_serialize(state : IVFState, dim : Int) -> Bytes {
 ///|
 /// Deserialize IVF state from bytes
 pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
   // Read centroid_count
   state.centroid_count = r.read_i32()
   // Read centroids

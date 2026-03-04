@@ -5,7 +5,7 @@
 ///|
 /// Helper to create a single-byte Bytes
 fn make_exists_key() -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   w.push_byte(b'\x01')
   w.concat()
 }
@@ -85,7 +85,7 @@ fn bytes_equal(a : Bytes, b : Bytes) -> Bool {
 ///|
 /// Encode AttrValue to order-preserving bytes
 fn encode_attr_value(value : @core.AttrValue) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   match value {
     Null => w.push_byte(b'\x00')
     Bool(v) => {

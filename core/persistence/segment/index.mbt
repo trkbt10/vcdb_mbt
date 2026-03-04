@@ -70,7 +70,7 @@ pub fn encode_index_file(
   entries : Array[IndexEntry],
   ann_bytes : Bytes?,
 ) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
 
   // Header (16 bytes)
   w.push_u32(index_magic)
@@ -129,7 +129,7 @@ pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
     return None
   }
 
-  let r = @core.BinaryReader::new(data)
+  let r = @binary.BinaryReader::new(data)
 
   // Header
   let magic = r.read_u32()
@@ -204,7 +204,7 @@ pub fn IndexHeader::from_store(
 
 ///|
 fn string_to_utf8_index(s : String) -> Bytes {
-  let w = @core.BinaryWriter::new()
+  let w = @binary.BinaryWriter::new()
   for c in s {
     let code = c.to_uint()
     if code < 0x80U {
