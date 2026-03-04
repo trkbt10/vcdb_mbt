@@ -129,21 +129,14 @@ pub fn SegmentReader::read_at(
   if offset + length > self.data.length() {
     return None
   }
-
-  // Create a reader starting at offset
-  let record_bytes : Array[Byte] = []
-  for i in offset..<(offset + length) {
-    record_bytes.push(self.data[i])
-  }
-  let r = @binary.BinaryReader::new(Bytes::from_array(record_bytes))
-
+  // Use reader with skip to avoid copying
+  let r = @binary.BinaryReader::new(self.data)
+  r.skip(offset)
   // Read ID
   let id = @core.VectorId(r.read_u64().reinterpret_as_int64())
-
   // Read lengths
   let attrs_len = r.read_u32().reinterpret_as_int()
   let vector_len = r.read_u32().reinterpret_as_int()
-
   // Read attrs
   let attrs = if attrs_len > 0 {
     let attrs_bytes = r.read_bytes(attrs_len)
@@ -151,14 +144,12 @@ pub fn SegmentReader::read_at(
   } else {
     @core.empty_attrs()
   }
-
   // Read vector
   let count = vector_len / 4
-  let vector : Array[Double] = []
-  for _ in 0..<count {
-    vector.push(r.read_f32().to_double())
+  let vector : Array[Double] = Array::make(count, 0.0)
+  for i in 0..<count {
+    vector[i] = r.read_f32().to_double()
   }
-
   Some((id, vector, attrs))
 }
 
@@ -168,24 +159,32 @@ pub fn SegmentReader::collect(
   self : SegmentReader,
 ) -> Array[(@core.VectorId, Array[Double], @core.Attrs)] {
   let results : Array[(@core.VectorId, Array[Double], @core.Attrs)] = []
-  let mut pos = 8 // Skip header
-  while pos < self.data.length() {
-    // Read record header to get length
-    if pos + 16 > self.data.length() {
-      break
-    }
-    let r = @binary.BinaryReader::new(self.data)
-    let _ = r.read_bytes(pos)
-    let _ = r.read_u64() // id
+  let r = @binary.BinaryReader::new(self.data)
+  r.skip(8) // Skip header
+  while r.remaining() >= 16 {
+    // Read ID
+    let id = @core.VectorId(r.read_u64().reinterpret_as_int64())
+    // Read lengths
     let attrs_len = r.read_u32().reinterpret_as_int()
     let vector_len = r.read_u32().reinterpret_as_int()
-    let length = 16 + attrs_len + vector_len
-
-    match self.read_at(pos, length) {
-      Some((id, vec, attrs)) => results.push((id, vec, attrs))
-      None => break
+    // Validate
+    if r.remaining() < attrs_len + vector_len {
+      break
     }
-    pos = pos + length
+    // Read attrs
+    let attrs = if attrs_len > 0 {
+      let attrs_bytes = r.read_bytes(attrs_len)
+      decode_attrs_from_segment(attrs_bytes)
+    } else {
+      @core.empty_attrs()
+    }
+    // Read vector
+    let count = vector_len / 4
+    let vector : Array[Double] = Array::make(count, 0.0)
+    for i in 0..<count {
+      vector[i] = r.read_f32().to_double()
+    }
+    results.push((id, vector, attrs))
   }
   results
 }

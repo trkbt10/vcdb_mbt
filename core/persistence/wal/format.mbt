@@ -90,45 +90,86 @@ fn encode_attrs_json(attrs : @core.Attrs?) -> Bytes {
 }
 
 ///|
-/// Convert attrs to JSON string
+/// Convert attrs to JSON string (optimized to build char array)
 fn attrs_to_json(attrs : @core.Attrs?) -> String {
   match attrs {
     None => "null"
     Some(a) => {
-      let parts : Array[String] = []
-      for key in a.keys() {
+      let keys = a.keys()
+      if keys.length() == 0 {
+        return "{}"
+      }
+      let chars : Array[Char] = []
+      chars.push('{')
+      let mut first = true
+      for key in keys {
         match a.get(key) {
           None => continue
           Some(value) => {
-            let value_json = attr_value_to_json(value)
-            parts.push("\"" + escape_json_string(key) + "\":" + value_json)
+            if not(first) {
+              chars.push(',')
+            }
+            first = false
+            chars.push('"')
+            push_escaped_json(chars, key)
+            chars.push('"')
+            chars.push(':')
+            push_attr_value_json(chars, value)
           }
         }
       }
-      "{" +
-      parts.iter().intersperse(",").fold(init="", fn(acc, s) { acc + s }) +
-      "}"
+      chars.push('}')
+      String::from_array(chars)
     }
   }
 }
 
 ///|
-/// Convert AttrValue to JSON string
-fn attr_value_to_json(value : @core.AttrValue) -> String {
+/// Push attr value as JSON chars (optimized)
+fn push_attr_value_json(chars : Array[Char], value : @core.AttrValue) -> Unit {
   match value {
-    Null => "null"
-    Bool(b) => if b { "true" } else { "false" }
-    Int(n) => n.to_string()
-    Float(f) => f.to_string()
-    String(s) => "\"" + escape_json_string(s) + "\""
+    Null => {
+      chars.push('n')
+      chars.push('u')
+      chars.push('l')
+      chars.push('l')
+    }
+    Bool(b) =>
+      if b {
+        chars.push('t')
+        chars.push('r')
+        chars.push('u')
+        chars.push('e')
+      } else {
+        chars.push('f')
+        chars.push('a')
+        chars.push('l')
+        chars.push('s')
+        chars.push('e')
+      }
+    Int(n) => {
+      let s = n.to_string()
+      for c in s {
+        chars.push(c)
+      }
+    }
+    Float(f) => {
+      let s = f.to_string()
+      for c in s {
+        chars.push(c)
+      }
+    }
+    String(s) => {
+      chars.push('"')
+      push_escaped_json(chars, s)
+      chars.push('"')
+    }
   }
 }
 
 ///|
-/// Escape special characters in JSON string
-/// Escapes all control characters (U+0000..U+001F) per JSON spec
-fn escape_json_string(s : String) -> String {
-  let chars : Array[Char] = []
+/// Push escaped JSON string chars
+fn push_escaped_json(chars : Array[Char], s : String) -> Unit {
   for c in s {
     let code = c.to_uint()
     match c {
@@ -153,18 +194,15 @@ fn escape_json_string(s : String) -> String {
         chars.push('t')
       }
       '\u0008' => {
-        // Backspace
         chars.push('\\')
         chars.push('b')
       }
       '\u000C' => {
-        // Form feed
         chars.push('\\')
         chars.push('f')
       }
       _ =>
         if code < 0x20U {
-          // Other control characters: escape as \uXXXX
           chars.push('\\')
           chars.push('u')
           chars.push('0')
@@ -176,6 +214,13 @@ fn escape_json_string(s : String) -> String {
         }
     }
   }
+}
+
+///|
+/// Convert AttrValue to JSON string
+fn attr_value_to_json(value : @core.AttrValue) -> String {
+  let chars : Array[Char] = []
+  push_attr_value_json(chars, value)
   String::from_array(chars)
 }
 
@@ -453,6 +498,13 @@ fn parse_json_value(chars : Array[Char], start : Int) -> (@core.AttrValue, Int) 
 /// Note: Uses 64-bit IDs to preserve full VectorId range
 pub fn encode_wal_record(record : WalRecord) -> Bytes {
   let w = @binary.BinaryWriter::new()
+  encode_wal_record_to(w, record)
+  w.concat()
+}
+
+///|
+/// Encode a WAL record to an existing writer (avoids intermediate allocations)
+fn encode_wal_record_to(w : @binary.BinaryWriter, record : WalRecord) -> Unit {
   // Type (1 byte)
   w.push_byte(record.record_type.to_byte())
   // Reserved (1 byte)
@@ -461,24 +513,24 @@ pub fn encode_wal_record(record : WalRecord) -> Bytes {
   w.push_u64(record.id.to_int64().reinterpret_as_uint64())
   // Encode attrs as JSON
   let attrs_bytes = encode_attrs_json(record.attrs)
-  // Encode vector as Float32 (TypeScript compatible)
-  let vector_bytes = match record.vector {
-    None => Bytes::new(0)
-    Some(v) => {
-      let vw = @binary.BinaryWriter::new()
-      for val in v {
-        vw.push_f32(Float::from_double(val))
-      }
-      vw.concat()
-    }
+  // Calculate vector length
+  let vector_len = match record.vector {
+    None => 0
+    Some(v) => v.length() * 4
   }
   // Write lengths
   w.push_u32(attrs_bytes.length().reinterpret_as_uint())
-  w.push_u32(vector_bytes.length().reinterpret_as_uint())
-  // Write data
+  w.push_u32(vector_len.reinterpret_as_uint())
+  // Write attrs
   w.push_bytes(attrs_bytes)
-  w.push_bytes(vector_bytes)
-  w.concat()
+  // Write vector inline (no intermediate buffer)
+  match record.vector {
+    None => ()
+    Some(v) =>
+      for val in v {
+        w.push_f32(Float::from_double(val))
+      }
+  }
 }
 
 ///|
@@ -553,21 +605,19 @@ pub fn encode_wal_footer(body : Bytes) -> Bytes {
 /// Encode multiple records to a complete WAL segment
 pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
   let w = @binary.BinaryWriter::new()
-  // Write header
-  w.push_bytes(encode_wal_header())
-  // Write records
+  // Write header inline
+  w.push_u32(wal_magic)
+  w.push_u32(wal_version)
+  // Write records directly (no intermediate allocations)
   for record in records {
-    w.push_bytes(encode_wal_record(record))
+    encode_wal_record_to(w, record)
   }
   // Get body (header + records)
   let body = w.concat()
-  // Add footer with CRC32
-  let footer = encode_wal_footer(body)
-  // Combine
-  let result = @binary.BinaryWriter::new()
-  result.push_bytes(body)
-  result.push_bytes(footer)
-  result.concat()
+  // Add footer with CRC32 inline
+  w.push_u32(wal_footer_magic)
+  w.push_u32(@binary.crc32(body))
+  w.concat()
 }
 
 ///|
