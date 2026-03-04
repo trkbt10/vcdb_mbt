@@ -2,3 +2,7 @@
 _build/
 .mooncakes/
 .moonagent/
+
+# Coverage artifacts
+bisect.coverage
+coveralls.json
