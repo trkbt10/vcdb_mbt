@@ -1,9 +1,9 @@
 /**
- * @file Browser localStorage/sessionStorage FileIO
+ * @file Browser localStorage/sessionStorage adapter
  * String-based storage using base64 encoding for binary data.
  */
-import type { FileIO } from "./types.js";
-import { toUint8 } from "./types.js";
+import type { StorageAdapter, StorageKindType } from "./types.js";
+import { StorageKind, toUint8 } from "./types.js";
 
 function requireStorage(kind: "localStorage" | "sessionStorage"): Storage {
   const g = globalThis as unknown as { [k: string]: unknown };
@@ -28,64 +28,67 @@ function decodeBase64(s: string): Uint8Array {
   return out;
 }
 
-function createStorageFileIO(storage: Storage): FileIO {
+function kindToPrefix(kind: StorageKindType): string {
+  switch (kind) {
+    case StorageKind.Config:
+      return "vcdb:config:";
+    case StorageKind.Index:
+      return "vcdb:index:";
+    case StorageKind.Data:
+      return "vcdb:data:";
+    default:
+      return "vcdb:data:";
+  }
+}
+
+function createWebStorageAdapter(storage: Storage): StorageAdapter {
+  const makeKey = (path: string, kind: StorageKindType): string =>
+    kindToPrefix(kind) + path;
+
   return {
-    async read(path: string): Promise<Uint8Array> {
-      const v = storage.getItem(path);
-      if (v == null) {
-        throw new Error(`file not found: ${path}`);
+    async read(path: string, kind: StorageKindType): Promise<Uint8Array | null> {
+      const v = storage.getItem(makeKey(path, kind));
+      return v != null ? decodeBase64(v) : null;
+    },
+
+    async write(path: string, data: Uint8Array, kind: StorageKindType): Promise<void> {
+      storage.setItem(makeKey(path, kind), encodeBase64(toUint8(data)));
+    },
+
+    async delete(path: string, kind: StorageKindType): Promise<void> {
+      storage.removeItem(makeKey(path, kind));
+    },
+
+    async exists(path: string, kind: StorageKindType): Promise<boolean> {
+      return storage.getItem(makeKey(path, kind)) != null;
+    },
+
+    async list(kind: StorageKindType, prefix = ""): Promise<string[]> {
+      const kindPrefix = kindToPrefix(kind);
+      const fullPrefix = kindPrefix + prefix;
+      const files: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key?.startsWith(fullPrefix)) {
+          files.push(key.slice(kindPrefix.length));
+        }
       }
-      return decodeBase64(v);
-    },
-
-    async write(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
-      storage.setItem(path, encodeBase64(toUint8(data)));
-    },
-
-    async append(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
-      const prev = storage.getItem(path);
-      if (prev == null) {
-        storage.setItem(path, encodeBase64(toUint8(data)));
-        return;
-      }
-      const a = decodeBase64(prev);
-      const b = toUint8(data);
-      const merged = new Uint8Array(a.length + b.length);
-      merged.set(a, 0);
-      merged.set(b, a.length);
-      storage.setItem(path, encodeBase64(merged));
-    },
-
-    async atomicWrite(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
-      storage.setItem(path, encodeBase64(toUint8(data)));
-    },
-
-    async del(path: string): Promise<void> {
-      storage.removeItem(path);
+      return files;
     },
   };
 }
 
-/** Create a FileIO backed by localStorage */
-export function createLocalStorageFileIO(): FileIO {
-  return createStorageFileIO(requireStorage("localStorage"));
+/** Create a StorageAdapter backed by localStorage */
+export function createLocalStorage(): StorageAdapter {
+  return createWebStorageAdapter(requireStorage("localStorage"));
 }
 
-/** Create a FileIO backed by sessionStorage */
-export function createSessionStorageFileIO(): FileIO {
-  return createStorageFileIO(requireStorage("sessionStorage"));
+/** Create a StorageAdapter backed by sessionStorage */
+export function createSessionStorage(): StorageAdapter {
+  return createWebStorageAdapter(requireStorage("sessionStorage"));
 }
 
-/** Create a FileIO backed by a provided Storage instance (for testing) */
-export function createFromWebStorage(storage: Storage): FileIO {
-  return createStorageFileIO(storage);
+/** Create a StorageAdapter backed by a provided Storage instance (for testing) */
+export function createFromWebStorage(storage: Storage): StorageAdapter {
+  return createWebStorageAdapter(storage);
 }

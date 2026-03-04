@@ -1,9 +1,9 @@
 /**
- * @file IndexedDB-backed FileIO for browsers
- * Persistent key-value storage using the IndexedDB API.
+ * @file IndexedDB storage adapter for browsers
+ * Persistent key-value storage using the IndexedDB API with StorageKind routing.
  */
-import type { FileIO } from "./types.js";
-import { toUint8 } from "./types.js";
+import type { StorageAdapter, StorageKindType } from "./types.js";
+import { StorageKind, toUint8 } from "./types.js";
 
 type IDBReq<T> = IDBRequest<T>;
 
@@ -42,16 +42,29 @@ function reqToPromise<T>(req: IDBReq<T>): Promise<T> {
   });
 }
 
-export interface IndexedDBFileIOOptions {
-  /** Database name (default: "vcdb_fileio") */
+function kindToPrefix(kind: StorageKindType): string {
+  switch (kind) {
+    case StorageKind.Config:
+      return "config/";
+    case StorageKind.Index:
+      return "index/";
+    case StorageKind.Data:
+      return "data/";
+    default:
+      return "data/";
+  }
+}
+
+export interface IndexedDBStorageOptions {
+  /** Database name (default: "vcdb") */
   dbName?: string;
   /** Object store name (default: "files") */
   storeName?: string;
 }
 
-/** Create an IndexedDB FileIO instance */
-export function createIndexedDBFileIO(options?: IndexedDBFileIOOptions): FileIO {
-  const dbName = options?.dbName ?? "vcdb_fileio";
+/** Create an IndexedDB StorageAdapter instance */
+export function createIndexedDBStorage(options?: IndexedDBStorageOptions): StorageAdapter {
+  const dbName = options?.dbName ?? "vcdb";
   const storeName = options?.storeName ?? "files";
   const state: { promise: Promise<IDBDatabase> | null } = { promise: null };
 
@@ -62,60 +75,66 @@ export function createIndexedDBFileIO(options?: IndexedDBFileIOOptions): FileIO 
     return state.promise;
   }
 
+  const makeKey = (path: string, kind: StorageKindType): string =>
+    kindToPrefix(kind) + path;
+
   return {
-    async read(path: string): Promise<Uint8Array> {
+    async read(path: string, kind: StorageKindType): Promise<Uint8Array | null> {
       const db = await getDB();
-      const r = reqToPromise<ArrayBuffer | undefined>(
-        tx(db, storeName, "readonly").get(path) as IDBReq<ArrayBuffer | undefined>
+      const key = makeKey(path, kind);
+      const res = await reqToPromise<ArrayBuffer | undefined>(
+        tx(db, storeName, "readonly").get(key) as IDBReq<ArrayBuffer | undefined>
       );
-      const res = await r;
-      if (res == null) {
-        throw new Error(`file not found: ${path}`);
-      }
-      return new Uint8Array(res);
+      return res != null ? new Uint8Array(res) : null;
     },
 
-    async write(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
+    async write(path: string, data: Uint8Array, kind: StorageKindType): Promise<void> {
       const db = await getDB();
+      const key = makeKey(path, kind);
       await reqToPromise(
-        tx(db, storeName, "readwrite").put(toUint8(data).buffer, path)
+        tx(db, storeName, "readwrite").put(toUint8(data).buffer, key)
       );
     },
 
-    async append(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
+    async delete(path: string, kind: StorageKindType): Promise<void> {
       const db = await getDB();
-      const store = tx(db, storeName, "readwrite");
-      const existing =
-        (await reqToPromise<ArrayBuffer | undefined>(
-          store.get(path) as IDBReq<ArrayBuffer | undefined>
-        )) ?? new ArrayBuffer(0);
-      const a = new Uint8Array(existing);
-      const b = toUint8(data);
-      const merged = new Uint8Array(a.length + b.length);
-      merged.set(a, 0);
-      merged.set(b, a.length);
-      await reqToPromise(store.put(merged.buffer, path));
+      const key = makeKey(path, kind);
+      await reqToPromise(tx(db, storeName, "readwrite").delete(key));
     },
 
-    async atomicWrite(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
+    async exists(path: string, kind: StorageKindType): Promise<boolean> {
       const db = await getDB();
-      await reqToPromise(
-        tx(db, storeName, "readwrite").put(toUint8(data).buffer, path)
+      const key = makeKey(path, kind);
+      const res = await reqToPromise<ArrayBuffer | undefined>(
+        tx(db, storeName, "readonly").get(key) as IDBReq<ArrayBuffer | undefined>
       );
+      return res != null;
     },
 
-    async del(path: string): Promise<void> {
+    async list(kind: StorageKindType, prefix = ""): Promise<string[]> {
       const db = await getDB();
-      await reqToPromise(tx(db, storeName, "readwrite").delete(path));
+      const kindPrefix = kindToPrefix(kind);
+      const fullPrefix = kindPrefix + prefix;
+      const store = tx(db, storeName, "readonly");
+
+      return new Promise((resolve, reject) => {
+        const files: string[] = [];
+        const req = store.openCursor();
+
+        req.onsuccess = () => {
+          const cursor = req.result;
+          if (cursor) {
+            const key = cursor.key as string;
+            if (key.startsWith(fullPrefix)) {
+              files.push(key.slice(kindPrefix.length));
+            }
+            cursor.continue();
+          } else {
+            resolve(files);
+          }
+        };
+        req.onerror = () => reject(req.error);
+      });
     },
   };
 }

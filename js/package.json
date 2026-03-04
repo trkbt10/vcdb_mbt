@@ -33,9 +33,13 @@
       "types": "./dist/storage/opfs.d.ts",
       "import": "./dist/storage/opfs.js"
     },
-    "./storage/cache": {
-      "types": "./dist/storage/cache.d.ts",
-      "import": "./dist/storage/cache.js"
+    "./storage/service-worker": {
+      "types": "./dist/storage/service-worker.d.ts",
+      "import": "./dist/storage/service-worker.js"
+    },
+    "./storage/wasm-bridge": {
+      "types": "./dist/storage/wasm-bridge.d.ts",
+      "import": "./dist/storage/wasm-bridge.js"
     },
     "./wasm": {
       "types": "./dist/wasm/index.d.ts",
@@ -53,10 +57,13 @@
     "prepublishOnly": "npm run clean && npm run build",
     "test": "bash e2e-test.sh",
     "test:smoke": "node test/smoke.test.mjs",
+    "test:spec": "npx tsx spec/node.runner.ts",
+    "test:spec:browser": "npx tsx spec/browser.runner.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "playwright": "^1.58.2",
     "typescript": "^5.3.0"
   },
   "keywords": [

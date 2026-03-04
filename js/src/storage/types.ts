@@ -1,27 +1,41 @@
 /**
- * @file File I/O abstraction layer
- * Unified read/write/append/atomic operations across backends.
+ * @file Unified storage abstraction
+ *
+ * StorageAdapter is the single interface for all storage backends.
+ * Supports StorageKind routing for separating config/index/data.
  */
 
 /**
- * FileIO interface for storage backends.
- * All backends must implement these methods for interoperability.
+ * Storage kind - tells app what type of data is being stored.
+ * App uses this to route to appropriate backend (e.g., index→DynamoDB, data→S3)
  */
-export interface FileIO {
-  /** Read file contents as Uint8Array */
-  read(path: string): Promise<Uint8Array>;
+export const StorageKind = {
+  Config: 0, // Collection configuration (.config.json)
+  Index: 1, // Index structures, manifests (.index, .manifest.json)
+  Data: 2, // Vector data, segments (.data.bin, segment files)
+} as const;
+
+export type StorageKindType = (typeof StorageKind)[keyof typeof StorageKind];
+
+/**
+ * Unified storage interface for all backends.
+ * All methods are async to support remote storage (S3, etc.).
+ */
+export interface StorageAdapter {
+  /** Read file contents. Returns null if not found. */
+  read(path: string, kind: StorageKindType): Promise<Uint8Array | null>;
 
   /** Write data to file (overwrites existing) */
-  write(path: string, data: Uint8Array | ArrayBuffer): Promise<void>;
+  write(path: string, data: Uint8Array, kind: StorageKindType): Promise<void>;
 
-  /** Append data to existing file (creates if not exists) */
-  append(path: string, data: Uint8Array | ArrayBuffer): Promise<void>;
+  /** Delete file */
+  delete(path: string, kind: StorageKindType): Promise<void>;
 
-  /** Atomic write (write-then-rename pattern where supported) */
-  atomicWrite(path: string, data: Uint8Array | ArrayBuffer): Promise<void>;
+  /** Check if file exists */
+  exists(path: string, kind: StorageKindType): Promise<boolean>;
 
-  /** Delete file (optional, may throw if not supported) */
-  del?(path: string): Promise<void>;
+  /** List all files for a given kind */
+  list(kind: StorageKindType, prefix?: string): Promise<string[]>;
 }
 
 /** Convert ArrayBuffer to Uint8Array (no-copy when possible) */

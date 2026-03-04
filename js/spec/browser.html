@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>vcdb Storage Spec (Browser)</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #eee; }
+    h1 { color: #fff; }
+    .suite { margin: 20px 0; }
+    .suite-name { font-size: 1.2em; color: #88f; }
+    .pass { color: #8f8; }
+    .fail { color: #f88; }
+    .error { color: #f66; margin-left: 20px; font-size: 0.9em; }
+    .summary { margin-top: 30px; padding: 10px; border-top: 1px solid #444; }
+    #log { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>vcdb Storage Spec (Browser)</h1>
+  <div id="log"></div>
+
+  <script type="module">
+    const log = document.getElementById('log');
+
+    function print(text, className = '') {
+      const div = document.createElement('div');
+      div.textContent = text;
+      if (className) div.className = className;
+      log.appendChild(div);
+    }
+
+    function assert(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+
+    function assertEq(actual, expected, message) {
+      if (actual !== expected) {
+        throw new Error(`${message}: expected ${expected}, got ${actual}`);
+      }
+    }
+
+    function assertArrayEq(actual, expected, message) {
+      if (actual === null && expected === null) return;
+      if (actual === null || expected === null) {
+        throw new Error(`${message}: one is null`);
+      }
+      if (actual.length !== expected.length) {
+        throw new Error(`${message}: length mismatch ${actual.length} vs ${expected.length}`);
+      }
+      for (let i = 0; i < actual.length; i++) {
+        if (actual[i] !== expected[i]) {
+          throw new Error(`${message}: mismatch at index ${i}`);
+        }
+      }
+    }
+
+    const StorageKind = { Config: 0, Index: 1, Data: 2 };
+
+    async function runSpec(name, createStorage, cleanup) {
+      print(`\n=== ${name} ===\n`, 'suite-name');
+
+      let passed = 0;
+      let failed = 0;
+
+      async function test(description, fn) {
+        try {
+          await fn();
+          print(`  ✓ ${description}`, 'pass');
+          passed++;
+        } catch (e) {
+          print(`  ✗ ${description}`, 'fail');
+          print(`    ${e.message}`, 'error');
+          failed++;
+        }
+      }
+
+      const storage = await createStorage();
+
+      // Basic CRUD
+      await test("read non-existent file returns null", async () => {
+        const result = await storage.read("nonexistent.txt", StorageKind.Data);
+        assertEq(result, null, "should return null");
+      });
+
+      await test("write and read back", async () => {
+        const data = new Uint8Array([1, 2, 3, 4, 5]);
+        await storage.write("test.bin", data, StorageKind.Data);
+        const result = await storage.read("test.bin", StorageKind.Data);
+        assertArrayEq(result, data, "data should match");
+      });
+
+      await test("exists returns false for non-existent", async () => {
+        const result = await storage.exists("no-such-file.txt", StorageKind.Data);
+        assertEq(result, false, "should not exist");
+      });
+
+      await test("exists returns true after write", async () => {
+        await storage.write("exists-test.txt", new Uint8Array([1]), StorageKind.Data);
+        const result = await storage.exists("exists-test.txt", StorageKind.Data);
+        assertEq(result, true, "should exist");
+      });
+
+      await test("delete removes file", async () => {
+        await storage.write("to-delete.txt", new Uint8Array([1]), StorageKind.Data);
+        await storage.delete("to-delete.txt", StorageKind.Data);
+        const result = await storage.exists("to-delete.txt", StorageKind.Data);
+        assertEq(result, false, "should not exist after delete");
+      });
+
+      await test("overwrite existing file", async () => {
+        const data1 = new Uint8Array([1, 2, 3]);
+        const data2 = new Uint8Array([4, 5, 6, 7]);
+        await storage.write("overwrite.bin", data1, StorageKind.Data);
+        await storage.write("overwrite.bin", data2, StorageKind.Data);
+        const result = await storage.read("overwrite.bin", StorageKind.Data);
+        assertArrayEq(result, data2, "should have new data");
+      });
+
+      // StorageKind isolation
+      await test("different kinds are isolated", async () => {
+        const configData = new Uint8Array([10]);
+        const indexData = new Uint8Array([20]);
+        const dataData = new Uint8Array([30]);
+
+        await storage.write("same-name.bin", configData, StorageKind.Config);
+        await storage.write("same-name.bin", indexData, StorageKind.Index);
+        await storage.write("same-name.bin", dataData, StorageKind.Data);
+
+        const readConfig = await storage.read("same-name.bin", StorageKind.Config);
+        const readIndex = await storage.read("same-name.bin", StorageKind.Index);
+        const readData = await storage.read("same-name.bin", StorageKind.Data);
+
+        assertArrayEq(readConfig, configData, "config should match");
+        assertArrayEq(readIndex, indexData, "index should match");
+        assertArrayEq(readData, dataData, "data should match");
+      });
+
+      // List
+      await test("list returns written files", async () => {
+        await storage.write("list-a.txt", new Uint8Array([1]), StorageKind.Config);
+        await storage.write("list-b.txt", new Uint8Array([2]), StorageKind.Config);
+        const files = await storage.list(StorageKind.Config);
+        assert(files.includes("list-a.txt"), "should include list-a.txt");
+        assert(files.includes("list-b.txt"), "should include list-b.txt");
+      });
+
+      // Edge cases
+      await test("empty file", async () => {
+        const empty = new Uint8Array(0);
+        await storage.write("empty.bin", empty, StorageKind.Data);
+        const result = await storage.read("empty.bin", StorageKind.Data);
+        assertArrayEq(result, empty, "empty file should be readable");
+      });
+
+      await test("binary data with all byte values", async () => {
+        const allBytes = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) {
+          allBytes[i] = i;
+        }
+        await storage.write("all-bytes.bin", allBytes, StorageKind.Data);
+        const result = await storage.read("all-bytes.bin", StorageKind.Data);
+        assertArrayEq(result, allBytes, "all byte values should be preserved");
+      });
+
+      if (cleanup) {
+        await cleanup();
+      }
+
+      print(`\n  ${passed} passed, ${failed} failed`, failed > 0 ? 'fail' : 'pass');
+      return failed;
+    }
+
+    // ========================================================================
+    // Storage Implementations
+    // ========================================================================
+
+    // IndexedDB
+    function createIndexedDBStorage(dbName = 'vcdb-spec') {
+      const storeName = 'files';
+      let dbPromise = null;
+
+      function openDB() {
+        if (!dbPromise) {
+          dbPromise = new Promise((resolve, reject) => {
+            const req = indexedDB.open(dbName, 1);
+            req.onupgradeneeded = () => {
+              const db = req.result;
+              if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName);
+              }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+        }
+        return dbPromise;
+      }
+
+      const kindPrefix = (k) => ['config/', 'index/', 'data/'][k] || 'data/';
+      const makeKey = (path, kind) => kindPrefix(kind) + path;
+
+      return {
+        async read(path, kind) {
+          const db = await openDB();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const req = tx.objectStore(storeName).get(makeKey(path, kind));
+            req.onsuccess = () => {
+              const result = req.result;
+              resolve(result != null ? new Uint8Array(result) : null);
+            };
+            req.onerror = () => reject(req.error);
+          });
+        },
+        async write(path, data, kind) {
+          const db = await openDB();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const req = tx.objectStore(storeName).put(data.buffer.slice(0), makeKey(path, kind));
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+          });
+        },
+        async delete(path, kind) {
+          const db = await openDB();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const req = tx.objectStore(storeName).delete(makeKey(path, kind));
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+          });
+        },
+        async exists(path, kind) {
+          const result = await this.read(path, kind);
+          return result !== null;
+        },
+        async list(kind, prefix = '') {
+          const db = await openDB();
+          const kindPfx = kindPrefix(kind);
+          const fullPrefix = kindPfx + prefix;
+          return new Promise((resolve, reject) => {
+            const files = [];
+            const tx = db.transaction(storeName, 'readonly');
+            const req = tx.objectStore(storeName).openCursor();
+            req.onsuccess = () => {
+              const cursor = req.result;
+              if (cursor) {
+                const key = cursor.key;
+                if (key.startsWith(fullPrefix)) {
+                  files.push(key.slice(kindPfx.length));
+                }
+                cursor.continue();
+              } else {
+                resolve(files);
+              }
+            };
+            req.onerror = () => reject(req.error);
+          });
+        },
+        async clear() {
+          const db = await openDB();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const req = tx.objectStore(storeName).clear();
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+          });
+        }
+      };
+    }
+
+    // localStorage
+    function createLocalStorage() {
+      const kindPrefix = (k) => ['vcdb:config:', 'vcdb:index:', 'vcdb:data:'][k] || 'vcdb:data:';
+      const makeKey = (path, kind) => kindPrefix(kind) + path;
+
+      const encode = (u8) => btoa(Array.from(u8, v => String.fromCharCode(v)).join(''));
+      const decode = (s) => {
+        const bin = atob(s);
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xff;
+        return out;
+      };
+
+      return {
+        async read(path, kind) {
+          const v = localStorage.getItem(makeKey(path, kind));
+          return v != null ? decode(v) : null;
+        },
+        async write(path, data, kind) {
+          localStorage.setItem(makeKey(path, kind), encode(data));
+        },
+        async delete(path, kind) {
+          localStorage.removeItem(makeKey(path, kind));
+        },
+        async exists(path, kind) {
+          return localStorage.getItem(makeKey(path, kind)) != null;
+        },
+        async list(kind, prefix = '') {
+          const kindPfx = kindPrefix(kind);
+          const fullPrefix = kindPfx + prefix;
+          const files = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith(fullPrefix)) {
+              files.push(key.slice(kindPfx.length));
+            }
+          }
+          return files;
+        },
+        clear() {
+          const toDelete = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith('vcdb:')) toDelete.push(key);
+          }
+          toDelete.forEach(k => localStorage.removeItem(k));
+        }
+      };
+    }
+
+    // OPFS (Origin Private File System)
+    function createOPFSStorage() {
+      const kindDir = (k) => ['config', 'index', 'data'][k] || 'data';
+      let rootPromise = null;
+
+      async function getRoot() {
+        if (!rootPromise) {
+          rootPromise = navigator.storage.getDirectory();
+        }
+        return rootPromise;
+      }
+
+      async function getKindDir(kind) {
+        const root = await getRoot();
+        return root.getDirectoryHandle(kindDir(kind), { create: true });
+      }
+
+      return {
+        async read(path, kind) {
+          try {
+            const dir = await getKindDir(kind);
+            const fh = await dir.getFileHandle(path);
+            const file = await fh.getFile();
+            return new Uint8Array(await file.arrayBuffer());
+          } catch {
+            return null;
+          }
+        },
+        async write(path, data, kind) {
+          const dir = await getKindDir(kind);
+          const fh = await dir.getFileHandle(path, { create: true });
+          const w = await fh.createWritable();
+          await w.write(data);
+          await w.close();
+        },
+        async delete(path, kind) {
+          try {
+            const dir = await getKindDir(kind);
+            await dir.removeEntry(path);
+          } catch {
+            // ignore not found
+          }
+        },
+        async exists(path, kind) {
+          try {
+            const dir = await getKindDir(kind);
+            await dir.getFileHandle(path);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        async list(kind, prefix = '') {
+          const dir = await getKindDir(kind);
+          const files = [];
+          for await (const [name, handle] of dir.entries()) {
+            if (handle.kind === 'file' && name.startsWith(prefix)) {
+              files.push(name);
+            }
+          }
+          return files;
+        },
+        async clear() {
+          const root = await getRoot();
+          for (const name of ['config', 'index', 'data']) {
+            try {
+              await root.removeEntry(name, { recursive: true });
+            } catch {}
+          }
+        }
+      };
+    }
+
+    // Cache API
+    function createCacheStorage(cacheName = 'vcdb-spec', urlPrefix = 'https://vcdb.local') {
+      const kindPrefix = (k) => ['config/', 'index/', 'data/'][k] || 'data/';
+      const pathToUrl = (path, kind) => `${urlPrefix}/${cacheName}/${kindPrefix(kind)}${path}`;
+
+      return {
+        async read(path, kind) {
+          const cache = await caches.open(cacheName);
+          const response = await cache.match(pathToUrl(path, kind));
+          if (!response) return null;
+          return new Uint8Array(await response.arrayBuffer());
+        },
+        async write(path, data, kind) {
+          const cache = await caches.open(cacheName);
+          const response = new Response(data, {
+            headers: { 'Content-Type': 'application/octet-stream' }
+          });
+          await cache.put(pathToUrl(path, kind), response);
+        },
+        async delete(path, kind) {
+          const cache = await caches.open(cacheName);
+          await cache.delete(pathToUrl(path, kind));
+        },
+        async exists(path, kind) {
+          const cache = await caches.open(cacheName);
+          const response = await cache.match(pathToUrl(path, kind));
+          return response != null;
+        },
+        async list(kind, prefix = '') {
+          const cache = await caches.open(cacheName);
+          const keys = await cache.keys();
+          const kindPfx = kindPrefix(kind);
+          const baseUrl = `${urlPrefix}/${cacheName}/${kindPfx}`;
+          const fullPrefix = baseUrl + prefix;
+          const files = [];
+          for (const req of keys) {
+            if (req.url.startsWith(fullPrefix)) {
+              files.push(req.url.slice(baseUrl.length));
+            }
+          }
+          return files;
+        },
+        async clear() {
+          await caches.delete(cacheName);
+        }
+      };
+    }
+
+    // ========================================================================
+    // Run all specs
+    // ========================================================================
+
+    async function runAll() {
+      let totalFailed = 0;
+
+      try {
+        // IndexedDB
+        const idb = createIndexedDBStorage();
+        totalFailed += await runSpec('IndexedDB Storage', () => idb, () => idb.clear());
+      } catch (e) {
+        print(`IndexedDB error: ${e}`, 'fail');
+        totalFailed++;
+      }
+
+      try {
+        // localStorage
+        const ls = createLocalStorage();
+        totalFailed += await runSpec('localStorage Storage', () => ls, () => ls.clear());
+      } catch (e) {
+        print(`localStorage error: ${e}`, 'fail');
+        totalFailed++;
+      }
+
+      // OPFS (if available)
+      if (navigator.storage?.getDirectory) {
+        try {
+          const opfs = createOPFSStorage();
+          totalFailed += await runSpec('OPFS Storage', () => opfs, () => opfs.clear());
+        } catch (e) {
+          print(`OPFS error: ${e}`, 'fail');
+          totalFailed++;
+        }
+      } else {
+        print('\n=== OPFS Storage ===\n', 'suite-name');
+        print('  ⚠ OPFS not available in this browser', 'fail');
+      }
+
+      // Cache API (if available)
+      if (typeof caches !== 'undefined') {
+        try {
+          const cache = createCacheStorage();
+          totalFailed += await runSpec('Cache API Storage', () => cache, () => cache.clear());
+        } catch (e) {
+          print(`Cache API error: ${e}`, 'fail');
+          totalFailed++;
+        }
+      } else {
+        print('\n=== Cache API Storage ===\n', 'suite-name');
+        print('  ⚠ Cache API not available in this browser', 'fail');
+      }
+
+      // Summary
+      print('\n=====================================', 'suite-name');
+      if (totalFailed > 0) {
+        print(`\n${totalFailed} test(s) failed`, 'fail');
+      } else {
+        print('\nAll browser specs passed!', 'pass');
+      }
+
+      // For Playwright detection
+      window.__specResult = { failed: totalFailed };
+    }
+
+    runAll();
+  </script>
+</body>
+</html>

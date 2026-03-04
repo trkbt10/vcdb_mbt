@@ -1,6 +1,10 @@
 /**
  * MoonBit WASM/JS VectorDB bindings
  */
+import type { StorageKindType } from "../storage/types.js";
+
+// Re-export storage types for convenience
+export { StorageKind, type StorageAdapter, type StorageKindType } from "../storage/types.js";
 
 type MoonBitModule = {
   vcdb_create(dim: number): number;
@@ -75,36 +79,28 @@ export function gatewayRequest(
 }
 
 // ============================================================================
-// Storage Callbacks
+// Storage Registration (low-level)
 // ============================================================================
 
-/**
- * Storage kind - tells app what type of data is being stored
- * App uses this to route to appropriate backend (e.g., index→DynamoDB, data→S3)
- */
-export const StorageKind = {
-  Config: 0, // Collection configuration (.config.json)
-  Index: 1,  // Index structures, manifests (.index, .manifest.json)
-  Data: 2,   // Vector data, segments (.data.bin, segment files)
-} as const;
-
-export type StorageKindType = (typeof StorageKind)[keyof typeof StorageKind];
-
-export interface StorageCallbacks {
-  read: (path: string, kind: StorageKindType) => Uint8Array;
-  write: (path: string, data: Uint8Array, kind: StorageKindType) => void;
-  exists: (path: string, kind: StorageKindType) => boolean;
-  del: (path: string, kind: StorageKindType) => void;
-  list: (kind: StorageKindType) => string[];
+export interface WasmStorageCallbacks {
+  read: (path: string, kind: number) => Uint8Array;
+  write: (path: string, data: Uint8Array, kind: number) => void;
+  exists: (path: string, kind: number) => boolean;
+  del: (path: string, kind: number) => void;
+  list: (kind: number) => string[];
 }
 
-export function registerStorageCallbacks(callbacks: StorageCallbacks): void {
+/**
+ * Register storage callbacks with the WASM gateway.
+ * Note: Callbacks must be synchronous (WASM FFI limitation).
+ */
+export function registerStorageCallbacks(callbacks: WasmStorageCallbacks): void {
   getModule().gateway_register_storage(
-    (path, kind) => callbacks.read(path, kind as StorageKindType),
-    (path, data, kind) => callbacks.write(path, data, kind as StorageKindType),
-    (path, kind) => callbacks.exists(path, kind as StorageKindType),
-    (path, kind) => callbacks.del(path, kind as StorageKindType),
-    (kind) => callbacks.list(kind as StorageKindType)
+    callbacks.read,
+    callbacks.write,
+    callbacks.exists,
+    callbacks.del,
+    callbacks.list
   );
 }
 

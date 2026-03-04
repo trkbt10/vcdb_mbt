@@ -1,132 +1,64 @@
 /**
- * @file Node.js file system storage adapter
- * Persistent storage using the local filesystem.
+ * @file Node.js filesystem storage adapter
+ * Persistent storage using the local filesystem with StorageKind routing.
  */
-import { readFile, rename, mkdir, rm, open } from "node:fs/promises";
+import { readFile, mkdir, rm, open, readdir, stat } from "node:fs/promises";
 import { dirname, join as joinPath } from "node:path";
-import type { FileIO } from "./types.js";
-import { toUint8 } from "./types.js";
+import type { StorageAdapter, StorageKindType } from "./types.js";
+import { StorageKind, toUint8 } from "./types.js";
 
 type FileSystemError = Error & { code?: string };
 
-function isRetryableError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const fsError = error as FileSystemError;
-  return (
-    fsError.code === "EBUSY" ||
-    fsError.code === "EMFILE" ||
-    fsError.code === "ENFILE"
-  );
-}
-
 function isFileNotFoundError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  const fsError = error as FileSystemError;
-  return fsError.code === "ENOENT";
+  return (error as FileSystemError).code === "ENOENT";
 }
 
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function retryOperation<T>(
-  operation: () => Promise<T>,
-  maxRetries = 3,
-  baseDelay = 100
-): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-
-      if (attempt === maxRetries || !isRetryableError(error)) {
-        throw error;
-      }
-
-      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 50;
-      await sleep(delay);
-    }
-  }
-
-  throw lastError;
-}
-
-async function writeToTempFile(
-  tmpPath: string,
-  data: ArrayBuffer | Uint8Array
-): Promise<void> {
-  const fd = await open(tmpPath, "w");
-  try {
-    await fd.writeFile(toUint8(data));
-    await fd.sync();
-  } finally {
-    await fd.close();
+function kindToDir(kind: StorageKindType): string {
+  switch (kind) {
+    case StorageKind.Config:
+      return "config";
+    case StorageKind.Index:
+      return "index";
+    case StorageKind.Data:
+      return "data";
+    default:
+      return "data";
   }
 }
 
-async function syncParentDirectory(filePath: string): Promise<void> {
-  try {
-    const dirFd = await open(dirname(filePath), "r");
-    try {
-      await dirFd.sync();
-    } finally {
-      await dirFd.close();
-    }
-  } catch {
-    // ignore directory fsync errors
-  }
-}
-
-async function safeDelete(
-  filePath: string,
-  options: { silent?: boolean } = {}
-): Promise<void> {
-  try {
-    await rm(filePath, { force: true });
-  } catch (error) {
-    if (isFileNotFoundError(error)) return;
-    if (options.silent) {
-      console.warn(`Failed to delete file ${filePath}:`, error);
-      return;
-    }
-    throw error;
-  }
-}
-
-async function cleanupTempFile(tmpPath: string): Promise<void> {
-  await safeDelete(tmpPath, { silent: true });
-}
-
-export interface NodeFileIOOptions {
+export interface NodeStorageOptions {
   /** Base directory for all file operations */
   baseDir: string;
 }
 
-/** Create a Node.js filesystem FileIO instance */
-export function createNodeFileIO(options: NodeFileIOOptions): FileIO {
+/** Create a Node.js filesystem StorageAdapter instance */
+export function createNodeStorage(options: NodeStorageOptions): StorageAdapter {
   const { baseDir } = options;
+
+  const getFullPath = (filePath: string, kind: StorageKindType): string =>
+    joinPath(baseDir, kindToDir(kind), filePath);
 
   async function ensureDir(p: string) {
     await mkdir(dirname(p), { recursive: true });
   }
 
   return {
-    async read(path: string): Promise<Uint8Array> {
-      const full = joinPath(baseDir, path);
-      const u8 = await readFile(full);
-      const out = new Uint8Array(u8.byteLength);
-      out.set(u8);
-      return out;
+    async read(filePath: string, kind: StorageKindType): Promise<Uint8Array | null> {
+      const full = getFullPath(filePath, kind);
+      try {
+        const u8 = await readFile(full);
+        const out = new Uint8Array(u8.byteLength);
+        out.set(u8);
+        return out;
+      } catch (error) {
+        if (isFileNotFoundError(error)) return null;
+        throw error;
+      }
     },
 
-    async write(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
-      const full = joinPath(baseDir, path);
+    async write(filePath: string, data: Uint8Array, kind: StorageKindType): Promise<void> {
+      const full = getFullPath(filePath, kind);
       await ensureDir(full);
       const fd = await open(full, "w");
       try {
@@ -137,42 +69,49 @@ export function createNodeFileIO(options: NodeFileIOOptions): FileIO {
       }
     },
 
-    async append(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
-      const full = joinPath(baseDir, path);
-      await ensureDir(full);
-      const fd = await open(full, "a");
+    async delete(filePath: string, kind: StorageKindType): Promise<void> {
+      const full = getFullPath(filePath, kind);
       try {
-        await fd.writeFile(toUint8(data));
-        await fd.sync();
-      } finally {
-        await fd.close();
-      }
-    },
-
-    async atomicWrite(
-      path: string,
-      data: Uint8Array | ArrayBuffer
-    ): Promise<void> {
-      const full = joinPath(baseDir, path);
-      await ensureDir(full);
-      const tmp = `${full}.tmp`;
-
-      try {
-        await writeToTempFile(tmp, data);
-        await retryOperation(() => rename(tmp, full));
-        await syncParentDirectory(full);
+        await rm(full, { force: true });
       } catch (error) {
-        await cleanupTempFile(tmp);
-        throw error;
+        if (!isFileNotFoundError(error)) throw error;
       }
     },
 
-    async del(path: string): Promise<void> {
-      const full = joinPath(baseDir, path);
-      await safeDelete(full);
+    async exists(filePath: string, kind: StorageKindType): Promise<boolean> {
+      const full = getFullPath(filePath, kind);
+      try {
+        await stat(full);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    async list(kind: StorageKindType, prefix = ""): Promise<string[]> {
+      const kindDir = joinPath(baseDir, kindToDir(kind));
+      const files: string[] = [];
+
+      async function walk(dir: string, relativePrefix: string) {
+        try {
+          const entries = await readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const relativePath = relativePrefix
+              ? `${relativePrefix}/${entry.name}`
+              : entry.name;
+            if (entry.isDirectory()) {
+              await walk(joinPath(dir, entry.name), relativePath);
+            } else if (relativePath.startsWith(prefix)) {
+              files.push(relativePath);
+            }
+          }
+        } catch (error) {
+          if (!isFileNotFoundError(error)) throw error;
+        }
+      }
+
+      await walk(kindDir, "");
+      return files;
     },
   };
 }
