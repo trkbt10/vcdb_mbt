@@ -146,25 +146,32 @@ pub fn split_path_query(full_path : String) -> (String, String) {
 
 ///|
 /// HTTP router that wraps gateway handlers
-pub struct Router {
-  manager : @gateway.CollectionManager
+pub struct Router[S] {
+  manager : @gateway.CollectionManager[S]
 }
 
 ///|
 /// Create a new router
-pub fn Router::new(storage_path? : String = "./storage") -> Router {
-  { manager: @gateway.CollectionManager::new(storage_path~) }
+pub fn[S : @storage.Storage] Router::new(
+  base_path? : String = "./storage",
+) -> Router[S] {
+  { manager: @gateway.CollectionManager::new(base_path~) }
 }
 
 ///|
 /// Get the collection manager
-pub fn Router::get_manager(self : Router) -> @gateway.CollectionManager {
+pub fn[S : @storage.Storage] Router::get_manager(
+  self : Router[S],
+) -> @gateway.CollectionManager[S] {
   self.manager
 }
 
 ///|
 /// Route an HTTP request to the appropriate handler
-pub fn Router::route(self : Router, request : HttpRequest) -> HttpResponse {
+pub fn[S : @storage.Storage] Router::route(
+  self : Router[S],
+  request : HttpRequest,
+) -> HttpResponse {
   let (path, _query) = split_path_query(request.path)
   let segments = parse_path(path)
 
@@ -198,8 +205,8 @@ pub fn Router::route(self : Router, request : HttpRequest) -> HttpResponse {
 
 ///|
 /// Convenience method to handle a raw HTTP request
-pub fn handle_http(
-  router : Router,
+pub fn[S : @storage.Storage] handle_http(
+  router : Router[S],
   http_method : String,
   path : String,
   body : String,

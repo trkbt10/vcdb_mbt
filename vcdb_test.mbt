@@ -689,8 +689,9 @@ test "api/hnsw_remove_search" {
     let removed = db.remove(@core.VectorId::from_int(i))
     inspect(removed, content="true")
   }
-  // Store size unchanged (tombstones still count), but search excludes them
-  inspect(db.size(), content="20")
+  // size() now excludes tombstones (use raw_size() to include them)
+  inspect(db.size(), content="15")
+  inspect(db.raw_size(), content="20")
   // Search should not return removed IDs
   let results = db.search([1.0, 0.0, 0.0], 20, None)
   // With 25% tombstones, expect good recall (at least 10 out of 15)

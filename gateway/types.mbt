@@ -34,12 +34,24 @@ pub fn CollectionConfig::default(name : String, dim : Int) -> CollectionConfig {
 
 ///|
 /// Parse collection config from JSON
+/// Supports both formats:
+/// - {"dim": 4, "metric": "Cosine"}
+/// - {"vectors": {"size": 4, "distance": "Cosine"}} (Qdrant-compatible)
 pub fn CollectionConfig::from_json(json : JsonValue) -> CollectionConfig? {
   match json {
     JObject(_) => {
       let name = get_string(json, "name").unwrap_or("")
-      let dim = get_int(json, "dim").unwrap_or(128)
-      let metric = match get_string(json, "metric") {
+      // Support both formats for dimension
+      let dim = match get_object(json, "vectors") {
+        Some(vectors) => get_int(JObject(vectors), "size").unwrap_or(128)
+        None => get_int(json, "dim").unwrap_or(128)
+      }
+      // Support both formats for metric
+      let metric_str = match get_object(json, "vectors") {
+        Some(vectors) => get_string(JObject(vectors), "distance")
+        None => get_string(json, "metric")
+      }
+      let metric = match metric_str {
         Some("l2") | Some("L2") => @core.L2
         Some("dot") | Some("Dot") => @core.Dot
         _ => @core.Cosine

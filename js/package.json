@@ -1,21 +1,87 @@
 {
   "name": "@vcdb/server",
   "version": "0.1.0",
-  "description": "vcdb vector database HTTP server",
+  "description": "vcdb vector database HTTP server with pluggable storage backends",
   "type": "module",
-  "main": "server.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
-    "vcdb-server": "./server.js"
+    "vcdb-server": "./bin/vcdb-server.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./storage/memory": {
+      "types": "./dist/storage/memory.d.ts",
+      "import": "./dist/storage/memory.js"
+    },
+    "./storage/node": {
+      "types": "./dist/storage/node.d.ts",
+      "import": "./dist/storage/node.js"
+    },
+    "./storage/indexeddb": {
+      "types": "./dist/storage/indexeddb.d.ts",
+      "import": "./dist/storage/indexeddb.js"
+    },
+    "./storage/local-storage": {
+      "types": "./dist/storage/local-storage.d.ts",
+      "import": "./dist/storage/local-storage.js"
+    },
+    "./storage/opfs": {
+      "types": "./dist/storage/opfs.d.ts",
+      "import": "./dist/storage/opfs.js"
+    },
+    "./storage/cache": {
+      "types": "./dist/storage/cache.d.ts",
+      "import": "./dist/storage/cache.js"
+    },
+    "./wasm": {
+      "types": "./dist/wasm/index.d.ts",
+      "import": "./dist/wasm/index.js"
+    }
   },
   "scripts": {
-    "start": "bun run server.js",
-    "start:node": "node server.js",
-    "build:wasm": "cd .. && moon build --target wasm-gc"
+    "build:moon": "cd .. && moon build --target js lib",
+    "copy:moon": "cp ../_build/js/debug/build/lib/lib.js dist/wasm/ && cp ../_build/js/debug/build/lib/moonbit.d.ts dist/wasm/",
+    "build:ts": "tsc",
+    "build": "npm run build:moon && npm run build:ts && npm run copy:moon",
+    "start": "node dist/server.js",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "bash e2e-test.sh",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0"
   },
   "keywords": [
     "vector-database",
-    "moonbit",
-    "wasm"
+    "vcdb",
+    "storage",
+    "indexeddb",
+    "opfs",
+    "http-server",
+    "rest-api"
   ],
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trkbt10/vcdb.git",
+    "directory": "js"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.10",
+    "hono": "^4.12.4"
+  }
 }

@@ -1,6 +1,8 @@
 ///|
 /// Collection manager for multi-collection support
-/// Manages multiple VectorDB instances
+/// Manages multiple VectorDB instances with optional persistence
+///
+/// Generic over Storage trait - allows pluggable storage backends
 
 ///|
 /// Collection entry with config and database instance
@@ -10,24 +12,113 @@ pub struct Collection {
 }
 
 ///|
-/// Collection manager
-pub struct CollectionManager {
+/// Collection manager with pluggable storage backend
+pub struct CollectionManager[S] {
   collections : Map[String, Collection]
-  storage_path : String
+  storage : S?
+  base_path : String
 }
 
 ///|
-/// Create a new collection manager
-pub fn CollectionManager::new(
-  storage_path? : String = "./storage",
-) -> CollectionManager {
-  { collections: {}, storage_path }
+/// Create a new collection manager without storage
+pub fn[S : @storage.Storage] CollectionManager::new(
+  base_path? : String = "",
+) -> CollectionManager[S] {
+  { collections: {}, storage: None, base_path }
+}
+
+///|
+/// Create a new collection manager with storage
+pub fn[S : @storage.Storage] CollectionManager::with_storage(
+  storage : S,
+  base_path? : String = "",
+) -> CollectionManager[S] {
+  { collections: {}, storage: Some(storage), base_path }
+}
+
+///|
+/// Get path for collection data
+fn collection_data_path(base_path : String, name : String) -> String {
+  if base_path.length() == 0 {
+    name + "/data.json"
+  } else {
+    base_path + "/" + name + "/data.json"
+  }
+}
+
+///|
+/// Get path for collection config
+fn collection_config_path(base_path : String, name : String) -> String {
+  if base_path.length() == 0 {
+    name + "/config.json"
+  } else {
+    base_path + "/" + name + "/config.json"
+  }
+}
+
+///|
+/// Persist a collection to storage
+fn[S : @storage.Storage] CollectionManager::persist_collection(
+  self : CollectionManager[S],
+  name : String,
+) -> Unit {
+  let storage = match self.storage {
+    Some(s) => s
+    None => return
+  }
+  let col = match self.collections.get(name) {
+    Some(c) => c
+    None => return
+  }
+
+  // Save config as JSON
+  let config_path = collection_config_path(self.base_path, name)
+  let config_json = col.config.to_json().to_string()
+  let config_bytes = Bytes::from_array(
+    config_json.to_array().map(fn(c) { c.to_int().to_byte() }),
+  )
+  S::write(storage, config_path, config_bytes) catch {
+    _ => ()
+  }
+
+  // Save data as binary
+  let data_path = collection_data_path(self.base_path, name)
+  let data = col.db.serialize()
+  S::write(storage, data_path, data) catch {
+    _ => ()
+  }
+}
+
+///|
+/// Remove persisted collection data
+fn[S : @storage.Storage] CollectionManager::remove_persisted_collection(
+  self : CollectionManager[S],
+  name : String,
+) -> Unit {
+  let storage = match self.storage {
+    Some(s) => s
+    None => return
+  }
+
+  let config_path = collection_config_path(self.base_path, name)
+  let data_path = collection_data_path(self.base_path, name)
+
+  if S::exists(storage, config_path) {
+    S::del(storage, config_path) catch {
+      _ => ()
+    }
+  }
+  if S::exists(storage, data_path) {
+    S::del(storage, data_path) catch {
+      _ => ()
+    }
+  }
 }
 
 ///|
 /// Create a new collection
-pub fn CollectionManager::create(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::create(
+  self : CollectionManager[S],
   config : CollectionConfig,
 ) -> Result[Unit, GatewayError] {
   if self.collections.contains(config.name) {
@@ -42,13 +133,17 @@ pub fn CollectionManager::create(
   let db = @vcdb.VectorDB::new(options)
   let collection : Collection = { config, db }
   self.collections[config.name] = collection
+
+  // Auto-persist
+  self.persist_collection(config.name)
+
   Ok(())
 }
 
 ///|
 /// Get a collection by name
-pub fn CollectionManager::get(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::get(
+  self : CollectionManager[S],
   name : String,
 ) -> @vcdb.VectorDB? {
   match self.collections.get(name) {
@@ -59,8 +154,8 @@ pub fn CollectionManager::get(
 
 ///|
 /// Get collection info
-pub fn CollectionManager::get_info(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::get_info(
+  self : CollectionManager[S],
   name : String,
 ) -> CollectionInfo? {
   match self.collections.get(name) {
@@ -89,20 +184,35 @@ pub fn CollectionManager::get_info(
 
 ///|
 /// Delete a collection
-pub fn CollectionManager::delete(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::delete(
+  self : CollectionManager[S],
   name : String,
 ) -> Result[Unit, GatewayError] {
   if not(self.collections.contains(name)) {
     return Err(CollectionNotFound(name))
   }
   self.collections.remove(name)
+
+  // Remove persisted data
+  self.remove_persisted_collection(name)
+
   Ok(())
 }
 
 ///|
+/// Notify that a collection was modified (for persistence)
+pub fn[S : @storage.Storage] CollectionManager::notify_modified(
+  self : CollectionManager[S],
+  name : String,
+) -> Unit {
+  self.persist_collection(name)
+}
+
+///|
 /// List all collection names
-pub fn CollectionManager::list(self : CollectionManager) -> Array[String] {
+pub fn[S : @storage.Storage] CollectionManager::list(
+  self : CollectionManager[S],
+) -> Array[String] {
   let names : Array[String] = []
   for kv in self.collections {
     let (name, _) = kv
@@ -113,8 +223,8 @@ pub fn CollectionManager::list(self : CollectionManager) -> Array[String] {
 
 ///|
 /// List all collections with info
-pub fn CollectionManager::list_info(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::list_info(
+  self : CollectionManager[S],
 ) -> Array[CollectionInfo] {
   let infos : Array[CollectionInfo] = []
   for name in self.list() {
@@ -128,8 +238,8 @@ pub fn CollectionManager::list_info(
 
 ///|
 /// Check if a collection exists
-pub fn CollectionManager::exists(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::exists(
+  self : CollectionManager[S],
   name : String,
 ) -> Bool {
   self.collections.contains(name)
@@ -137,14 +247,16 @@ pub fn CollectionManager::exists(
 
 ///|
 /// Get the number of collections
-pub fn CollectionManager::count(self : CollectionManager) -> Int {
+pub fn[S : @storage.Storage] CollectionManager::count(
+  self : CollectionManager[S],
+) -> Int {
   self.collections.length()
 }
 
 ///|
 /// Serialize a collection to bytes (for persistence)
-pub fn CollectionManager::serialize_collection(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::serialize_collection(
+  self : CollectionManager[S],
   name : String,
 ) -> Bytes? {
   match self.collections.get(name) {
@@ -155,8 +267,8 @@ pub fn CollectionManager::serialize_collection(
 
 ///|
 /// Deserialize and load a collection
-pub fn CollectionManager::load_collection(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::load_collection(
+  self : CollectionManager[S],
   config : CollectionConfig,
   data : Bytes,
 ) -> Result[Unit, GatewayError] {
@@ -171,8 +283,8 @@ pub fn CollectionManager::load_collection(
 
 ///|
 /// Export collections metadata as JSON
-pub fn CollectionManager::export_metadata(
-  self : CollectionManager,
+pub fn[S : @storage.Storage] CollectionManager::export_metadata(
+  self : CollectionManager[S],
 ) -> JsonValue {
   let collections : Array[JsonValue] = []
   for kv in self.collections {

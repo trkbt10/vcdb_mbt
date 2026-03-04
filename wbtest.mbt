@@ -252,8 +252,9 @@ test "vectordb/hnsw_remove" {
   // Remove id1 (tombstone only for HNSW)
   let removed = db.remove(id1)
   inspect(removed, content="true")
-  // Size stays same (HNSW tombstone)
-  inspect(db.size(), content="3")
+  // size() now excludes tombstones
+  inspect(db.size(), content="2")
+  inspect(db.raw_size(), content="3")
   // Search should not find id1
   let results = db.search([1.0, 0.0], 10, None)
   let has_id1 = results.iter().any(fn(h) { h.id.to_int64() == 1L })

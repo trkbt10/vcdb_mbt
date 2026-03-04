@@ -144,11 +144,24 @@ pub fn VectorDB::with_ivf(
 }
 
 ///|
-/// Get the number of vectors in the database.
+/// Get the number of accessible vectors in the database.
 ///
-/// Note: For HNSW, this includes tombstoned (deleted) vectors.
-/// Use has() to check if a specific ID is accessible.
+/// For HNSW, this excludes tombstoned (deleted) vectors.
+/// Use raw_size() to get the total count including tombstones.
 pub fn VectorDB::size(self : VectorDB) -> Int {
+  match self.hnsw {
+    Some(state) => {
+      let (alive, _) = @ann.hnsw_tombstone_stats(state, self.store)
+      alive
+    }
+    None => self.store.size()
+  }
+}
+
+///|
+/// Get the raw size including tombstoned vectors.
+/// This is primarily for internal use and serialization.
+pub fn VectorDB::raw_size(self : VectorDB) -> Int {
   self.store.size()
 }
 

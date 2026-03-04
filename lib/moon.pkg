@@ -1,0 +1,35 @@
+import {
+  "trkbt10/vcdb",
+  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/storage",
+  "trkbt10/vcdb/gateway",
+  "moonbitlang/core/hashmap",
+}
+
+options(
+  link: {
+    "js": {
+      "exports": [
+        "vcdb_create",
+        "vcdb_create_hnsw",
+        "vcdb_create_ivf",
+        "vcdb_destroy",
+        "vcdb_size",
+        "vcdb_dim",
+        "vcdb_add",
+        "vcdb_upsert",
+        "vcdb_get",
+        "vcdb_search",
+        "vcdb_has",
+        "vcdb_remove",
+        "vcdb_serialize",
+        "vcdb_deserialize",
+        "gateway_request",
+        "gateway_storage_list",
+        "gateway_storage_read",
+        "gateway_storage_write",
+        "gateway_storage_exists",
+      ],
+    },
+  },
+)

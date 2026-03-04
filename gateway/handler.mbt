@@ -4,6 +4,7 @@
 
 ///|
 /// Handle upsert points into a collection
+/// Returns (count, needs_persist) - caller should persist if needed
 pub fn handle_upsert(
   db : @vcdb.VectorDB,
   req : UpsertRequest,
@@ -79,8 +80,8 @@ pub fn handle_delete_point(
 
 ///|
 /// Handle collection creation
-pub fn handle_create_collection(
-  manager : CollectionManager,
+pub fn[S : @storage.Storage] handle_create_collection(
+  manager : CollectionManager[S],
   config : CollectionConfig,
 ) -> Result[Unit, GatewayError] {
   manager.create(config)
@@ -88,8 +89,8 @@ pub fn handle_create_collection(
 
 ///|
 /// Handle collection deletion
-pub fn handle_delete_collection(
-  manager : CollectionManager,
+pub fn[S : @storage.Storage] handle_delete_collection(
+  manager : CollectionManager[S],
   name : String,
 ) -> Result[Unit, GatewayError] {
   manager.delete(name)
@@ -97,16 +98,16 @@ pub fn handle_delete_collection(
 
 ///|
 /// Handle list collections
-pub fn handle_list_collections(
-  manager : CollectionManager,
+pub fn[S : @storage.Storage] handle_list_collections(
+  manager : CollectionManager[S],
 ) -> CollectionsResponse {
   { collections: manager.list_info() }
 }
 
 ///|
 /// Handle get collection info
-pub fn handle_get_collection(
-  manager : CollectionManager,
+pub fn[S : @storage.Storage] handle_get_collection(
+  manager : CollectionManager[S],
   name : String,
 ) -> Result[CollectionInfo, GatewayError] {
   match manager.get_info(name) {
@@ -117,8 +118,8 @@ pub fn handle_get_collection(
 
 ///|
 /// Convenience: Handle request with collection name
-pub fn[T] with_collection(
-  manager : CollectionManager,
+pub fn[S : @storage.Storage, T] with_collection(
+  manager : CollectionManager[S],
   name : String,
   handler : (@vcdb.VectorDB) -> Result[T, GatewayError],
 ) -> Result[T, GatewayError] {
@@ -163,8 +164,8 @@ fn error_to_string(e : GatewayError) -> String {
 
 ///|
 /// Parse and execute an API request, returning JSON response
-pub fn execute_request(
-  manager : CollectionManager,
+pub fn[S : @storage.Storage] execute_request(
+  manager : CollectionManager[S],
   http_method : String,
   path : Array[String],
   body : String,
@@ -212,13 +213,15 @@ pub fn execute_request(
         None => return ApiResponse::err("Invalid JSON")
       }
       match with_collection(manager, name, fn(db) { handle_upsert(db, req) }) {
-        Ok(count) =>
+        Ok(count) => {
+          manager.notify_modified(name) // Persist changes
           ApiResponse::ok(
             json_object([
               ("status", JString("ok")),
               ("upserted", JNumber(count.to_double())),
             ]),
           )
+        }
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     }
@@ -256,7 +259,10 @@ pub fn execute_request(
       }
       match
         with_collection(manager, name, fn(db) { handle_delete_point(db, id) }) {
-        Ok(_) => ApiResponse::ok(JBool(true))
+        Ok(_) => {
+          manager.notify_modified(name) // Persist changes
+          ApiResponse::ok(JBool(true))
+        }
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     }

@@ -120,11 +120,17 @@ echo ""
 log_info "Starting vcdb server..."
 rm -rf ./test_storage
 
+# Build if needed
+if [ ! -f dist/server.js ]; then
+  log_info "Building TypeScript..."
+  npm run build
+fi
+
 if command -v bun &> /dev/null; then
-  bun run server.js --port $PORT --storage ./test_storage &
+  bun run dist/server.js --port $PORT --storage ./test_storage &
   SERVER_PID=$!
 elif command -v node &> /dev/null; then
-  node server.js --port $PORT --storage ./test_storage &
+  node dist/server.js --port $PORT --storage ./test_storage &
   SERVER_PID=$!
 else
   log_error "Neither bun nor node found. Please install one of them."

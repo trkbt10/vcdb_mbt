@@ -40,14 +40,14 @@ test "http/split_path_query_no_query" {
 
 ///|
 test "http/router_health" {
-  let router = Router::new()
+  let router : Router[@storage.MemoryStorage] = Router::new()
   let response = router.route(HttpRequest::new("GET", "/healthz"))
   assert_eq(response.status, 200)
 }
 
 ///|
 test "http/router_collections" {
-  let router = Router::new()
+  let router : Router[@storage.MemoryStorage] = Router::new()
   // Create a collection
   let _ = router.route(
     HttpRequest::new("POST", "/collections/test", body="{\"dim\":3}"),
@@ -59,7 +59,7 @@ test "http/router_collections" {
 
 ///|
 test "http/router_not_found" {
-  let router = Router::new()
+  let router : Router[@storage.MemoryStorage] = Router::new()
   let response = router.route(HttpRequest::new("GET", "/unknown"))
   assert_eq(response.status, 404) // "Not found" from execute_request
 }
