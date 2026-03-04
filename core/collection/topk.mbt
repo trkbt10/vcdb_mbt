@@ -13,24 +13,43 @@ pub fn[T] push_top_k(
   if k <= 0 {
     return
   }
-  if out.length() < k {
-    out.push(item)
-    // Always keep sorted (simple approach for small arrays)
-    out.sort_by(fn(a, b) { get_score(b).compare(get_score(a)) })
+  let item_score = get_score(item)
+  let len = out.length()
+  if len < k {
+    // Find insertion position using binary search on descending array
+    let mut lo = 0
+    let mut hi = len
+    while lo < hi {
+      let mid = (lo + hi) / 2
+      if get_score(out[mid]) > item_score {
+        lo = mid + 1
+      } else {
+        hi = mid
+      }
+    }
+    // Insert at position lo
+    out.push(item) // Add placeholder at end
+    for i = len; i > lo; {
+      out[i] = out[i - 1]
+      continue i - 1
+    }
+    out[lo] = item
     return
   }
   // out.length() >= k
-  let worst_score = get_score(out[out.length() - 1])
-  let item_score = get_score(item)
+  let worst_score = get_score(out[len - 1])
   if item_score <= worst_score {
     return
   }
-  // Replace worst and bubble up
-  out[out.length() - 1] = item
-  for i = out.length() - 1; i > 0 && get_score(out[i]) > get_score(out[i - 1]); {
-    let tmp = out[i]
+  // Replace worst and bubble up (cache item_score)
+  out[len - 1] = item
+  for i = len - 1; i > 0; {
+    let prev_score = get_score(out[i - 1])
+    if item_score <= prev_score {
+      break
+    }
     out[i] = out[i - 1]
-    out[i - 1] = tmp
+    out[i - 1] = item
     continue i - 1
   }
 }

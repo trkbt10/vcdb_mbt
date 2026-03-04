@@ -108,7 +108,7 @@ fn HNSWState::ensure_levels(self : HNSWState, level : Int) -> Unit {
 }
 
 ///|
-/// Compute score between query and vector at index
+/// Compute score between query and vector at index (inline for performance)
 fn hnsw_score(
   state : HNSWState,
   store : @core.CoreStore,
@@ -121,8 +121,11 @@ fn hnsw_score(
   if base + dim > store.data.length() {
     return -1.0e308
   }
-  let score_fn = @core.get_score_fn(state.metric)
-  score_fn(store.data, base, q, dim)
+  // Inline score computation to avoid function lookup overhead
+  match state.metric {
+    Cosine | Dot => @core.dot_at(store.data, base, q, dim)
+    L2 => @core.l2neg_at(store.data, base, q, dim)
+  }
 }
 
 ///|
