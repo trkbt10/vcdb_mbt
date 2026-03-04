@@ -597,7 +597,7 @@ pub fn encode_wal_header() -> Bytes {
 pub fn encode_wal_footer(body : Bytes) -> Bytes {
   let w = @binary.BinaryWriter::new()
   w.push_u32(wal_footer_magic)
-  w.push_u32(@binary.crc32(body))
+  w.push_u32(@binary.crc32_fast(body))
   w.concat()
 }
 
@@ -616,7 +616,7 @@ pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
   let body = w.concat()
   // Add footer with CRC32 inline
   w.push_u32(wal_footer_magic)
-  w.push_u32(@binary.crc32(body))
+  w.push_u32(@binary.crc32_fast(body))
   w.concat()
 }
 
@@ -651,7 +651,7 @@ pub fn verify_wal_checksum(data : Bytes) -> Bool {
   let stored_crc = r.read_u32()
   let body_reader = @binary.BinaryReader::new(data)
   let body = body_reader.read_bytes(footer_start)
-  let computed_crc = @binary.crc32(body)
+  let computed_crc = @binary.crc32_fast(body)
   stored_crc == computed_crc
 }
 

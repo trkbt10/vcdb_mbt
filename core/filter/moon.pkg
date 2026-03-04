@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/core/bench",
   "trkbt10/vcdb/core",
   "trkbt10/vcdb/core/attr",
 }
