@@ -41,3 +41,39 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: moon coverage report -f coveralls --send-to coveralls --coveralls-token "$COVERALLS_REPO_TOKEN"
+
+  js-smoke-test:
+    runs-on: ubuntu-latest
+    name: JS/WASM Smoke Test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install MoonBit dependencies
+        run: |
+          moon version --all
+          moon update
+
+      - name: Build WASM/JS target
+        run: moon build --target js lib
+
+      - name: Setup JS package
+        working-directory: js
+        run: |
+          npm ci
+          npm run build:ts
+          npm run copy:moon
+
+      - name: Run WASM smoke test
+        run: node js/test/smoke.test.mjs
