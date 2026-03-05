@@ -1,0 +1,45 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/collection"
+
+import {
+  "trkbt10/vcdb/core",
+}
+
+// Values
+pub fn[T : Scored] push_sorted_desc(Array[T], T, Int?) -> Unit
+
+pub fn[T] push_top_k(Array[T], T, Int, (T) -> Double) -> Unit
+
+pub fn scored_item(Int, Double) -> ScoredItem
+
+// Errors
+
+// Types and methods
+pub struct MaxHeap[T] {
+  data : Array[T]
+  compare : (T, T) -> Int
+}
+pub fn[T] MaxHeap::clear(Self[T]) -> Unit
+pub fn[T : Scored] MaxHeap::for_scored() -> Self[T]
+pub fn[T] MaxHeap::is_empty(Self[T]) -> Bool
+pub fn[T] MaxHeap::length(Self[T]) -> Int
+pub fn[T] MaxHeap::new((T, T) -> Int) -> Self[T]
+pub fn[T] MaxHeap::peek(Self[T]) -> T?
+pub fn[T] MaxHeap::pop(Self[T]) -> T?
+pub fn[T] MaxHeap::push(Self[T], T) -> Unit
+
+pub(all) struct ScoredItem {
+  idx : Int
+  s : Double
+}
+pub impl Show for ScoredItem
+pub impl Scored for ScoredItem
+
+// Type aliases
+
+// Traits
+pub trait Scored {
+  score(Self) -> Double
+}
+pub impl Scored for @core.SearchHit
+

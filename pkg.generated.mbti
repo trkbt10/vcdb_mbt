@@ -1,0 +1,50 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb"
+
+import {
+  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/ann",
+  "trkbt10/vcdb/core/attr",
+  "trkbt10/vcdb/core/filter",
+}
+
+// Values
+pub fn empty_attrs() -> @core.Attrs
+
+// Errors
+
+// Types and methods
+pub struct VectorDB {
+  store : @core.CoreStore
+  strategy : @core.Strategy
+  bruteforce : @ann.BruteforceState?
+  hnsw : @ann.HNSWState?
+  ivf : @ann.IVFState?
+}
+pub fn VectorDB::add(Self, @core.VectorId, Array[Double], @core.Attrs) -> Unit
+pub fn VectorDB::deserialize(Bytes) -> Self
+pub fn VectorDB::dim(Self) -> Int
+pub fn VectorDB::find(Self, Array[Double], ((@core.VectorId, @core.Attrs) -> Bool)?) -> @core.SearchHit?
+pub fn VectorDB::from_store(@core.CoreStore, @core.DatabaseOptions) -> Self
+pub fn VectorDB::get(Self, @core.VectorId) -> @core.VectorRecord?
+pub fn VectorDB::has(Self, @core.VectorId) -> Bool
+pub fn VectorDB::metric(Self) -> @core.Metric
+pub fn VectorDB::new(@core.DatabaseOptions) -> Self
+pub fn VectorDB::raw_size(Self) -> Int
+pub fn VectorDB::remove(Self, @core.VectorId) -> Bool
+pub fn VectorDB::search(Self, Array[Double], Int, ((@core.VectorId, @core.Attrs) -> Bool)?) -> Array[@core.SearchHit]
+pub fn VectorDB::search_with_expr(Self, Array[Double], Int, @filter.FilterExpr?, @attr.BasicAttrIndex?, @filter.FilterStrategy) -> Array[@core.SearchHit]
+pub fn VectorDB::serialize(Self) -> Bytes
+pub fn VectorDB::size(Self) -> Int
+pub fn VectorDB::store(Self) -> @core.CoreStore
+pub fn VectorDB::train(Self, iterations? : Int) -> Unit
+pub fn VectorDB::update_attrs(Self, @core.VectorId, @core.Attrs) -> Bool
+pub fn VectorDB::upsert(Self, @core.VectorId, Array[Double], @core.Attrs) -> Bool
+pub fn VectorDB::with_dim(Int) -> Self
+pub fn VectorDB::with_hnsw(Int, metric? : @core.Metric) -> Self
+pub fn VectorDB::with_ivf(Int, metric? : @core.Metric) -> Self
+
+// Type aliases
+
+// Traits
+

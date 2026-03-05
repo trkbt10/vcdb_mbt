@@ -1,0 +1,71 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/persistence/wal"
+
+import {
+  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/binary",
+  "trkbt10/vcdb/core/storage",
+}
+
+// Values
+pub fn decode_wal_record(@binary.BinaryReader) -> WalRecord?
+
+pub fn decode_wal_records(Bytes) -> Array[WalRecord]
+
+pub fn encode_wal_footer(Bytes) -> Bytes
+
+pub fn encode_wal_header() -> Bytes
+
+pub fn encode_wal_record(WalRecord) -> Bytes
+
+pub fn encode_wal_segment(Array[WalRecord]) -> Bytes
+
+pub fn verify_wal_checksum(Bytes) -> Bool
+
+pub fn verify_wal_header(@binary.BinaryReader) -> Bool
+
+pub let wal_footer_magic : UInt
+
+pub let wal_magic : UInt
+
+pub let wal_version : UInt
+
+// Errors
+
+// Types and methods
+pub struct WalRecord {
+  record_type : WalRecordType
+  id : @core.VectorId
+  attrs : @core.Attrs?
+  vector : Array[Double]?
+}
+pub fn WalRecord::remove(@core.VectorId) -> Self
+pub fn WalRecord::set_attrs(@core.VectorId, @core.Attrs) -> Self
+pub fn WalRecord::upsert(@core.VectorId, Array[Double], @core.Attrs) -> Self
+pub impl Show for WalRecord
+
+pub enum WalRecordType {
+  Upsert
+  Remove
+  SetAttrs
+}
+pub fn WalRecordType::from_byte(Byte) -> Self?
+pub fn WalRecordType::to_byte(Self) -> Byte
+pub impl Eq for WalRecordType
+pub impl Show for WalRecordType
+
+pub struct WalRuntime {
+  storage : @storage.MemoryStorage
+  path : String
+}
+pub fn WalRuntime::append(Self, Array[WalRecord]) -> Unit raise @storage.IOError
+pub fn WalRuntime::exists(Self) -> Bool
+pub fn WalRuntime::new(@storage.MemoryStorage, String) -> Self
+pub fn WalRuntime::replay_into(Self, @core.CoreStore) -> Int raise @storage.IOError
+pub fn WalRuntime::size(Self) -> Int
+pub fn WalRuntime::truncate(Self) -> Unit
+
+// Type aliases
+
+// Traits
+

@@ -1,0 +1,52 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/filter"
+
+import {
+  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/attr",
+}
+
+// Values
+pub fn compile_filter(FilterExpr) -> (@core.VectorId, @core.Attrs) -> Bool
+
+pub fn eval_filter(FilterExpr, @core.Attrs) -> Bool
+
+pub fn get_candidates_basic(FilterExpr, @attr.BasicAttrIndex) -> Array[@core.VectorId]?
+
+// Errors
+
+// Types and methods
+pub(all) enum FilterExpr {
+  Leaf(LeafExpr)
+  Must(Array[FilterExpr])
+  MustNot(Array[FilterExpr])
+  Should(Array[FilterExpr], Int)
+}
+pub fn FilterExpr::exists(String) -> Self
+pub fn FilterExpr::is_null(String) -> Self
+pub fn FilterExpr::match_(String, @core.AttrValue) -> Self
+pub fn FilterExpr::must(Array[Self]) -> Self
+pub fn FilterExpr::must_not(Array[Self]) -> Self
+pub fn FilterExpr::range(String, @core.NumericRange) -> Self
+pub fn FilterExpr::should(Array[Self], min? : Int) -> Self
+pub impl Show for FilterExpr
+
+pub(all) enum FilterStrategy {
+  PreFilter
+  PostFilter
+  Auto
+}
+pub impl Show for FilterStrategy
+
+pub(all) enum LeafExpr {
+  Match(String, @core.AttrValue)
+  Range(String, @core.NumericRange)
+  Exists(String)
+  IsNull(String)
+}
+pub impl Show for LeafExpr
+
+// Type aliases
+
+// Traits
+

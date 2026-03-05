@@ -1,0 +1,50 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/binary"
+
+// Values
+pub fn crc32(Bytes) -> UInt
+
+pub fn crc32_fast(Bytes) -> UInt
+
+pub fn crc32_verify(Bytes, UInt) -> Bool
+
+// Errors
+
+// Types and methods
+pub struct BinaryReader {
+  data : Bytes
+  mut offset : Int
+}
+pub fn BinaryReader::has_more(Self) -> Bool
+pub fn BinaryReader::new(Bytes) -> Self
+pub fn BinaryReader::position(Self) -> Int
+pub fn BinaryReader::read_byte(Self) -> Byte
+pub fn BinaryReader::read_bytes(Self, Int) -> Bytes
+pub fn BinaryReader::read_f32(Self) -> Float
+pub fn BinaryReader::read_f64(Self) -> Double
+pub fn BinaryReader::read_i32(Self) -> Int
+pub fn BinaryReader::read_i64(Self) -> Int64
+pub fn BinaryReader::read_u32(Self) -> UInt
+pub fn BinaryReader::read_u64(Self) -> UInt64
+pub fn BinaryReader::remaining(Self) -> Int
+pub fn BinaryReader::skip(Self, Int) -> Unit
+
+pub struct BinaryWriter {
+  mut buf : FixedArray[Byte]
+  mut len : Int
+}
+pub fn BinaryWriter::concat(Self) -> Bytes
+pub fn BinaryWriter::new(capacity? : Int) -> Self
+pub fn BinaryWriter::push_byte(Self, Byte) -> Unit
+pub fn BinaryWriter::push_bytes(Self, Bytes) -> Unit
+pub fn BinaryWriter::push_f32(Self, Float) -> Unit
+pub fn BinaryWriter::push_f64(Self, Double) -> Unit
+pub fn BinaryWriter::push_i32(Self, Int) -> Unit
+pub fn BinaryWriter::push_i64(Self, Int64) -> Unit
+pub fn BinaryWriter::push_u32(Self, UInt) -> Unit
+pub fn BinaryWriter::push_u64(Self, UInt64) -> Unit
+
+// Type aliases
+
+// Traits
+

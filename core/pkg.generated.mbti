@@ -1,0 +1,183 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core"
+
+// Values
+pub fn attr_value_to_number(AttrValue) -> Double?
+
+pub fn cosine_similarity(Array[Double], Array[Double]) -> Double
+
+pub fn dot(Array[Double], Array[Double]) -> Double
+
+pub fn dot_at(Array[Double], Int, Array[Double], Int) -> Double
+
+pub fn empty_attrs() -> Attrs
+
+pub fn get_score_fn(Metric) -> (Array[Double], Int, Array[Double], Int) -> Double
+
+pub let hnsw_ef_construction_max : Int
+
+pub let hnsw_ef_construction_min : Int
+
+pub let hnsw_m_max : Int
+
+pub let hnsw_m_min : Int
+
+pub let ivf_nlist_max : Int
+
+pub let ivf_nlist_min : Int
+
+pub fn l2_norm(Array[Double]) -> Double
+
+pub fn l2_squared(Array[Double], Array[Double]) -> Double
+
+pub fn l2neg_at(Array[Double], Int, Array[Double], Int) -> Double
+
+pub fn ln(Double) -> Double
+
+pub fn normalize(Array[Double]) -> Array[Double]
+
+pub fn normalize_in_place(Array[Double]) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) enum AttrValue {
+  Null
+  Bool(Bool)
+  Int(Int64)
+  Float(Double)
+  String(String)
+}
+pub impl Eq for AttrValue
+pub impl Show for AttrValue
+
+pub(all) struct Attrs(Map[String, AttrValue])
+pub fn Attrs::clear(Self) -> Unit
+pub fn Attrs::copy(Self) -> Self
+pub fn Attrs::get(Self, String) -> AttrValue?
+#deprecated
+pub fn Attrs::inner(Self) -> Map[String, AttrValue]
+pub fn Attrs::is_empty(Self) -> Bool
+pub fn Attrs::keys(Self) -> Array[String]
+pub fn Attrs::set(Self, String, AttrValue) -> Unit
+pub fn Attrs::size(Self) -> Int
+pub impl Show for Attrs
+
+pub struct CoreStore {
+  dim : Int
+  metric : Metric
+  mut ids : Array[VectorId]
+  mut data : Array[Double]
+  mut attrs : Array[Attrs]
+  pos : Map[Int64, Int]
+  mut capacity : Int
+  mut count : Int
+}
+pub fn CoreStore::add_or_update(Self, VectorId, Array[Double], Attrs, upsert? : Bool) -> (Int, Bool)
+pub fn CoreStore::capacity(Self) -> Int
+pub fn CoreStore::deserialize(Bytes) -> Self
+pub fn CoreStore::ensure_capacity(Self, Int) -> Bool
+pub fn CoreStore::get(Self, VectorId) -> VectorRecord?
+pub fn CoreStore::get_by_index(Self, Int) -> VectorRecord
+pub fn CoreStore::get_index(Self, VectorId) -> Int?
+pub fn CoreStore::has(Self, VectorId) -> Bool
+pub fn CoreStore::new(Int, Metric, capacity? : Int) -> Self
+pub fn CoreStore::normalize_query(Self, Array[Double]) -> Array[Double]
+pub fn CoreStore::remove_by_id(Self, VectorId) -> MoveInfo?
+pub fn CoreStore::serialize(Self) -> Bytes
+pub fn CoreStore::shrink_to_fit(Self) -> Unit
+pub fn CoreStore::size(Self) -> Int
+pub fn CoreStore::update_attrs(Self, VectorId, Attrs) -> Bool
+
+pub(all) struct DatabaseOptions {
+  dim : Int
+  metric : Metric
+  capacity : Int
+  strategy : Strategy
+}
+pub fn DatabaseOptions::default(Int) -> Self
+pub impl Show for DatabaseOptions
+
+pub(all) struct HNSWParams {
+  m : Int
+  ef_construction : Int
+  ef_search : Int
+  level_mult : Double
+  seed : UInt64
+  allow_replace_deleted : Bool
+}
+pub fn HNSWParams::default() -> Self
+pub impl Show for HNSWParams
+
+pub(all) struct IVFParams {
+  nlist : Int
+  nprobe : Int
+}
+pub fn IVFParams::default() -> Self
+pub impl Show for IVFParams
+
+pub(all) enum Metric {
+  Cosine
+  L2
+  Dot
+}
+pub impl Eq for Metric
+pub impl Show for Metric
+
+pub struct MoveInfo {
+  moved_id : VectorId?
+  moved_from : Int?
+  moved_to : Int?
+}
+pub impl Show for MoveInfo
+
+pub(all) struct NumericRange {
+  gt : Double?
+  gte : Double?
+  lt : Double?
+  lte : Double?
+}
+pub fn NumericRange::between(Double, Double, lower_inclusive? : Bool, upper_inclusive? : Bool) -> Self
+pub fn NumericRange::empty() -> Self
+pub fn NumericRange::gt(Double) -> Self
+pub fn NumericRange::gte(Double) -> Self
+pub fn NumericRange::lt(Double) -> Self
+pub fn NumericRange::lte(Double) -> Self
+pub fn NumericRange::matches(Self, Double) -> Bool
+pub impl Show for NumericRange
+
+pub(all) struct SearchHit {
+  id : VectorId
+  score : Double
+  attrs : Attrs
+}
+pub impl Show for SearchHit
+
+pub(all) enum Strategy {
+  Bruteforce
+  HNSW(HNSWParams)
+  IVF(IVFParams)
+}
+pub impl Show for Strategy
+
+pub(all) struct VectorId(Int64)
+pub fn VectorId::from_int(Int) -> Self
+pub fn VectorId::from_int64(Int64) -> Self
+#deprecated
+pub fn VectorId::inner(Self) -> Int64
+pub fn VectorId::to_int64(Self) -> Int64
+pub impl Compare for VectorId
+pub impl Eq for VectorId
+pub impl Hash for VectorId
+pub impl Show for VectorId
+
+pub(all) struct VectorRecord {
+  vector : Array[Double]
+  attrs : Attrs
+}
+pub impl Show for VectorRecord
+
+// Type aliases
+
+// Traits
+

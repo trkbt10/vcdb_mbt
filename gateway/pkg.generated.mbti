@@ -1,0 +1,205 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/gateway"
+
+import {
+  "trkbt10/vcdb",
+  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/storage",
+}
+
+// Values
+pub fn attr_value_to_json(@core.AttrValue) -> JsonValue
+
+pub fn attrs_to_json(@core.Attrs) -> JsonValue
+
+pub fn[S : @storage.Storage] execute_request(CollectionManager[S], String, Array[String], String) -> ApiResponse
+
+pub fn get_array(JsonValue, String) -> Array[JsonValue]?
+
+pub fn get_bool(JsonValue, String) -> Bool?
+
+pub fn get_int(JsonValue, String) -> Int?
+
+pub fn get_int64(JsonValue, String) -> Int64?
+
+pub fn get_number(JsonValue, String) -> Double?
+
+pub fn get_object(JsonValue, String) -> Map[String, JsonValue]?
+
+pub fn get_string(JsonValue, String) -> String?
+
+pub fn[S : @storage.Storage] handle_create_collection(CollectionManager[S], CollectionConfig) -> Result[Unit, GatewayError]
+
+pub fn[S : @storage.Storage] handle_delete_collection(CollectionManager[S], String) -> Result[Unit, GatewayError]
+
+pub fn handle_delete_point(@vcdb.VectorDB, Int64) -> Result[Unit, GatewayError]
+
+pub fn[S : @storage.Storage] handle_get_collection(CollectionManager[S], String) -> Result[CollectionInfo, GatewayError]
+
+pub fn handle_get_point(@vcdb.VectorDB, Int64) -> Result[PointResponse, GatewayError]
+
+pub fn handle_health() -> JsonValue
+
+pub fn[S : @storage.Storage] handle_list_collections(CollectionManager[S]) -> CollectionsResponse
+
+pub fn handle_search(@vcdb.VectorDB, SearchRequest) -> Result[SearchResponse, GatewayError]
+
+pub fn handle_service_info() -> JsonValue
+
+pub fn handle_upsert(@vcdb.VectorDB, UpsertRequest) -> Result[Int, GatewayError]
+
+pub fn json_array(Array[JsonValue]) -> JsonValue
+
+pub fn json_object(Array[(String, JsonValue)]) -> JsonValue
+
+pub fn json_to_attr_value(JsonValue) -> @core.AttrValue
+
+pub fn json_to_attrs(JsonValue) -> @core.Attrs?
+
+pub fn json_to_vector(JsonValue) -> Array[Double]?
+
+pub fn parse_json(String) -> JsonValue?
+
+pub fn vector_to_json(Array[Double]) -> JsonValue
+
+pub fn[S : @storage.Storage, T] with_collection(CollectionManager[S], String, (@vcdb.VectorDB) -> Result[T, GatewayError]) -> Result[T, GatewayError]
+
+// Errors
+pub(all) suberror GatewayError {
+  NotFound(String)
+  InvalidInput(String)
+  DimensionMismatch(expected~ : Int, got~ : Int)
+  CollectionExists(String)
+  CollectionNotFound(String)
+  StorageError(String)
+}
+pub impl Show for GatewayError
+
+// Types and methods
+pub struct ApiResponse {
+  status : String
+  result : JsonValue?
+  error : String?
+}
+pub fn ApiResponse::err(String) -> Self
+pub fn ApiResponse::ok(JsonValue) -> Self
+pub fn ApiResponse::to_json(Self) -> JsonValue
+pub impl Show for ApiResponse
+
+pub struct Collection {
+  config : CollectionConfig
+  db : @vcdb.VectorDB
+}
+
+pub struct CollectionConfig {
+  name : String
+  dim : Int
+  metric : @core.Metric
+  strategy : @core.Strategy
+}
+pub fn CollectionConfig::default(String, Int) -> Self
+pub fn CollectionConfig::from_json(JsonValue) -> Self?
+pub fn CollectionConfig::to_json(Self) -> JsonValue
+pub impl Show for CollectionConfig
+
+pub struct CollectionInfo {
+  name : String
+  vectors_count : Int
+  dim : Int
+  metric : String
+  strategy : String
+}
+pub fn CollectionInfo::to_json(Self) -> JsonValue
+pub impl Show for CollectionInfo
+
+pub struct CollectionManager[S] {
+  collections : Map[String, Collection]
+  storage : S?
+  base_path : String
+}
+pub fn[S : @storage.Storage] CollectionManager::count(Self[S]) -> Int
+pub fn[S : @storage.Storage] CollectionManager::create(Self[S], CollectionConfig) -> Result[Unit, GatewayError]
+pub fn[S : @storage.Storage] CollectionManager::delete(Self[S], String) -> Result[Unit, GatewayError]
+pub fn[S : @storage.Storage] CollectionManager::exists(Self[S], String) -> Bool
+pub fn[S : @storage.Storage] CollectionManager::export_metadata(Self[S]) -> JsonValue
+pub fn[S : @storage.Storage] CollectionManager::get(Self[S], String) -> @vcdb.VectorDB?
+pub fn[S : @storage.Storage] CollectionManager::get_info(Self[S], String) -> CollectionInfo?
+pub fn[S : @storage.Storage] CollectionManager::list(Self[S]) -> Array[String]
+pub fn[S : @storage.Storage] CollectionManager::list_info(Self[S]) -> Array[CollectionInfo]
+pub fn[S : @storage.Storage] CollectionManager::load_collection(Self[S], CollectionConfig, Bytes) -> Result[Unit, GatewayError]
+pub fn[S : @storage.Storage] CollectionManager::new(base_path? : String) -> Self[S]
+pub fn[S : @storage.Storage] CollectionManager::notify_modified(Self[S], String) -> Unit
+pub fn[S : @storage.Storage] CollectionManager::serialize_collection(Self[S], String) -> Bytes?
+pub fn[S : @storage.Storage] CollectionManager::with_storage(S, base_path? : String) -> Self[S]
+
+pub struct CollectionsResponse {
+  collections : Array[CollectionInfo]
+}
+pub fn CollectionsResponse::to_json(Self) -> JsonValue
+pub impl Show for CollectionsResponse
+
+pub(all) enum JsonValue {
+  JNull
+  JBool(Bool)
+  JNumber(Double)
+  JString(String)
+  JArray(Array[JsonValue])
+  JObject(Map[String, JsonValue])
+}
+pub fn JsonValue::to_string(Self) -> String
+pub impl Eq for JsonValue
+pub impl Show for JsonValue
+
+pub struct PointData {
+  id : Int64
+  vector : Array[Double]
+  payload : @core.Attrs
+}
+pub fn PointData::from_json(JsonValue) -> Self?
+pub fn PointData::to_json(Self) -> JsonValue
+pub impl Show for PointData
+
+pub struct PointResponse {
+  id : Int64
+  payload : @core.Attrs
+  vector : Array[Double]
+}
+pub fn PointResponse::to_json(Self) -> JsonValue
+pub impl Show for PointResponse
+
+pub struct SearchHitResponse {
+  id : Int64
+  score : Double
+  payload : @core.Attrs?
+  vector : Array[Double]?
+}
+pub fn SearchHitResponse::to_json(Self) -> JsonValue
+pub impl Show for SearchHitResponse
+
+pub struct SearchRequest {
+  vector : Array[Double]
+  limit : Int
+  filter : JsonValue?
+  with_payload : Bool
+  with_vector : Bool
+}
+pub fn SearchRequest::from_json(JsonValue) -> Self?
+pub impl Show for SearchRequest
+
+pub struct SearchResponse {
+  result : Array[SearchHitResponse]
+  time_ms : Double
+}
+pub fn SearchResponse::to_json(Self) -> JsonValue
+pub impl Show for SearchResponse
+
+pub struct UpsertRequest {
+  points : Array[PointData]
+}
+pub fn UpsertRequest::from_json(JsonValue) -> Self?
+pub impl Show for UpsertRequest
+
+// Type aliases
+
+// Traits
+

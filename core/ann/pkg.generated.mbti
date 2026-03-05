@@ -1,0 +1,100 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/ann"
+
+import {
+  "trkbt10/vcdb/core",
+}
+
+// Values
+pub fn bf_add(BruteforceState, @core.CoreStore, @core.VectorId) -> Unit
+
+pub fn bf_deserialize(BruteforceState, Bytes) -> Unit
+
+pub fn bf_find(BruteforceState, @core.CoreStore, Array[Double], ((@core.VectorId, @core.Attrs) -> Bool)?) -> @core.SearchHit?
+
+pub fn bf_remove(BruteforceState, @core.CoreStore, @core.VectorId) -> Unit
+
+pub fn bf_search(BruteforceState, @core.CoreStore, Array[Double], Int, ((@core.VectorId, @core.Attrs) -> Bool)?) -> Array[@core.SearchHit]
+
+pub fn bf_serialize(BruteforceState) -> Bytes
+
+pub fn hnsw_add(HNSWState, @core.CoreStore, @core.VectorId) -> Unit
+
+pub fn hnsw_compact_and_rebuild(HNSWState, @core.CoreStore) -> (HNSWState, Int)
+
+pub fn hnsw_deserialize(HNSWState, Bytes) -> Unit
+
+pub fn hnsw_find(HNSWState, @core.CoreStore, Array[Double], ((@core.VectorId, @core.Attrs) -> Bool)?) -> @core.SearchHit?
+
+pub fn hnsw_rebuild(@core.CoreStore, @core.HNSWParams, @core.Metric) -> HNSWState
+
+pub fn hnsw_remove(HNSWState, @core.VectorId, @core.CoreStore) -> Unit
+
+pub fn hnsw_search(HNSWState, @core.CoreStore, Array[Double], Int, ((@core.VectorId, @core.Attrs) -> Bool)?) -> Array[@core.SearchHit]
+
+pub fn hnsw_serialize(HNSWState) -> Bytes
+
+pub fn hnsw_tombstone_stats(HNSWState, @core.CoreStore) -> (Int, Int)
+
+pub fn ivf_add(IVFState, @core.CoreStore, @core.VectorId) -> Unit
+
+pub fn ivf_assign(IVFState, @core.CoreStore, @core.VectorId) -> Unit
+
+pub fn ivf_deserialize(IVFState, Bytes, Int) -> Unit
+
+pub fn ivf_find(IVFState, @core.CoreStore, Array[Double], ((@core.VectorId, @core.Attrs) -> Bool)?) -> @core.SearchHit?
+
+pub fn ivf_rebuild(@core.CoreStore, @core.IVFParams, @core.Metric, Int) -> IVFState
+
+pub fn ivf_remove(IVFState, @core.VectorId) -> Unit
+
+pub fn ivf_retrain(IVFState, @core.CoreStore, Int) -> Int
+
+pub fn ivf_search(IVFState, @core.CoreStore, Array[Double], Int, ((@core.VectorId, @core.Attrs) -> Bool)?) -> Array[@core.SearchHit]
+
+pub fn ivf_serialize(IVFState, Int) -> Bytes
+
+pub fn ivf_train(IVFState, @core.CoreStore, iterations? : Int) -> Unit
+
+// Errors
+
+// Types and methods
+pub struct BruteforceState {
+  metric : @core.Metric
+}
+pub fn BruteforceState::new(@core.Metric) -> Self
+
+pub struct HNSWState {
+  metric : @core.Metric
+  m : Int
+  ef_construction : Int
+  ef_search : Int
+  level_mult : Double
+  allow_replace_deleted : Bool
+  mut enter_point : Int
+  mut max_level : Int
+  mut level_arr : Array[Int]
+  mut tombstone : Array[Bool]
+  links : Array[Array[Array[Int]]]
+  rng : Rng
+}
+pub fn HNSWState::ensure_capacity(Self, Int) -> Unit
+pub fn HNSWState::new(@core.HNSWParams, @core.Metric, Int) -> Self
+
+pub struct IVFState {
+  metric : @core.Metric
+  nlist : Int
+  nprobe : Int
+  mut centroid_count : Int
+  centroids : Array[Double]
+  lists : Array[Array[@core.VectorId]]
+  id_to_list : Map[Int64, Int]
+}
+pub fn IVFState::new(@core.IVFParams, @core.Metric, Int) -> Self
+
+type Rng
+
+// Type aliases
+
+// Traits
+

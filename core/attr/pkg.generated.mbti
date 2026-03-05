@@ -1,0 +1,156 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/attr"
+
+import {
+  "trkbt10/vcdb/core",
+}
+
+// Values
+pub fn attr_value_to_key(@core.AttrValue) -> String
+
+pub fn attr_value_to_number(@core.AttrValue) -> Double?
+
+pub fn lower_bound(Array[NumEntry], Double) -> Int
+
+pub fn remove_int64_swap(Array[Int64], Int64) -> Bool
+
+pub fn remove_num_entry_swap(Array[NumEntry], Int64) -> Bool
+
+pub fn sort_num_entries(Array[NumEntry]) -> Unit
+
+pub fn upper_bound(Array[NumEntry], Double) -> Int
+
+// Errors
+
+// Types and methods
+pub enum AttrIndexStrategy {
+  Basic
+  Bitmap
+  BPTree
+  LSM
+}
+pub impl Eq for AttrIndexStrategy
+pub impl Show for AttrIndexStrategy
+
+type BPTree
+
+pub struct BPTreeAttrIndex {
+  field_trees : Map[String, BPTree]
+  exists_trees : Map[String, BPTree]
+  data : Map[Int64, @core.Attrs]
+  order : Int
+}
+pub fn BPTreeAttrIndex::eq(Self, String, @core.AttrValue) -> Array[@core.VectorId]
+pub fn BPTreeAttrIndex::exists(Self, String) -> Array[@core.VectorId]
+pub fn BPTreeAttrIndex::get_attrs(Self, @core.VectorId) -> @core.Attrs?
+pub fn BPTreeAttrIndex::new(order? : Int) -> Self
+pub fn BPTreeAttrIndex::range(Self, String, @core.NumericRange) -> Array[@core.VectorId]?
+pub fn BPTreeAttrIndex::remove_id(Self, @core.VectorId) -> Unit
+pub fn BPTreeAttrIndex::set_attrs(Self, @core.VectorId, @core.Attrs) -> Unit
+pub fn BPTreeAttrIndex::size(Self) -> Int
+
+pub struct BasicAttrIndex {
+  data : Map[Int64, @core.Attrs]
+  eq_map : Map[String, Map[String, Array[Int64]]]
+  exists_map : Map[String, Array[Int64]]
+  num_map : Map[String, (Array[NumEntry], Bool)]
+}
+pub fn BasicAttrIndex::eq(Self, String, @core.AttrValue) -> Array[@core.VectorId]
+pub fn BasicAttrIndex::exists(Self, String) -> Array[@core.VectorId]
+pub fn BasicAttrIndex::get_attrs(Self, @core.VectorId) -> @core.Attrs?
+pub fn BasicAttrIndex::new() -> Self
+pub fn BasicAttrIndex::range(Self, String, @core.NumericRange) -> Array[@core.VectorId]?
+pub fn BasicAttrIndex::remove_id(Self, @core.VectorId) -> Unit
+pub fn BasicAttrIndex::set_attrs(Self, @core.VectorId, @core.Attrs) -> Unit
+pub fn BasicAttrIndex::size(Self) -> Int
+
+pub struct BitmapAttrIndex {
+  data : Map[Int64, @core.Attrs]
+  eq_map : Map[String, Map[String, Array[Int64]]]
+  exists_map : Map[String, Array[Int64]]
+}
+pub fn BitmapAttrIndex::eq(Self, String, @core.AttrValue) -> Array[@core.VectorId]
+pub fn BitmapAttrIndex::exists(Self, String) -> Array[@core.VectorId]
+pub fn BitmapAttrIndex::get_attrs(Self, @core.VectorId) -> @core.Attrs?
+pub fn BitmapAttrIndex::new() -> Self
+pub fn BitmapAttrIndex::range(Self, String, @core.NumericRange) -> Array[@core.VectorId]?
+pub fn BitmapAttrIndex::remove_id(Self, @core.VectorId) -> Unit
+pub fn BitmapAttrIndex::set_attrs(Self, @core.VectorId, @core.Attrs) -> Unit
+pub fn BitmapAttrIndex::size(Self) -> Int
+
+pub struct BloomFilter {
+  bits : Bytes
+  hash_count : Int
+  bit_count : Int
+}
+pub fn BloomFilter::create(Array[Bytes], Double) -> Self
+pub fn BloomFilter::decode(Bytes) -> Self?
+pub fn BloomFilter::encode(Self) -> Bytes
+pub fn BloomFilter::might_contain(Self, Bytes) -> Bool
+
+pub struct LSMAttrIndex {
+  memtable : Memtable
+  exists_memtable : Memtable
+  data : Map[Int64, @core.Attrs]
+  flush_threshold : Int
+}
+pub fn LSMAttrIndex::clear_memtable(Self) -> Unit
+pub fn LSMAttrIndex::eq(Self, String, @core.AttrValue) -> Array[@core.VectorId]
+pub fn LSMAttrIndex::exists(Self, String) -> Array[@core.VectorId]
+pub fn LSMAttrIndex::get_attrs(Self, @core.VectorId) -> @core.Attrs?
+pub fn LSMAttrIndex::memtable_size(Self) -> Int
+pub fn LSMAttrIndex::new(flush_threshold? : Int) -> Self
+pub fn LSMAttrIndex::range(Self, String, @core.NumericRange) -> Array[@core.VectorId]?
+pub fn LSMAttrIndex::remove_id(Self, @core.VectorId) -> Unit
+pub fn LSMAttrIndex::set_attrs(Self, @core.VectorId, @core.Attrs) -> Unit
+pub fn LSMAttrIndex::should_flush(Self) -> Bool
+pub fn LSMAttrIndex::size(Self) -> Int
+
+type Memtable
+
+pub struct NumEntry {
+  value : Double
+  id : Int64
+}
+pub fn NumEntry::compare(Self, Self) -> Int
+pub impl Show for NumEntry
+
+pub struct SSTable {
+  records : Array[SSTableRecord]
+  index : Array[SparseIndexEntry]
+  bloom : BloomFilter?
+  footer : SSTableFooter
+}
+pub fn SSTable::build(Array[SSTableRecord], Int) -> Bytes
+pub fn SSTable::find(Self, Bytes) -> SSTableRecord?
+pub fn SSTable::read(Bytes) -> Self?
+
+pub struct SSTableFooter {
+  magic : UInt
+  version : UInt
+  data_offset : Int
+  data_size : Int
+  index_offset : Int
+  index_size : Int
+  bloom_offset : Int
+  bloom_size : Int
+}
+pub fn SSTableFooter::decode(Bytes) -> Self?
+pub fn SSTableFooter::encode(Self) -> Bytes
+
+pub struct SSTableRecord {
+  key : Bytes
+  value : Bytes
+}
+pub fn SSTableRecord::decode(Bytes, Int) -> (Self, Int)?
+pub fn SSTableRecord::encode(Self) -> Bytes
+
+pub struct SparseIndexEntry {
+  key : Bytes
+  offset : Int
+}
+
+// Type aliases
+
+// Traits
+

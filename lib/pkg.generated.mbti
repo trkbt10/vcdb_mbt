@@ -1,0 +1,56 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/lib"
+
+// Values
+pub fn gateway_clear_storage_callbacks() -> Unit
+
+pub fn gateway_has_storage_callbacks() -> Bool
+
+pub fn gateway_register_storage((String, Int) -> Bytes, (String, Bytes, Int) -> Unit, (String, Int) -> Bool, (String, Int) -> Unit, (Int) -> Array[String]) -> Unit
+
+pub fn gateway_request(String, Array[String], String) -> String
+
+pub fn gateway_storage_exists(String, Int) -> Bool
+
+pub fn gateway_storage_list(Int) -> Array[String]
+
+pub fn gateway_storage_read(String, Int) -> Bytes
+
+pub fn gateway_storage_write(String, Bytes, Int) -> Unit
+
+pub fn vcdb_add(Int, Int, Array[Double]) -> Int
+
+pub fn vcdb_create(Int) -> Int
+
+pub fn vcdb_create_hnsw(Int) -> Int
+
+pub fn vcdb_create_ivf(Int) -> Int
+
+pub fn vcdb_deserialize(Bytes) -> Int
+
+pub fn vcdb_destroy(Int) -> Unit
+
+pub fn vcdb_dim(Int) -> Int
+
+pub fn vcdb_get(Int, Int) -> (Array[Double], Int)
+
+pub fn vcdb_has(Int, Int) -> Int
+
+pub fn vcdb_remove(Int, Int) -> Int
+
+pub fn vcdb_search(Int, Array[Double], Int) -> Array[(Int, Double)]
+
+pub fn vcdb_serialize(Int) -> Bytes
+
+pub fn vcdb_size(Int) -> Int
+
+pub fn vcdb_upsert(Int, Int, Array[Double]) -> Int
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

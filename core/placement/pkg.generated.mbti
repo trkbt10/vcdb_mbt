@@ -1,0 +1,116 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/placement"
+
+import {
+  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/persistence/segment",
+  "trkbt10/vcdb/core/storage",
+}
+
+// Values
+pub fn[S : @storage.Storage] apply_rebalance(Array[MovePlan], Map[String, S]) -> Unit raise @storage.IOError
+
+pub fn apply_rebalance_memory(Array[MovePlan], Map[String, @storage.MemoryStorage]) -> Unit raise @storage.IOError
+
+pub fn crush_locate(@core.VectorId, CrushMap) -> LocateResult
+
+pub fn crush_primary(@core.VectorId, CrushMap) -> String?
+
+pub fn[S : @storage.Storage] load_store_distributed(String, Map[String, S], S) -> @core.CoreStore raise @storage.IOError
+
+pub fn[S : @storage.Storage] load_store_distributed_full(String, Map[String, S], S) -> LoadDistributedResult raise @storage.IOError
+
+pub fn plan_rebalance(PlacementManifest, CrushMap) -> Array[MovePlan]
+
+pub fn[S : @storage.Storage] read_segments_from_manifest(PlacementManifest, Map[String, S]) -> Array[(@core.VectorId, Array[Double], @core.Attrs)] raise @storage.IOError
+
+pub fn[S : @storage.Storage] save_store_distributed(@core.CoreStore, SegmentOptions, Map[String, S], S) -> PlacementManifest raise @storage.IOError
+
+pub fn[S : @storage.Storage] save_store_distributed_with_ann(@core.CoreStore, SegmentOptions, Map[String, S], S, @core.Strategy, Bytes?) -> PlacementManifest raise @storage.IOError
+
+pub fn update_manifest_after_rebalance(PlacementManifest, Array[MovePlan], CrushMap, Int, Int64) -> PlacementManifest
+
+pub fn[S : @storage.Storage] write_segments_from_store(@core.CoreStore, SegmentOptions, Map[String, S]) -> SegmentResult raise @storage.IOError
+
+// Errors
+
+// Types and methods
+pub struct CrushMap {
+  pgs : Int
+  replicas : Int
+  targets : Array[CrushTarget]
+}
+pub fn CrushMap::new(Int, Int, Array[CrushTarget]) -> Self
+pub impl Show for CrushMap
+
+pub struct CrushTarget {
+  key : String
+  weight : Double
+  zone : String?
+}
+pub fn CrushTarget::new(String) -> Self
+pub fn CrushTarget::with_weight(String, Double) -> Self
+pub fn CrushTarget::with_zone(String, Double, String) -> Self
+pub impl Show for CrushTarget
+
+pub struct LoadDistributedResult {
+  store : @core.CoreStore
+  header : @segment.IndexHeader
+  ann_bytes : Bytes?
+}
+
+pub struct LocateResult {
+  pg : Int
+  primaries : Array[String]
+}
+pub impl Show for LocateResult
+
+pub(all) struct MovePlan {
+  name : String
+  from : String
+  to : String
+}
+pub impl Show for MovePlan
+
+pub(all) struct PlacementManifest {
+  base : String
+  segments : Array[SegmentEntry]
+  crush : CrushMap
+  epoch : Int
+  commit_ts : Int64
+}
+pub impl Show for PlacementManifest
+
+pub struct SaveDistributedOptions {
+  segment_opts : SegmentOptions
+  strategy : @core.Strategy
+  include_ann : Bool
+  ann_bytes : Bytes?
+}
+pub fn SaveDistributedOptions::default(String, CrushMap) -> Self
+
+pub(all) struct SegmentEntry {
+  name : String
+  target_key : String
+}
+pub impl Show for SegmentEntry
+
+pub struct SegmentOptions {
+  base_name : String
+  crush : CrushMap
+  segmented : Bool
+  segment_bytes : Int
+}
+pub fn SegmentOptions::default(String, CrushMap) -> Self
+
+pub struct SegmentResult {
+  entries : Array[@segment.IndexEntry]
+  manifest : PlacementManifest
+  dim : Int
+  count : Int
+}
+
+// Type aliases
+
+// Traits
+

@@ -1,0 +1,83 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/storage"
+
+// Values
+pub fn clear_callbacks() -> Unit
+
+pub fn collection_config_path(String) -> String
+
+pub fn collection_data_path(String) -> String
+
+pub fn collection_index_path(String) -> String
+
+pub fn collection_manifest_path(String) -> String
+
+pub fn has_callbacks() -> Bool
+
+pub fn register_callbacks(StorageCallbacks) -> Unit
+
+pub fn segment_data_path(String, Int, Int) -> String
+
+// Errors
+pub(all) suberror IOError {
+  NotFound(String)
+  PermissionDenied(String)
+  IoFailed(String)
+}
+
+// Types and methods
+pub struct CallbackStorage {
+  // private fields
+}
+pub fn CallbackStorage::append(Self, String, Bytes, StorageKind) -> Unit
+pub fn CallbackStorage::atomic_write(Self, String, Bytes, StorageKind) -> Unit
+pub fn CallbackStorage::del(Self, String, StorageKind) -> Unit raise IOError
+pub fn CallbackStorage::exists(Self, String, StorageKind) -> Bool
+pub fn CallbackStorage::list(Self, StorageKind) -> Array[String]
+pub fn CallbackStorage::new() -> Self
+pub fn CallbackStorage::read(Self, String, StorageKind) -> Bytes raise IOError
+pub fn CallbackStorage::write(Self, String, Bytes, StorageKind) -> Unit
+pub impl Storage for CallbackStorage
+
+pub struct MemoryStorage {
+  data : Map[String, Bytes]
+}
+pub fn MemoryStorage::append(Self, String, Bytes) -> Unit
+pub fn MemoryStorage::atomic_write(Self, String, Bytes) -> Unit
+pub fn MemoryStorage::clear(Self) -> Unit
+pub fn MemoryStorage::del(Self, String) -> Unit raise IOError
+pub fn MemoryStorage::exists(Self, String) -> Bool
+pub fn MemoryStorage::list(Self) -> Array[String]
+pub fn MemoryStorage::new() -> Self
+pub fn MemoryStorage::read(Self, String) -> Bytes raise IOError
+pub fn MemoryStorage::write(Self, String, Bytes) -> Unit
+pub impl Storage for MemoryStorage
+
+pub struct StorageCallbacks {
+  read : (String, StorageKind) -> Bytes
+  write : (String, Bytes, StorageKind) -> Unit
+  exists : (String, StorageKind) -> Bool
+  del : (String, StorageKind) -> Unit
+  list : (StorageKind) -> Array[String]
+}
+pub fn StorageCallbacks::new((String, StorageKind) -> Bytes, (String, Bytes, StorageKind) -> Unit, (String, StorageKind) -> Bool, (String, StorageKind) -> Unit, (StorageKind) -> Array[String]) -> Self
+
+pub(all) enum StorageKind {
+  Config
+  Index
+  Data
+}
+
+// Type aliases
+
+// Traits
+pub trait Storage {
+  read(Self, String, StorageKind) -> Bytes raise IOError
+  write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  append(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  del(Self, String, StorageKind) -> Unit raise IOError
+  exists(Self, String, StorageKind) -> Bool
+  list(Self, StorageKind) -> Array[String]
+}
+
