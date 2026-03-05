@@ -48,45 +48,45 @@ pub fn WalRecordType::from_byte(b : Byte) -> WalRecordType? {
 /// WAL record
 pub struct WalRecord {
   record_type : WalRecordType
-  id : @core.VectorId
-  attrs : @core.Attrs?
+  id : @types.VectorId
+  attrs : @types.Attrs?
   vector : Array[Double]?
 } derive(Show)
 
 ///|
 /// Create an upsert record
 pub fn WalRecord::upsert(
-  id : @core.VectorId,
+  id : @types.VectorId,
   vector : Array[Double],
-  attrs : @core.Attrs,
+  attrs : @types.Attrs,
 ) -> WalRecord {
   { record_type: Upsert, id, attrs: Some(attrs), vector: Some(vector) }
 }
 
 ///|
 /// Create a remove record
-pub fn WalRecord::remove(id : @core.VectorId) -> WalRecord {
+pub fn WalRecord::remove(id : @types.VectorId) -> WalRecord {
   { record_type: Remove, id, attrs: None, vector: None }
 }
 
 ///|
 /// Create a set_attrs record
 pub fn WalRecord::set_attrs(
-  id : @core.VectorId,
-  attrs : @core.Attrs,
+  id : @types.VectorId,
+  attrs : @types.Attrs,
 ) -> WalRecord {
   { record_type: SetAttrs, id, attrs: Some(attrs), vector: None }
 }
 
 ///|
 /// Encode attrs to JSON bytes (TypeScript compatible)
-fn encode_attrs_json(attrs : @core.Attrs?) -> Bytes {
+fn encode_attrs_json(attrs : @types.Attrs?) -> Bytes {
   @codec.encode_attrs_json(attrs)
 }
 
 ///|
 /// Decode JSON string to attrs
-fn decode_attrs_json(bytes : Bytes) -> @core.Attrs? {
+fn decode_attrs_json(bytes : Bytes) -> @types.Attrs? {
   @codec.decode_attrs_json(bytes)
 }
 
@@ -147,7 +147,7 @@ pub fn decode_wal_record(r : @binary.BinaryReader) -> WalRecord? {
   // Reserved
   let _ = r.read_byte()
   // ID (8 bytes as u64)
-  let id = @core.VectorId(r.read_u64().reinterpret_as_int64())
+  let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
   // Lengths
   let attrs_len = r.read_u32().reinterpret_as_int()
   let vector_len = r.read_u32().reinterpret_as_int()

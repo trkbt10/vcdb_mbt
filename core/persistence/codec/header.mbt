@@ -54,7 +54,7 @@ pub let header_size : Int = 12
 pub fn encode_header(
   w : @binary.BinaryWriter,
   file_type : FileType,
-  version : Byte
+  version : Byte,
 ) -> Unit {
   w.push_u32(vcdb_magic_lo)
   w.push_u32(vcdb_magic_hi)

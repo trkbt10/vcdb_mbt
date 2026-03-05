@@ -2,6 +2,6 @@ import {
   "moonbitlang/core/bench",
   "moonbitlang/core/cmp",
   "moonbitlang/core/math",
-  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/binary",
 }

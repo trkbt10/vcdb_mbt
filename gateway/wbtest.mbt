@@ -92,20 +92,20 @@ test "json/vector_conversion" {
 
 ///|
 test "json/attrs_conversion" {
-  let attrs = @core.empty_attrs()
-  attrs.set("name", @core.String("test"))
-  attrs.set("count", @core.Int(42L))
-  attrs.set("ratio", @core.Float(0.5))
-  attrs.set("active", @core.Bool(true))
+  let attrs = @types.empty_attrs()
+  attrs.set("name", @types.String("test"))
+  attrs.set("count", @types.Int(42L))
+  attrs.set("ratio", @types.Float(0.5))
+  attrs.set("active", @types.Bool(true))
 
   let json = attrs_to_json(attrs)
   let back = json_to_attrs(json)
 
   match back {
     Some(a) => {
-      assert_eq(a.get("name"), Some(@core.String("test")))
-      assert_eq(a.get("count"), Some(@core.Int(42L)))
-      assert_eq(a.get("active"), Some(@core.Bool(true)))
+      assert_eq(a.get("name"), Some(@types.String("test")))
+      assert_eq(a.get("count"), Some(@types.Int(42L)))
+      assert_eq(a.get("active"), Some(@types.Bool(true)))
     }
     None => assert_true(false)
   }

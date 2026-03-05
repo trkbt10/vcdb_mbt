@@ -1,8 +1,8 @@
 ///|
 /// Iterate all key-value pairs in attrs.
 fn for_each_attr(
-  attrs : @core.Attrs,
-  f : (String, @core.AttrValue) -> Unit,
+  attrs : @types.Attrs,
+  f : (String, @types.AttrValue) -> Unit,
 ) -> Unit {
   for key in attrs.keys() {
     match attrs.get(key) {
@@ -14,10 +14,10 @@ fn for_each_attr(
 
 ///|
 /// Convert internal Int64 id list to VectorId list.
-fn ids_to_vector_ids(ids : Array[Int64]) -> Array[@core.VectorId] {
-  let result : Array[@core.VectorId] = []
+fn ids_to_vector_ids(ids : Array[Int64]) -> Array[@types.VectorId] {
+  let result : Array[@types.VectorId] = []
   for id in ids {
-    result.push(@core.VectorId(id))
+    result.push(@types.VectorId(id))
   }
   result
 }
@@ -27,7 +27,7 @@ fn ids_to_vector_ids(ids : Array[Int64]) -> Array[@core.VectorId] {
 fn add_to_eq_index(
   eq_map : Map[String, Map[String, Array[Int64]]],
   key : String,
-  value : @core.AttrValue,
+  value : @types.AttrValue,
   id : Int64,
 ) -> Unit {
   let value_key = attr_value_to_key(value)
@@ -50,7 +50,7 @@ fn add_to_eq_index(
 fn remove_from_eq_index(
   eq_map : Map[String, Map[String, Array[Int64]]],
   key : String,
-  value : @core.AttrValue,
+  value : @types.AttrValue,
   id : Int64,
 ) -> Unit {
   let value_key = attr_value_to_key(value)

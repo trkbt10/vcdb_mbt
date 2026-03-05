@@ -10,7 +10,7 @@ pub enum AttrIndexStrategy {
 ///|
 /// Convert AttrValue to string key for indexing
 /// Uses type prefix to disambiguate different types with same string representation
-pub fn attr_value_to_key(value : @core.AttrValue) -> String {
+pub fn attr_value_to_key(value : @types.AttrValue) -> String {
   match value {
     Null => "N:"
     Bool(b) => if b { "B:true" } else { "B:false" }
@@ -22,7 +22,7 @@ pub fn attr_value_to_key(value : @core.AttrValue) -> String {
 
 ///|
 /// Extract numeric value from AttrValue for range queries
-pub fn attr_value_to_number(value : @core.AttrValue) -> Double? {
+pub fn attr_value_to_number(value : @types.AttrValue) -> Double? {
   match value {
     Int(n) => Some(n.to_double())
     Float(f) => Some(f)

@@ -2,12 +2,12 @@
 /// Bruteforce ANN strategy implementation.
 /// Simple linear scan over all vectors - best for small datasets.
 pub struct BruteforceState {
-  metric : @core.Metric
+  metric : @types.Metric
 }
 
 ///|
 /// Create bruteforce state
-pub fn BruteforceState::new(metric : @core.Metric) -> BruteforceState {
+pub fn BruteforceState::new(metric : @types.Metric) -> BruteforceState {
   { metric, }
 }
 
@@ -17,11 +17,11 @@ pub fn BruteforceState::new(metric : @core.Metric) -> BruteforceState {
 /// Query is normalized for cosine metric.
 pub fn bf_search(
   state : BruteforceState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   q : Array[Double],
   k : Int,
-  filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
-) -> Array[@core.SearchHit] {
+  filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
+) -> Array[@types.SearchHit] {
   guard q.length() == store.dim else {
     abort(
       "dim mismatch: got " +
@@ -32,8 +32,8 @@ pub fn bf_search(
   }
   // Normalize query for cosine
   let query = store.normalize_query(q)
-  let out : Array[@core.SearchHit] = []
-  let score_fn = @core.get_score_fn(state.metric)
+  let out : Array[@types.SearchHit] = []
+  let score_fn = @vecmath.get_score_fn(state.metric)
   for i in 0..<store.count {
     let id = store.ids[i]
     let attrs = store.attrs[i]
@@ -44,7 +44,7 @@ pub fn bf_search(
     }
     let base = i * store.dim
     let s = score_fn(store.data, base, query, store.dim)
-    push_search_hit_top_k(out, @core.SearchHit::{ id, score: s, attrs }, k)
+    push_search_hit_top_k(out, @types.SearchHit::{ id, score: s, attrs }, k)
   }
   out
 }
@@ -53,10 +53,10 @@ pub fn bf_search(
 /// Bruteforce find one - returns the best match
 pub fn bf_find(
   state : BruteforceState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   q : Array[Double],
-  filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
-) -> @core.SearchHit? {
+  filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
+) -> @types.SearchHit? {
   let results = bf_search(state, store, q, 1, filter)
   first_search_hit(results)
 }
@@ -65,8 +65,8 @@ pub fn bf_find(
 /// Bruteforce add - no-op for bruteforce (no index structure)
 pub fn bf_add(
   _state : BruteforceState,
-  _store : @core.CoreStore,
-  _id : @core.VectorId,
+  _store : @store.CoreStore,
+  _id : @types.VectorId,
 ) -> Unit {
   // No-op: bruteforce doesn't maintain an index
 }
@@ -75,8 +75,8 @@ pub fn bf_add(
 /// Bruteforce remove - no-op for bruteforce (no index structure)
 pub fn bf_remove(
   _state : BruteforceState,
-  _store : @core.CoreStore,
-  _id : @core.VectorId,
+  _store : @store.CoreStore,
+  _id : @types.VectorId,
 ) -> Unit {
   // No-op: bruteforce doesn't maintain an index
 }

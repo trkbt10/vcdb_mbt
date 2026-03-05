@@ -8,7 +8,7 @@ test "crush/deterministic" {
     CrushTarget::new("node3"),
   ]
   let map = CrushMap::new(16, 2, targets)
-  let id = @core.VectorId::from_int(12345)
+  let id = @types.VectorId::from_int(12345)
   // Same ID should always map to same placement
   let result1 = crush_locate(id, map)
   let result2 = crush_locate(id, map)
@@ -24,7 +24,7 @@ test "crush/primary" {
     CrushTarget::new("c"),
   ]
   let map = CrushMap::new(8, 1, targets)
-  let primary = crush_primary(@core.VectorId::from_int(100), map)
+  let primary = crush_primary(@types.VectorId::from_int(100), map)
   match primary {
     Some(key) => inspect(key.length() > 0, content="true")
     None => inspect(false, content="true")
@@ -34,7 +34,7 @@ test "crush/primary" {
 ///|
 test "crush/empty_targets" {
   let map = CrushMap::new(8, 2, [])
-  let result = crush_locate(@core.VectorId::from_int(1), map)
+  let result = crush_locate(@types.VectorId::from_int(1), map)
   inspect(result.primaries.is_empty(), content="true")
 }
 
@@ -51,7 +51,7 @@ test "crush/distribution" {
   let mut node1_count = 0
   let mut node2_count = 0
   for i in 1..<=100 {
-    let result = crush_locate(@core.VectorId::from_int(i), map)
+    let result = crush_locate(@types.VectorId::from_int(i), map)
     if result.primaries.length() > 0 {
       if result.primaries[0] == "node1" {
         node1_count = node1_count + 1
@@ -138,7 +138,7 @@ test "crush/update_manifest" {
 test "crush/replicas_exceed_targets" {
   let targets = [CrushTarget::new("node1")]
   let map = CrushMap::new(8, 3, targets) // 3 replicas but only 1 target
-  let result = crush_locate(@core.VectorId::from_int(1), map)
+  let result = crush_locate(@types.VectorId::from_int(1), map)
   // Should only return 1 primary (min of replicas and targets)
   inspect(result.primaries.length(), content="1")
 }
@@ -156,7 +156,7 @@ test "crush/pg_distribution" {
   let mut pg0_count = 0
   let mut pg1_count = 0
   for i in 1..<=100 {
-    let result = crush_locate(@core.VectorId::from_int(i), map)
+    let result = crush_locate(@types.VectorId::from_int(i), map)
     if result.pg == 0 {
       pg0_count = pg0_count + 1
     } else if result.pg == 1 {
@@ -177,7 +177,7 @@ test "crush/zone_aware" {
     CrushTarget::with_zone("node4", 1.0, "rack-b"),
   ]
   let map = CrushMap::new(8, 2, targets)
-  let result = crush_locate(@core.VectorId::from_int(42), map)
+  let result = crush_locate(@types.VectorId::from_int(42), map)
   // Should have 2 primaries
   inspect(result.primaries.length(), content="2")
 }
@@ -186,7 +186,7 @@ test "crush/zone_aware" {
 test "crush/zero_pgs" {
   let targets = [CrushTarget::new("node1")]
   let map = CrushMap::new(0, 1, targets)
-  let result = crush_locate(@core.VectorId::from_int(1), map)
+  let result = crush_locate(@types.VectorId::from_int(1), map)
   inspect(result.pg, content="0")
 }
 
@@ -290,8 +290,8 @@ test "crush/full_64bit_hashing" {
   ]
   let map = CrushMap::new(256, 2, targets)
   // IDs that differ only in upper 32 bits
-  let id_low = @core.VectorId(1L) // Lower 32 bits: 1, Upper 32 bits: 0
-  let id_high = @core.VectorId(0x1_0000_0001L) // Lower 32 bits: 1, Upper 32 bits: 1
+  let id_low = @types.VectorId(1L) // Lower 32 bits: 1, Upper 32 bits: 0
+  let id_high = @types.VectorId(0x1_0000_0001L) // Lower 32 bits: 1, Upper 32 bits: 1
   let result_low = crush_locate(id_low, map)
   let result_high = crush_locate(id_high, map)
   // These should produce different placement groups (hash includes upper bits)
@@ -310,12 +310,12 @@ test "crush/64bit_id_patterns" {
   let map = CrushMap::new(1024, 1, targets)
   // Test IDs with different upper/lower bit patterns
   let ids = [
-    @core.VectorId(0L), // All zeros
-    @core.VectorId(0xFFFF_FFFF_FFFF_FFFFL), // All ones (negative in signed)
-    @core.VectorId(0x8000_0000_0000_0000L), // Only MSB set
-    @core.VectorId(0x0000_0000_8000_0000L), // Only bit 31 set (lower half MSB)
-    @core.VectorId(0x1234_5678_0000_0000L), // Upper 32 bits only
-    @core.VectorId(0x0000_0000_1234_5678L), // Lower 32 bits only
+    @types.VectorId(0L), // All zeros
+    @types.VectorId(0xFFFF_FFFF_FFFF_FFFFL), // All ones (negative in signed)
+    @types.VectorId(0x8000_0000_0000_0000L), // Only MSB set
+    @types.VectorId(0x0000_0000_8000_0000L), // Only bit 31 set (lower half MSB)
+    @types.VectorId(0x1234_5678_0000_0000L), // Upper 32 bits only
+    @types.VectorId(0x0000_0000_1234_5678L), // Lower 32 bits only
   ]
   // All should get valid placements
   for id in ids {
@@ -382,51 +382,51 @@ test "crush/parse_pg_last_marker" {
 ///|
 test "distributed/estimate_attrs_size" {
   // Empty attrs
-  let empty = @core.empty_attrs()
+  let empty = @types.empty_attrs()
   let size1 = estimate_attrs_size(empty)
   inspect(size1, content="2") // Just {}
 
   // With string
-  let a1 = @core.empty_attrs()
-  a1.set("key", @core.String("value"))
+  let a1 = @types.empty_attrs()
+  a1.set("key", @types.String("value"))
   let size2 = estimate_attrs_size(a1)
   inspect(size2 > 10, content="true")
 
   // With int
-  let a2 = @core.empty_attrs()
-  a2.set("num", @core.Int(12345L))
+  let a2 = @types.empty_attrs()
+  a2.set("num", @types.Int(12345L))
   let size3 = estimate_attrs_size(a2)
   inspect(size3 > 10, content="true")
 
   // With float
-  let a3 = @core.empty_attrs()
-  a3.set("f", @core.Float(3.14))
+  let a3 = @types.empty_attrs()
+  a3.set("f", @types.Float(3.14))
   let size4 = estimate_attrs_size(a3)
   inspect(size4 > 10, content="true")
 
   // With bool
-  let a4 = @core.empty_attrs()
-  a4.set("flag", @core.Bool(true))
+  let a4 = @types.empty_attrs()
+  a4.set("flag", @types.Bool(true))
   let size5 = estimate_attrs_size(a4)
   inspect(size5 > 5, content="true")
 
   // With null
-  let a5 = @core.empty_attrs()
-  a5.set("null_val", @core.Null)
+  let a5 = @types.empty_attrs()
+  a5.set("null_val", @types.Null)
   let size6 = estimate_attrs_size(a5)
   inspect(size6 > 5, content="true")
 }
 
 ///|
 test "distributed/segment_part_rotation" {
-  let store = @core.CoreStore::new(2, @core.Dot, capacity=20)
+  let store = @store.CoreStore::new(2, @types.Dot, capacity=20)
   // Add vectors with large attrs to trigger rotation
   for i in 1..<=10 {
-    let attrs = @core.empty_attrs()
+    let attrs = @types.empty_attrs()
     // Create a reasonably sized attr
-    attrs.set("data", @core.String("value_" + i.to_string()))
+    attrs.set("data", @types.String("value_" + i.to_string()))
     let _ = store.add_or_update(
-      @core.VectorId::from_int(i),
+      @types.VectorId::from_int(i),
       [i.to_double(), 0.0],
       attrs,
       upsert=false,
@@ -457,12 +457,12 @@ test "distributed/segment_part_rotation" {
 
 ///|
 test "distributed/load_slow_path" {
-  let store = @core.CoreStore::new(3, @core.Cosine, capacity=10)
+  let store = @store.CoreStore::new(3, @types.Cosine, capacity=10)
   for i in 1..<=3 {
-    let attrs = @core.empty_attrs()
-    attrs.set("idx", @core.Int(i.to_int64()))
+    let attrs = @types.empty_attrs()
+    attrs.set("idx", @types.Int(i.to_int64()))
     let _ = store.add_or_update(
-      @core.VectorId::from_int(i),
+      @types.VectorId::from_int(i),
       [i.to_double(), 0.0, 0.0],
       attrs,
       upsert=false,
@@ -484,7 +484,10 @@ test "distributed/load_slow_path" {
     _ => ()
   }
   inspect(index_storage.exists("slowpath" + @codec.ext_index), content="false")
-  inspect(index_storage.exists("slowpath" + @codec.ext_manifest), content="true")
+  inspect(
+    index_storage.exists("slowpath" + @codec.ext_manifest),
+    content="true",
+  )
 
   // Load should work via segment scan
   let restored = load_store_distributed("slowpath", storages, index_storage) catch {
@@ -558,9 +561,9 @@ test "distributed/empty_manifest_error" {
     IoFailed(msg) => {
       inspect(msg, content="Empty manifest")
       caught = true
-      @core.CoreStore::new(1, @core.Cosine)
+      @store.CoreStore::new(1, @types.Cosine)
     }
-    _ => @core.CoreStore::new(1, @core.Cosine)
+    _ => @store.CoreStore::new(1, @types.Cosine)
   }
   inspect(caught, content="true")
 }

@@ -2,7 +2,7 @@
 /// Bitmap Attribute Index - Simplified index for low-cardinality fields
 /// Supports equality and existence queries only, no range queries.
 pub struct BitmapAttrIndex {
-  data : Map[Int64, @core.Attrs] // id -> attrs
+  data : Map[Int64, @types.Attrs] // id -> attrs
   eq_map : Map[String, Map[String, Array[Int64]]] // key -> value -> ids
   exists_map : Map[String, Array[Int64]] // key -> ids with that key
 }
@@ -17,8 +17,8 @@ pub fn BitmapAttrIndex::new() -> BitmapAttrIndex {
 /// Set attributes for an ID (replaces existing)
 pub fn BitmapAttrIndex::set_attrs(
   self : BitmapAttrIndex,
-  id : @core.VectorId,
-  attrs : @core.Attrs,
+  id : @types.VectorId,
+  attrs : @types.Attrs,
 ) -> Unit {
   let id_val = id.to_int64()
   // Remove old attrs from indexes if present
@@ -43,8 +43,8 @@ pub fn BitmapAttrIndex::set_attrs(
 /// Get attributes for an ID
 pub fn BitmapAttrIndex::get_attrs(
   self : BitmapAttrIndex,
-  id : @core.VectorId,
-) -> @core.Attrs? {
+  id : @types.VectorId,
+) -> @types.Attrs? {
   self.data.get(id.to_int64())
 }
 
@@ -52,7 +52,7 @@ pub fn BitmapAttrIndex::get_attrs(
 /// Remove an ID from the index
 pub fn BitmapAttrIndex::remove_id(
   self : BitmapAttrIndex,
-  id : @core.VectorId,
+  id : @types.VectorId,
 ) -> Unit {
   let id_val = id.to_int64()
   match self.data.get(id_val) {
@@ -72,8 +72,8 @@ pub fn BitmapAttrIndex::remove_id(
 pub fn BitmapAttrIndex::eq(
   self : BitmapAttrIndex,
   key : String,
-  value : @core.AttrValue,
-) -> Array[@core.VectorId] {
+  value : @types.AttrValue,
+) -> Array[@types.VectorId] {
   let value_key = attr_value_to_key(value)
   match self.eq_map.get(key) {
     None => []
@@ -90,7 +90,7 @@ pub fn BitmapAttrIndex::eq(
 pub fn BitmapAttrIndex::exists(
   self : BitmapAttrIndex,
   key : String,
-) -> Array[@core.VectorId] {
+) -> Array[@types.VectorId] {
   match self.exists_map.get(key) {
     None => []
     Some(ids) => ids_to_vector_ids(ids)
@@ -102,8 +102,8 @@ pub fn BitmapAttrIndex::exists(
 pub fn BitmapAttrIndex::range(
   _self : BitmapAttrIndex,
   key : String,
-  range : @core.NumericRange,
-) -> Array[@core.VectorId]? {
+  range : @types.NumericRange,
+) -> Array[@types.VectorId]? {
   let _ = (key, range)
   None // Not supported
 }

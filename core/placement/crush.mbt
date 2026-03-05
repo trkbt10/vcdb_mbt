@@ -114,7 +114,7 @@ fn choose_primaries(pg : Int, replicas : Int, total : Int) -> Array[Int] {
 ///|
 /// Locate placement for a vector ID
 /// Returns the placement group and primary target keys
-pub fn crush_locate(id : @core.VectorId, map : CrushMap) -> LocateResult {
+pub fn crush_locate(id : @types.VectorId, map : CrushMap) -> LocateResult {
   // Use hash64_to_32 to preserve full 64-bit ID without truncation
   let id_hash = hash64_to_32(id.to_int64().reinterpret_as_uint64())
   let pg = if map.pgs > 0 {
@@ -136,7 +136,7 @@ pub fn crush_locate(id : @core.VectorId, map : CrushMap) -> LocateResult {
 ///|
 /// Locate placement using just ID and CRUSH map
 /// Convenience function that returns the primary target key
-pub fn crush_primary(id : @core.VectorId, map : CrushMap) -> String? {
+pub fn crush_primary(id : @types.VectorId, map : CrushMap) -> String? {
   let result = crush_locate(id, map)
   first_string_opt(result.primaries)
 }

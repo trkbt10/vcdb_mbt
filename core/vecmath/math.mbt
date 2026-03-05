@@ -59,12 +59,12 @@ pub fn l2neg_at(
 /// Get score function for a given metric.
 /// Returns a function that computes similarity score.
 pub fn get_score_fn(
-  metric : Metric,
+  metric : @types.Metric,
 ) -> (Array[Double], Int, Array[Double], Int) -> Double {
   match metric {
-    Cosine => dot_at // cosine uses dot after normalization
-    Dot => dot_at
-    L2 => l2neg_at
+    @types.Cosine => dot_at // cosine uses dot after normalization
+    @types.Dot => dot_at
+    @types.L2 => l2neg_at
   }
 }
 

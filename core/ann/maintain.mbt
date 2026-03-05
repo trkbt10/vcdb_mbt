@@ -8,7 +8,7 @@
 /// Returns the number of removed entries
 pub fn hnsw_compact_and_rebuild(
   state : HNSWState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
 ) -> (HNSWState, Int) {
   let n = store.size()
   if n == 0 {
@@ -26,7 +26,7 @@ pub fn hnsw_compact_and_rebuild(
   }
   // Create new HNSW state (use default seed 42 for rebuild)
   let new_state = HNSWState::new(
-    @core.HNSWParams::{
+    @types.HNSWParams::{
       m: state.m,
       ef_construction: state.ef_construction,
       ef_search: state.ef_search,
@@ -60,7 +60,7 @@ pub fn hnsw_compact_and_rebuild(
 /// Returns the number of centroid updates
 pub fn ivf_retrain(
   state : IVFState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   iterations : Int,
 ) -> Int {
   if store.size() == 0 {
@@ -86,9 +86,9 @@ pub fn ivf_retrain(
 ///|
 /// Rebuild IVF index with new parameters
 pub fn ivf_rebuild(
-  store : @core.CoreStore,
-  params : @core.IVFParams,
-  metric : @core.Metric,
+  store : @store.CoreStore,
+  params : @types.IVFParams,
+  metric : @types.Metric,
   iterations : Int,
 ) -> IVFState {
   let state = IVFState::new(params, metric, store.dim)
@@ -106,9 +106,9 @@ pub fn ivf_rebuild(
 ///|
 /// Rebuild HNSW index from scratch
 pub fn hnsw_rebuild(
-  store : @core.CoreStore,
-  params : @core.HNSWParams,
-  metric : @core.Metric,
+  store : @store.CoreStore,
+  params : @types.HNSWParams,
+  metric : @types.Metric,
 ) -> HNSWState {
   let cap = if store.size() > 0 { store.size() } else { 1 }
   let state = HNSWState::new(params, metric, cap)
@@ -123,7 +123,7 @@ pub fn hnsw_rebuild(
 /// Get statistics about HNSW tombstones
 pub fn hnsw_tombstone_stats(
   state : HNSWState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
 ) -> (Int, Int) {
   let n = store.size()
   let mut dead = 0

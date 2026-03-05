@@ -2,7 +2,7 @@
 /// Basic Attribute Index - Hash map based implementation
 /// Provides fast equality lookups and range queries via sorted numeric arrays.
 pub struct BasicAttrIndex {
-  data : Map[Int64, @core.Attrs] // id -> attrs
+  data : Map[Int64, @types.Attrs] // id -> attrs
   eq_map : Map[String, Map[String, Array[Int64]]] // key -> value -> ids
   exists_map : Map[String, Array[Int64]] // key -> ids with that key
   num_map : Map[String, (Array[NumEntry], Bool)] // key -> (sorted entries, dirty flag)
@@ -51,8 +51,8 @@ fn remove_from_num_index(
 /// Set attributes for an ID (replaces existing)
 pub fn BasicAttrIndex::set_attrs(
   self : BasicAttrIndex,
-  id : @core.VectorId,
-  attrs : @core.Attrs,
+  id : @types.VectorId,
+  attrs : @types.Attrs,
 ) -> Unit {
   let id_val = id.to_int64()
   // Remove old attrs from indexes if present
@@ -85,8 +85,8 @@ pub fn BasicAttrIndex::set_attrs(
 /// Get attributes for an ID
 pub fn BasicAttrIndex::get_attrs(
   self : BasicAttrIndex,
-  id : @core.VectorId,
-) -> @core.Attrs? {
+  id : @types.VectorId,
+) -> @types.Attrs? {
   self.data.get(id.to_int64())
 }
 
@@ -94,7 +94,7 @@ pub fn BasicAttrIndex::get_attrs(
 /// Remove an ID from the index
 pub fn BasicAttrIndex::remove_id(
   self : BasicAttrIndex,
-  id : @core.VectorId,
+  id : @types.VectorId,
 ) -> Unit {
   let id_val = id.to_int64()
   match self.data.get(id_val) {
@@ -118,8 +118,8 @@ pub fn BasicAttrIndex::remove_id(
 pub fn BasicAttrIndex::eq(
   self : BasicAttrIndex,
   key : String,
-  value : @core.AttrValue,
-) -> Array[@core.VectorId] {
+  value : @types.AttrValue,
+) -> Array[@types.VectorId] {
   let value_key = attr_value_to_key(value)
   match self.eq_map.get(key) {
     None => []
@@ -136,7 +136,7 @@ pub fn BasicAttrIndex::eq(
 pub fn BasicAttrIndex::exists(
   self : BasicAttrIndex,
   key : String,
-) -> Array[@core.VectorId] {
+) -> Array[@types.VectorId] {
   match self.exists_map.get(key) {
     None => []
     Some(ids) => ids_to_vector_ids(ids)
@@ -165,8 +165,8 @@ fn ensure_sorted(
 pub fn BasicAttrIndex::range(
   self : BasicAttrIndex,
   key : String,
-  range : @core.NumericRange,
-) -> Array[@core.VectorId]? {
+  range : @types.NumericRange,
+) -> Array[@types.VectorId]? {
   match self.num_map.get(key) {
     None => Some([]) // Key doesn't exist, return empty
     Some((_arr, _)) => {
@@ -198,9 +198,9 @@ pub fn BasicAttrIndex::range(
           if lo_idx >= hi_idx {
             Some([])
           } else {
-            let result : Array[@core.VectorId] = []
+            let result : Array[@types.VectorId] = []
             for i = lo_idx; i < hi_idx; i = i + 1 {
-              result.push(@core.VectorId(sorted_arr[i].id))
+              result.push(@types.VectorId(sorted_arr[i].id))
             }
             Some(result)
           }

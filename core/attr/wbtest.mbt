@@ -4,26 +4,26 @@
 /// Test: BasicAttrIndex equality queries
 test "attr/basic_eq" {
   let index = BasicAttrIndex::new()
-  let id1 = @core.VectorId::from_int(1)
-  let id2 = @core.VectorId::from_int(2)
-  let id3 = @core.VectorId::from_int(3)
+  let id1 = @types.VectorId::from_int(1)
+  let id2 = @types.VectorId::from_int(2)
+  let id3 = @types.VectorId::from_int(3)
   // Set attrs
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("category", @core.String("A"))
-  attrs1.set("score", @core.Int(100L))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("category", @core.String("B"))
-  attrs2.set("score", @core.Int(200L))
-  let attrs3 = @core.empty_attrs()
-  attrs3.set("category", @core.String("A"))
-  attrs3.set("score", @core.Int(150L))
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("category", @types.String("A"))
+  attrs1.set("score", @types.Int(100L))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("category", @types.String("B"))
+  attrs2.set("score", @types.Int(200L))
+  let attrs3 = @types.empty_attrs()
+  attrs3.set("category", @types.String("A"))
+  attrs3.set("score", @types.Int(150L))
   index.set_attrs(id1, attrs1)
   index.set_attrs(id2, attrs2)
   index.set_attrs(id3, attrs3)
   // Query eq
-  let result_a = index.eq("category", @core.String("A"))
+  let result_a = index.eq("category", @types.String("A"))
   inspect(result_a.length(), content="2")
-  let result_b = index.eq("category", @core.String("B"))
+  let result_b = index.eq("category", @types.String("B"))
   inspect(result_b.length(), content="1")
   inspect(result_b[0].to_int64(), content="2")
 }
@@ -33,12 +33,12 @@ test "attr/basic_eq" {
 test "attr/basic_range" {
   let index = BasicAttrIndex::new()
   for i in 1..<=10 {
-    let attrs = @core.empty_attrs()
-    attrs.set("value", @core.Int(i.to_int64() * 10L))
-    index.set_attrs(@core.VectorId::from_int(i), attrs)
+    let attrs = @types.empty_attrs()
+    attrs.set("value", @types.Int(i.to_int64() * 10L))
+    index.set_attrs(@types.VectorId::from_int(i), attrs)
   }
   // Range: 30 <= value <= 70 (inclusive bounds by default)
-  let range = @core.NumericRange::between(30.0, 70.0)
+  let range = @types.NumericRange::between(30.0, 70.0)
   let result = index.range("value", range)
   match result {
     Some(ids) => inspect(ids.length(), content="5") // 30, 40, 50, 60, 70
@@ -50,12 +50,12 @@ test "attr/basic_range" {
 /// Test: BasicAttrIndex exists queries
 test "attr/basic_exists" {
   let index = BasicAttrIndex::new()
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("name", @core.String("Alice"))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("age", @core.Int(30L))
-  index.set_attrs(@core.VectorId::from_int(1), attrs1)
-  index.set_attrs(@core.VectorId::from_int(2), attrs2)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("name", @types.String("Alice"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("age", @types.Int(30L))
+  index.set_attrs(@types.VectorId::from_int(1), attrs1)
+  index.set_attrs(@types.VectorId::from_int(2), attrs2)
   // Exists query
   let with_name = index.exists("name")
   inspect(with_name.length(), content="1")
@@ -67,13 +67,13 @@ test "attr/basic_exists" {
 /// Test: BitmapAttrIndex equality
 test "attr/bitmap_eq" {
   let index = BitmapAttrIndex::new()
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("status", @core.String("active"))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("status", @core.String("inactive"))
-  index.set_attrs(@core.VectorId::from_int(1), attrs1)
-  index.set_attrs(@core.VectorId::from_int(2), attrs2)
-  let active = index.eq("status", @core.String("active"))
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("status", @types.String("active"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("status", @types.String("inactive"))
+  index.set_attrs(@types.VectorId::from_int(1), attrs1)
+  index.set_attrs(@types.VectorId::from_int(2), attrs2)
+  let active = index.eq("status", @types.String("active"))
   inspect(active.length(), content="1")
 }
 
@@ -81,14 +81,14 @@ test "attr/bitmap_eq" {
 /// Test: BPTreeAttrIndex operations
 test "attr/bptree_operations" {
   let index = BPTreeAttrIndex::new()
-  let attrs = @core.empty_attrs()
-  attrs.set("priority", @core.Int(5L))
-  index.set_attrs(@core.VectorId::from_int(1), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("priority", @types.Int(5L))
+  index.set_attrs(@types.VectorId::from_int(1), attrs)
   // Eq query
-  let result = index.eq("priority", @core.Int(5L))
+  let result = index.eq("priority", @types.Int(5L))
   inspect(result.length(), content="1")
   // Get attrs
-  let retrieved = index.get_attrs(@core.VectorId::from_int(1))
+  let retrieved = index.get_attrs(@types.VectorId::from_int(1))
   inspect(retrieved is Some(_), content="true")
 }
 
@@ -96,11 +96,11 @@ test "attr/bptree_operations" {
 /// Test: LSMAttrIndex memtable operations
 test "attr/lsm_memtable" {
   let index = LSMAttrIndex::new()
-  let attrs = @core.empty_attrs()
-  attrs.set("key", @core.String("value"))
-  index.set_attrs(@core.VectorId::from_int(1), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("key", @types.String("value"))
+  index.set_attrs(@types.VectorId::from_int(1), attrs)
   // Query
-  let result = index.eq("key", @core.String("value"))
+  let result = index.eq("key", @types.String("value"))
   inspect(result.length(), content="1")
   // Check memtable size
   inspect(index.memtable_size() > 0, content="true")
@@ -110,22 +110,22 @@ test "attr/lsm_memtable" {
 /// Test: BasicAttrIndex remove_id
 test "attr/basic_remove_id" {
   let index = BasicAttrIndex::new()
-  let id1 = @core.VectorId::from_int(1)
-  let id2 = @core.VectorId::from_int(2)
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("category", @core.String("A"))
-  attrs1.set("score", @core.Int(100L))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("category", @core.String("A"))
-  attrs2.set("score", @core.Int(200L))
+  let id1 = @types.VectorId::from_int(1)
+  let id2 = @types.VectorId::from_int(2)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("category", @types.String("A"))
+  attrs1.set("score", @types.Int(100L))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("category", @types.String("A"))
+  attrs2.set("score", @types.Int(200L))
   index.set_attrs(id1, attrs1)
   index.set_attrs(id2, attrs2)
   // Verify both exist
-  inspect(index.eq("category", @core.String("A")).length(), content="2")
+  inspect(index.eq("category", @types.String("A")).length(), content="2")
   // Remove id1
   index.remove_id(id1)
   // Verify id1 is removed
-  inspect(index.eq("category", @core.String("A")).length(), content="1")
+  inspect(index.eq("category", @types.String("A")).length(), content="1")
   inspect(index.exists("score").length(), content="1")
   inspect(index.get_attrs(id1) is None, content="true")
   inspect(index.get_attrs(id2) is Some(_), content="true")
@@ -135,27 +135,27 @@ test "attr/basic_remove_id" {
 /// Test: BitmapAttrIndex remove_id
 test "attr/bitmap_remove_id" {
   let index = BitmapAttrIndex::new()
-  let id1 = @core.VectorId::from_int(1)
-  let id2 = @core.VectorId::from_int(2)
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("status", @core.String("active"))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("status", @core.String("active"))
+  let id1 = @types.VectorId::from_int(1)
+  let id2 = @types.VectorId::from_int(2)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("status", @types.String("active"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("status", @types.String("active"))
   index.set_attrs(id1, attrs1)
   index.set_attrs(id2, attrs2)
-  inspect(index.eq("status", @core.String("active")).length(), content="2")
+  inspect(index.eq("status", @types.String("active")).length(), content="2")
   // Remove id1
   index.remove_id(id1)
-  inspect(index.eq("status", @core.String("active")).length(), content="1")
+  inspect(index.eq("status", @types.String("active")).length(), content="1")
 }
 
 ///|
 /// Test: BPTreeAttrIndex remove_id
 test "attr/bptree_remove_id" {
   let index = BPTreeAttrIndex::new()
-  let id1 = @core.VectorId::from_int(1)
-  let attrs = @core.empty_attrs()
-  attrs.set("key", @core.String("value"))
+  let id1 = @types.VectorId::from_int(1)
+  let attrs = @types.empty_attrs()
+  attrs.set("key", @types.String("value"))
   index.set_attrs(id1, attrs)
   inspect(index.get_attrs(id1) is Some(_), content="true")
   // Remove
@@ -167,18 +167,18 @@ test "attr/bptree_remove_id" {
 /// Test: LSMAttrIndex remove_id
 test "attr/lsm_remove_id" {
   let index = LSMAttrIndex::new()
-  let id1 = @core.VectorId::from_int(1)
-  let id2 = @core.VectorId::from_int(2)
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("tag", @core.String("test"))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("tag", @core.String("test"))
+  let id1 = @types.VectorId::from_int(1)
+  let id2 = @types.VectorId::from_int(2)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("tag", @types.String("test"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("tag", @types.String("test"))
   index.set_attrs(id1, attrs1)
   index.set_attrs(id2, attrs2)
-  inspect(index.eq("tag", @core.String("test")).length(), content="2")
+  inspect(index.eq("tag", @types.String("test")).length(), content="2")
   // Remove id1
   index.remove_id(id1)
-  inspect(index.eq("tag", @core.String("test")).length(), content="1")
+  inspect(index.eq("tag", @types.String("test")).length(), content="1")
 }
 
 ///|
@@ -403,12 +403,12 @@ test "sstable/empty_records" {
 test "bptree/range_int" {
   let index = BPTreeAttrIndex::new()
   for i in 1..<=10 {
-    let attrs = @core.empty_attrs()
-    attrs.set("score", @core.Int(i.to_int64() * 10L))
-    index.set_attrs(@core.VectorId::from_int(i), attrs)
+    let attrs = @types.empty_attrs()
+    attrs.set("score", @types.Int(i.to_int64() * 10L))
+    index.set_attrs(@types.VectorId::from_int(i), attrs)
   }
   // Range: 30 <= score <= 70
-  let range = @core.NumericRange::between(30.0, 70.0)
+  let range = @types.NumericRange::between(30.0, 70.0)
   let result = index.range("score", range)
   match result {
     Some(ids) => inspect(ids.length(), content="5") // 30, 40, 50, 60, 70
@@ -421,12 +421,12 @@ test "bptree/range_int" {
 test "bptree/range_float" {
   let index = BPTreeAttrIndex::new()
   for i in 1..<=10 {
-    let attrs = @core.empty_attrs()
-    attrs.set("price", @core.Float(i.to_double() * 1.5))
-    index.set_attrs(@core.VectorId::from_int(i), attrs)
+    let attrs = @types.empty_attrs()
+    attrs.set("price", @types.Float(i.to_double() * 1.5))
+    index.set_attrs(@types.VectorId::from_int(i), attrs)
   }
   // Range: 3.0 <= price <= 9.0
-  let range = @core.NumericRange::between(3.0, 9.0)
+  let range = @types.NumericRange::between(3.0, 9.0)
   let result = index.range("price", range)
   match result {
     Some(ids) => inspect(ids.length() >= 3, content="true")
@@ -439,42 +439,42 @@ test "bptree/range_float" {
 test "bptree/eq_types" {
   let index = BPTreeAttrIndex::new()
   // Int
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("num", @core.Int(42L))
-  index.set_attrs(@core.VectorId::from_int(1), attrs1)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("num", @types.Int(42L))
+  index.set_attrs(@types.VectorId::from_int(1), attrs1)
   // Float
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("num", @core.Float(3.14))
-  index.set_attrs(@core.VectorId::from_int(2), attrs2)
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("num", @types.Float(3.14))
+  index.set_attrs(@types.VectorId::from_int(2), attrs2)
   // String
-  let attrs3 = @core.empty_attrs()
-  attrs3.set("name", @core.String("test"))
-  index.set_attrs(@core.VectorId::from_int(3), attrs3)
+  let attrs3 = @types.empty_attrs()
+  attrs3.set("name", @types.String("test"))
+  index.set_attrs(@types.VectorId::from_int(3), attrs3)
   // Bool
-  let attrs4 = @core.empty_attrs()
-  attrs4.set("flag", @core.Bool(true))
-  index.set_attrs(@core.VectorId::from_int(4), attrs4)
+  let attrs4 = @types.empty_attrs()
+  attrs4.set("flag", @types.Bool(true))
+  index.set_attrs(@types.VectorId::from_int(4), attrs4)
   // Null
-  let attrs5 = @core.empty_attrs()
-  attrs5.set("empty", @core.Null)
-  index.set_attrs(@core.VectorId::from_int(5), attrs5)
+  let attrs5 = @types.empty_attrs()
+  attrs5.set("empty", @types.Null)
+  index.set_attrs(@types.VectorId::from_int(5), attrs5)
   // Query
-  inspect(index.eq("num", @core.Int(42L)).length(), content="1")
-  inspect(index.eq("name", @core.String("test")).length(), content="1")
-  inspect(index.eq("flag", @core.Bool(true)).length(), content="1")
-  inspect(index.eq("empty", @core.Null).length(), content="1")
+  inspect(index.eq("num", @types.Int(42L)).length(), content="1")
+  inspect(index.eq("name", @types.String("test")).length(), content="1")
+  inspect(index.eq("flag", @types.Bool(true)).length(), content="1")
+  inspect(index.eq("empty", @types.Null).length(), content="1")
 }
 
 ///|
 /// Test: BPTreeAttrIndex exists query
 test "bptree/exists" {
   let index = BPTreeAttrIndex::new()
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("email", @core.String("a@b.com"))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("phone", @core.String("123"))
-  index.set_attrs(@core.VectorId::from_int(1), attrs1)
-  index.set_attrs(@core.VectorId::from_int(2), attrs2)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("email", @types.String("a@b.com"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("phone", @types.String("123"))
+  index.set_attrs(@types.VectorId::from_int(1), attrs1)
+  index.set_attrs(@types.VectorId::from_int(2), attrs2)
   inspect(index.exists("email").length(), content="1")
   inspect(index.exists("phone").length(), content="1")
   inspect(index.exists("missing").length(), content="0")
@@ -484,20 +484,20 @@ test "bptree/exists" {
 /// Test: BPTreeAttrIndex update attrs
 test "bptree/update_attrs" {
   let index = BPTreeAttrIndex::new()
-  let id = @core.VectorId::from_int(1)
+  let id = @types.VectorId::from_int(1)
   // Set initial attrs
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("status", @core.String("active"))
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("status", @types.String("active"))
   index.set_attrs(id, attrs1)
-  inspect(index.eq("status", @core.String("active")).length(), content="1")
+  inspect(index.eq("status", @types.String("active")).length(), content="1")
   // Update attrs
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("status", @core.String("inactive"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("status", @types.String("inactive"))
   index.set_attrs(id, attrs2)
   // Old value should not be found
-  inspect(index.eq("status", @core.String("active")).length(), content="0")
+  inspect(index.eq("status", @types.String("active")).length(), content="0")
   // New value should be found
-  inspect(index.eq("status", @core.String("inactive")).length(), content="1")
+  inspect(index.eq("status", @types.String("inactive")).length(), content="1")
 }
 
 ///|
@@ -506,7 +506,7 @@ test "bptree/size" {
   let index = BPTreeAttrIndex::new()
   inspect(index.size(), content="0")
   for i in 1..<=5 {
-    index.set_attrs(@core.VectorId::from_int(i), @core.empty_attrs())
+    index.set_attrs(@types.VectorId::from_int(i), @types.empty_attrs())
   }
   inspect(index.size(), content="5")
 }
@@ -515,7 +515,7 @@ test "bptree/size" {
 /// Test: BPTreeAttrIndex range with non-existent key
 test "bptree/range_empty" {
   let index = BPTreeAttrIndex::new()
-  let range = @core.NumericRange::between(0.0, 100.0)
+  let range = @types.NumericRange::between(0.0, 100.0)
   let result = index.range("nonexistent", range)
   match result {
     Some(ids) => inspect(ids.length(), content="0")
@@ -527,9 +527,9 @@ test "bptree/range_empty" {
 /// Test: LSMAttrIndex exists query
 test "lsm/exists" {
   let index = LSMAttrIndex::new()
-  let attrs = @core.empty_attrs()
-  attrs.set("email", @core.String("test@test.com"))
-  index.set_attrs(@core.VectorId::from_int(1), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("email", @types.String("test@test.com"))
+  index.set_attrs(@types.VectorId::from_int(1), attrs)
   inspect(index.exists("email").length(), content="1")
   inspect(index.exists("missing").length(), content="0")
 }
@@ -539,11 +539,11 @@ test "lsm/exists" {
 test "lsm/range" {
   let index = LSMAttrIndex::new()
   for i in 1..<=10 {
-    let attrs = @core.empty_attrs()
-    attrs.set("value", @core.Int(i.to_int64() * 10L))
-    index.set_attrs(@core.VectorId::from_int(i), attrs)
+    let attrs = @types.empty_attrs()
+    attrs.set("value", @types.Int(i.to_int64() * 10L))
+    index.set_attrs(@types.VectorId::from_int(i), attrs)
   }
-  let range = @core.NumericRange::between(30.0, 70.0)
+  let range = @types.NumericRange::between(30.0, 70.0)
   let result = index.range("value", range)
   match result {
     Some(ids) => inspect(ids.length(), content="5")
@@ -555,9 +555,9 @@ test "lsm/range" {
 /// Test: BitmapAttrIndex exists query
 test "bitmap/exists" {
   let index = BitmapAttrIndex::new()
-  let attrs = @core.empty_attrs()
-  attrs.set("active", @core.Bool(true))
-  index.set_attrs(@core.VectorId::from_int(1), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("active", @types.Bool(true))
+  index.set_attrs(@types.VectorId::from_int(1), attrs)
   inspect(index.exists("active").length(), content="1")
   inspect(index.exists("missing").length(), content="0")
 }
@@ -566,12 +566,15 @@ test "bitmap/exists" {
 /// Test: BitmapAttrIndex get_attrs
 test "bitmap/get_attrs" {
   let index = BitmapAttrIndex::new()
-  let attrs = @core.empty_attrs()
-  attrs.set("tag", @core.String("test"))
-  index.set_attrs(@core.VectorId::from_int(1), attrs)
-  let retrieved = index.get_attrs(@core.VectorId::from_int(1))
+  let attrs = @types.empty_attrs()
+  attrs.set("tag", @types.String("test"))
+  index.set_attrs(@types.VectorId::from_int(1), attrs)
+  let retrieved = index.get_attrs(@types.VectorId::from_int(1))
   inspect(retrieved is Some(_), content="true")
-  inspect(index.get_attrs(@core.VectorId::from_int(99)) is None, content="true")
+  inspect(
+    index.get_attrs(@types.VectorId::from_int(99)) is None,
+    content="true",
+  )
 }
 
 ///|
@@ -579,10 +582,10 @@ test "bitmap/get_attrs" {
 test "lsm/size" {
   let index = LSMAttrIndex::new()
   inspect(index.size(), content="0")
-  let attrs = @core.empty_attrs()
-  attrs.set("key", @core.String("value"))
-  index.set_attrs(@core.VectorId::from_int(1), attrs)
-  index.set_attrs(@core.VectorId::from_int(2), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("key", @types.String("value"))
+  index.set_attrs(@types.VectorId::from_int(1), attrs)
+  index.set_attrs(@types.VectorId::from_int(2), attrs)
   inspect(index.size(), content="2")
 }
 
@@ -592,12 +595,12 @@ test "lsm/should_flush" {
   let index = LSMAttrIndex::new(flush_threshold=2)
   inspect(index.should_flush(), content="false")
   // Add entries to trigger flush threshold
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("key", @core.String("value1"))
-  index.set_attrs(@core.VectorId::from_int(1), attrs1)
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("key", @core.String("value2"))
-  index.set_attrs(@core.VectorId::from_int(2), attrs2)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("key", @types.String("value1"))
+  index.set_attrs(@types.VectorId::from_int(1), attrs1)
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("key", @types.String("value2"))
+  index.set_attrs(@types.VectorId::from_int(2), attrs2)
   // Memtable size should trigger flush
   inspect(index.memtable_size() >= 2, content="true")
 }
@@ -606,16 +609,16 @@ test "lsm/should_flush" {
 /// Test: LSMAttrIndex clear_memtable
 test "lsm/clear_memtable" {
   let index = LSMAttrIndex::new()
-  let attrs = @core.empty_attrs()
-  attrs.set("key", @core.String("value"))
-  index.set_attrs(@core.VectorId::from_int(1), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("key", @types.String("value"))
+  index.set_attrs(@types.VectorId::from_int(1), attrs)
   inspect(index.memtable_size() > 0, content="true")
   index.clear_memtable()
   inspect(index.memtable_size(), content="0")
   // Data should still exist
   inspect(index.size(), content="1")
   inspect(
-    index.get_attrs(@core.VectorId::from_int(1)) is Some(_),
+    index.get_attrs(@types.VectorId::from_int(1)) is Some(_),
     content="true",
   )
 }
@@ -625,16 +628,16 @@ test "lsm/clear_memtable" {
 test "lsm/get_attrs" {
   let index = LSMAttrIndex::new()
   // Non-existent
-  inspect(index.get_attrs(@core.VectorId::from_int(1)) is None, content="true")
+  inspect(index.get_attrs(@types.VectorId::from_int(1)) is None, content="true")
   // Add and retrieve
-  let attrs = @core.empty_attrs()
-  attrs.set("name", @core.String("test"))
-  attrs.set("count", @core.Int(42L))
-  index.set_attrs(@core.VectorId::from_int(1), attrs)
-  match index.get_attrs(@core.VectorId::from_int(1)) {
+  let attrs = @types.empty_attrs()
+  attrs.set("name", @types.String("test"))
+  attrs.set("count", @types.Int(42L))
+  index.set_attrs(@types.VectorId::from_int(1), attrs)
+  match index.get_attrs(@types.VectorId::from_int(1)) {
     Some(a) =>
       match a.get("name") {
-        Some(@core.String(s)) => inspect(s, content="test")
+        Some(@types.String(s)) => inspect(s, content="test")
         _ => inspect(false, content="true")
       }
     None => inspect(false, content="true")
@@ -645,20 +648,20 @@ test "lsm/get_attrs" {
 /// Test: LSMAttrIndex update attrs replaces old
 test "lsm/update_attrs" {
   let index = LSMAttrIndex::new()
-  let id = @core.VectorId::from_int(1)
+  let id = @types.VectorId::from_int(1)
   // Set initial attrs
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("status", @core.String("old"))
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("status", @types.String("old"))
   index.set_attrs(id, attrs1)
-  inspect(index.eq("status", @core.String("old")).length(), content="1")
+  inspect(index.eq("status", @types.String("old")).length(), content="1")
   // Update attrs
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("status", @core.String("new"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("status", @types.String("new"))
   index.set_attrs(id, attrs2)
   // Old value should not be found
-  inspect(index.eq("status", @core.String("old")).length(), content="0")
+  inspect(index.eq("status", @types.String("old")).length(), content="0")
   // New value should be found
-  inspect(index.eq("status", @core.String("new")).length(), content="1")
+  inspect(index.eq("status", @types.String("new")).length(), content="1")
 }
 
 ///|
@@ -666,8 +669,8 @@ test "lsm/update_attrs" {
 test "basic/size" {
   let index = BasicAttrIndex::new()
   inspect(index.size(), content="0")
-  index.set_attrs(@core.VectorId::from_int(1), @core.empty_attrs())
-  index.set_attrs(@core.VectorId::from_int(2), @core.empty_attrs())
+  index.set_attrs(@types.VectorId::from_int(1), @types.empty_attrs())
+  index.set_attrs(@types.VectorId::from_int(2), @types.empty_attrs())
   inspect(index.size(), content="2")
 }
 
@@ -676,12 +679,12 @@ test "basic/size" {
 test "basic/range_float" {
   let index = BasicAttrIndex::new()
   for i in 1..<=10 {
-    let attrs = @core.empty_attrs()
-    attrs.set("price", @core.Float(i.to_double() * 1.5))
-    index.set_attrs(@core.VectorId::from_int(i), attrs)
+    let attrs = @types.empty_attrs()
+    attrs.set("price", @types.Float(i.to_double() * 1.5))
+    index.set_attrs(@types.VectorId::from_int(i), attrs)
   }
   // Range: 3.0 <= price <= 9.0
-  let range = @core.NumericRange::between(3.0, 9.0)
+  let range = @types.NumericRange::between(3.0, 9.0)
   let result = index.range("price", range)
   match result {
     Some(ids) => inspect(ids.length() >= 3, content="true")
@@ -693,7 +696,7 @@ test "basic/range_float" {
 /// Test: BitmapAttrIndex range (returns None)
 test "bitmap/range" {
   let index = BitmapAttrIndex::new()
-  let range = @core.NumericRange::between(0.0, 100.0)
+  let range = @types.NumericRange::between(0.0, 100.0)
   let result = index.range("any", range)
   inspect(result is None, content="true")
 }
@@ -702,9 +705,9 @@ test "bitmap/range" {
 /// Test: attr_value_to_key disambiguates types (P2 fix)
 test "attr/key_type_disambiguation" {
   // Int(1), Float(1.0), String("1") should produce different keys
-  let key_int = attr_value_to_key(@core.Int(1L))
-  let key_float = attr_value_to_key(@core.Float(1.0))
-  let key_string = attr_value_to_key(@core.String("1"))
+  let key_int = attr_value_to_key(@types.Int(1L))
+  let key_float = attr_value_to_key(@types.Float(1.0))
+  let key_string = attr_value_to_key(@types.String("1"))
   // All should be different
   inspect(key_int != key_float, content="true")
   inspect(key_int != key_string, content="true")
@@ -714,8 +717,8 @@ test "attr/key_type_disambiguation" {
   inspect(key_float.has_prefix("F:"), content="true")
   inspect(key_string.has_prefix("S:"), content="true")
   // Bool and Null also have prefixes
-  let key_bool = attr_value_to_key(@core.Bool(true))
-  let key_null = attr_value_to_key(@core.Null)
+  let key_bool = attr_value_to_key(@types.Bool(true))
+  let key_null = attr_value_to_key(@types.Null)
   inspect(key_bool.has_prefix("B:"), content="true")
   inspect(key_null.has_prefix("N:"), content="true")
 }
@@ -724,29 +727,29 @@ test "attr/key_type_disambiguation" {
 /// Test: BasicAttrIndex correctly distinguishes types (P2 fix)
 test "basic/type_disambiguation" {
   let index = BasicAttrIndex::new()
-  let id1 = @core.VectorId::from_int(1)
-  let id2 = @core.VectorId::from_int(2)
-  let id3 = @core.VectorId::from_int(3)
+  let id1 = @types.VectorId::from_int(1)
+  let id2 = @types.VectorId::from_int(2)
+  let id3 = @types.VectorId::from_int(3)
   // Set same "value" but different types
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("val", @core.Int(1L))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("val", @core.Float(1.0))
-  let attrs3 = @core.empty_attrs()
-  attrs3.set("val", @core.String("1"))
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("val", @types.Int(1L))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("val", @types.Float(1.0))
+  let attrs3 = @types.empty_attrs()
+  attrs3.set("val", @types.String("1"))
   index.set_attrs(id1, attrs1)
   index.set_attrs(id2, attrs2)
   index.set_attrs(id3, attrs3)
   // Querying for Int(1) should only find id1
-  let result_int = index.eq("val", @core.Int(1L))
+  let result_int = index.eq("val", @types.Int(1L))
   inspect(result_int.length(), content="1")
   inspect(result_int[0].to_int64(), content="1")
   // Querying for Float(1.0) should only find id2
-  let result_float = index.eq("val", @core.Float(1.0))
+  let result_float = index.eq("val", @types.Float(1.0))
   inspect(result_float.length(), content="1")
   inspect(result_float[0].to_int64(), content="2")
   // Querying for String("1") should only find id3
-  let result_string = index.eq("val", @core.String("1"))
+  let result_string = index.eq("val", @types.String("1"))
   inspect(result_string.length(), content="1")
   inspect(result_string[0].to_int64(), content="3")
 }
@@ -755,27 +758,27 @@ test "basic/type_disambiguation" {
 /// Test: BPTree handles Unicode strings correctly
 test "bptree/unicode_strings" {
   let index = BPTreeAttrIndex::new()
-  let id1 = @core.VectorId::from_int(1)
-  let id2 = @core.VectorId::from_int(2)
-  let id3 = @core.VectorId::from_int(3)
+  let id1 = @types.VectorId::from_int(1)
+  let id2 = @types.VectorId::from_int(2)
+  let id3 = @types.VectorId::from_int(3)
   // Add entries with Unicode vs ASCII that would collide with truncation
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("name", @core.String("hello")) // ASCII
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("name", @core.String("héllo")) // Unicode é (0xE9)
-  let attrs3 = @core.empty_attrs()
-  attrs3.set("name", @core.String("日本語")) // Japanese
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("name", @types.String("hello")) // ASCII
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("name", @types.String("héllo")) // Unicode é (0xE9)
+  let attrs3 = @types.empty_attrs()
+  attrs3.set("name", @types.String("日本語")) // Japanese
   index.set_attrs(id1, attrs1)
   index.set_attrs(id2, attrs2)
   index.set_attrs(id3, attrs3)
   // Each should be distinct
-  let r1 = index.eq("name", @core.String("hello"))
+  let r1 = index.eq("name", @types.String("hello"))
   inspect(r1.length(), content="1")
   inspect(r1[0].to_int64(), content="1")
-  let r2 = index.eq("name", @core.String("héllo"))
+  let r2 = index.eq("name", @types.String("héllo"))
   inspect(r2.length(), content="1")
   inspect(r2[0].to_int64(), content="2")
-  let r3 = index.eq("name", @core.String("日本語"))
+  let r3 = index.eq("name", @types.String("日本語"))
   inspect(r3.length(), content="1")
   inspect(r3[0].to_int64(), content="3")
 }
@@ -784,19 +787,19 @@ test "bptree/unicode_strings" {
 /// Test: LSM handles Unicode attribute keys correctly
 test "lsm/unicode_attr_keys" {
   let index = LSMAttrIndex::new()
-  let id1 = @core.VectorId::from_int(1)
-  let id2 = @core.VectorId::from_int(2)
+  let id1 = @types.VectorId::from_int(1)
+  let id2 = @types.VectorId::from_int(2)
   // Add with Unicode vs ASCII attr keys
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("name", @core.Bool(true))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("名前", @core.Bool(true)) // Japanese for "name"
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("name", @types.Bool(true))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("名前", @types.Bool(true)) // Japanese for "name"
   index.set_attrs(id1, attrs1)
   index.set_attrs(id2, attrs2)
   // Each should be distinct
-  let r1 = index.eq("name", @core.Bool(true))
+  let r1 = index.eq("name", @types.Bool(true))
   inspect(r1.length(), content="1")
-  let r2 = index.eq("名前", @core.Bool(true))
+  let r2 = index.eq("名前", @types.Bool(true))
   inspect(r2.length(), content="1")
   // exists should also be distinct
   let e1 = index.exists("name")
@@ -839,23 +842,23 @@ test "sstable/read_invalid_bounds" {
 /// Test: BasicAttrIndex stores defensive copy of attrs
 test "basic/attrs_defensive_copy" {
   let index = BasicAttrIndex::new()
-  let id = @core.VectorId::from_int(1)
-  let attrs = @core.empty_attrs()
-  attrs.set("tag", @core.String("A"))
+  let id = @types.VectorId::from_int(1)
+  let attrs = @types.empty_attrs()
+  attrs.set("tag", @types.String("A"))
   index.set_attrs(id, attrs)
   // Mutate the original attrs after storing
-  attrs.set("tag", @core.String("B"))
+  attrs.set("tag", @types.String("B"))
   // get_attrs should still return "A"
   match index.get_attrs(id) {
     None => inspect(false, content="true") // Should not reach here
     Some(stored) =>
       match stored.get("tag") {
-        Some(@core.String(s)) => inspect(s, content="A")
+        Some(@types.String(s)) => inspect(s, content="A")
         _ => inspect(false, content="true") // Should not reach here
       }
   }
   // eq query should also still find "A"
-  let results = index.eq("tag", @core.String("A"))
+  let results = index.eq("tag", @types.String("A"))
   inspect(results.length(), content="1")
 }
 
@@ -863,18 +866,18 @@ test "basic/attrs_defensive_copy" {
 /// Test: BitmapAttrIndex stores defensive copy of attrs
 test "bitmap/attrs_defensive_copy" {
   let index = BitmapAttrIndex::new()
-  let id = @core.VectorId::from_int(1)
-  let attrs = @core.empty_attrs()
-  attrs.set("tag", @core.String("A"))
+  let id = @types.VectorId::from_int(1)
+  let attrs = @types.empty_attrs()
+  attrs.set("tag", @types.String("A"))
   index.set_attrs(id, attrs)
   // Mutate the original attrs after storing
-  attrs.set("tag", @core.String("B"))
+  attrs.set("tag", @types.String("B"))
   // get_attrs should still return "A"
   match index.get_attrs(id) {
     None => inspect(false, content="true")
     Some(stored) =>
       match stored.get("tag") {
-        Some(@core.String(s)) => inspect(s, content="A")
+        Some(@types.String(s)) => inspect(s, content="A")
         _ => inspect(false, content="true")
       }
   }
@@ -884,18 +887,18 @@ test "bitmap/attrs_defensive_copy" {
 /// Test: BPTreeAttrIndex stores defensive copy of attrs
 test "bptree/attrs_defensive_copy" {
   let index = BPTreeAttrIndex::new()
-  let id = @core.VectorId::from_int(1)
-  let attrs = @core.empty_attrs()
-  attrs.set("tag", @core.String("A"))
+  let id = @types.VectorId::from_int(1)
+  let attrs = @types.empty_attrs()
+  attrs.set("tag", @types.String("A"))
   index.set_attrs(id, attrs)
   // Mutate the original attrs after storing
-  attrs.set("tag", @core.String("B"))
+  attrs.set("tag", @types.String("B"))
   // get_attrs should still return "A"
   match index.get_attrs(id) {
     None => inspect(false, content="true")
     Some(stored) =>
       match stored.get("tag") {
-        Some(@core.String(s)) => inspect(s, content="A")
+        Some(@types.String(s)) => inspect(s, content="A")
         _ => inspect(false, content="true")
       }
   }
@@ -905,18 +908,18 @@ test "bptree/attrs_defensive_copy" {
 /// Test: LSMAttrIndex stores defensive copy of attrs
 test "lsm/attrs_defensive_copy" {
   let index = LSMAttrIndex::new()
-  let id = @core.VectorId::from_int(1)
-  let attrs = @core.empty_attrs()
-  attrs.set("tag", @core.String("A"))
+  let id = @types.VectorId::from_int(1)
+  let attrs = @types.empty_attrs()
+  attrs.set("tag", @types.String("A"))
   index.set_attrs(id, attrs)
   // Mutate the original attrs after storing
-  attrs.set("tag", @core.String("B"))
+  attrs.set("tag", @types.String("B"))
   // get_attrs should still return "A"
   match index.get_attrs(id) {
     None => inspect(false, content="true")
     Some(stored) =>
       match stored.get("tag") {
-        Some(@core.String(s)) => inspect(s, content="A")
+        Some(@types.String(s)) => inspect(s, content="A")
         _ => inspect(false, content="true")
       }
   }

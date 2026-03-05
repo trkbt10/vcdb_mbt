@@ -16,8 +16,8 @@
 
 ///|
 /// Re-export factory functions for convenience
-pub fn empty_attrs() -> @core.Attrs {
-  @core.empty_attrs()
+pub fn empty_attrs() -> @types.Attrs {
+  @types.empty_attrs()
 }
 
 ///|
@@ -34,8 +34,8 @@ pub fn empty_attrs() -> @core.Attrs {
 /// - strategy: The selected ANN strategy (Bruteforce/HNSW/IVF)
 /// - bruteforce/hnsw/ivf: Strategy-specific index state
 pub struct VectorDB {
-  store : @core.CoreStore
-  strategy : @core.Strategy
+  store : @store.CoreStore
+  strategy : @types.Strategy
   bruteforce : @ann.BruteforceState?
   hnsw : @ann.HNSWState?
   ivf : @ann.IVFState?
@@ -48,8 +48,8 @@ pub struct VectorDB {
 /// - options: Configuration including dimension, metric, capacity, and strategy
 ///
 /// Returns: A new VectorDB instance configured according to options
-pub fn VectorDB::new(options : @core.DatabaseOptions) -> VectorDB {
-  let store = @core.CoreStore::new(
+pub fn VectorDB::new(options : @types.DatabaseOptions) -> VectorDB {
+  let store = @store.CoreStore::new(
     options.dim,
     options.metric,
     capacity=options.capacity,
@@ -92,7 +92,7 @@ pub fn VectorDB::new(options : @core.DatabaseOptions) -> VectorDB {
 ///
 /// Returns: A VectorDB with Bruteforce strategy and Cosine metric
 pub fn VectorDB::with_dim(dim : Int) -> VectorDB {
-  VectorDB::new(@core.DatabaseOptions::default(dim))
+  VectorDB::new(@types.DatabaseOptions::default(dim))
 }
 
 ///|
@@ -108,13 +108,13 @@ pub fn VectorDB::with_dim(dim : Int) -> VectorDB {
 /// Returns: A VectorDB configured with HNSW index
 pub fn VectorDB::with_hnsw(
   dim : Int,
-  metric? : @core.Metric = Cosine,
+  metric? : @types.Metric = Cosine,
 ) -> VectorDB {
-  let options : @core.DatabaseOptions = {
+  let options : @types.DatabaseOptions = {
     dim,
     metric,
     capacity: 1024,
-    strategy: HNSW(@core.HNSWParams::default()),
+    strategy: HNSW(@types.HNSWParams::default()),
   }
   VectorDB::new(options)
 }
@@ -132,13 +132,13 @@ pub fn VectorDB::with_hnsw(
 /// Returns: A VectorDB configured with IVF index
 pub fn VectorDB::with_ivf(
   dim : Int,
-  metric? : @core.Metric = Cosine,
+  metric? : @types.Metric = Cosine,
 ) -> VectorDB {
-  let options : @core.DatabaseOptions = {
+  let options : @types.DatabaseOptions = {
     dim,
     metric,
     capacity: 1024,
-    strategy: IVF(@core.IVFParams::default()),
+    strategy: IVF(@types.IVFParams::default()),
   }
   VectorDB::new(options)
 }
@@ -173,21 +173,21 @@ pub fn VectorDB::dim(self : VectorDB) -> Int {
 
 ///|
 /// Get the similarity metric used by this database.
-pub fn VectorDB::metric(self : VectorDB) -> @core.Metric {
+pub fn VectorDB::metric(self : VectorDB) -> @types.Metric {
   self.store.metric
 }
 
 ///|
 /// Get access to the underlying CoreStore (for distributed storage operations)
-pub fn VectorDB::store(self : VectorDB) -> @core.CoreStore {
+pub fn VectorDB::store(self : VectorDB) -> @store.CoreStore {
   self.store
 }
 
 ///|
 /// Create VectorDB from an existing CoreStore (for loading from distributed storage)
 pub fn VectorDB::from_store(
-  store : @core.CoreStore,
-  options : @core.DatabaseOptions,
+  store : @store.CoreStore,
+  options : @types.DatabaseOptions,
 ) -> VectorDB {
   match options.strategy {
     Bruteforce =>
@@ -233,7 +233,7 @@ pub fn VectorDB::from_store(
 /// HNSW uses tombstones for soft-delete to maintain graph connectivity.
 /// Tombstoned vectors are excluded from search results but remain in storage
 /// until compact() is called.
-fn VectorDB::is_tombstoned(self : VectorDB, id : @core.VectorId) -> Bool {
+fn VectorDB::is_tombstoned(self : VectorDB, id : @types.VectorId) -> Bool {
   match self.hnsw {
     None => false
     Some(state) =>
@@ -253,7 +253,7 @@ fn VectorDB::is_tombstoned(self : VectorDB, id : @core.VectorId) -> Bool {
 /// - id: The vector ID to check
 ///
 /// Returns: true if the vector exists and is not tombstoned
-pub fn VectorDB::has(self : VectorDB, id : @core.VectorId) -> Bool {
+pub fn VectorDB::has(self : VectorDB, id : @types.VectorId) -> Bool {
   if not(self.store.has(id)) {
     return false
   }
@@ -271,8 +271,8 @@ pub fn VectorDB::has(self : VectorDB, id : @core.VectorId) -> Bool {
 /// Returns: The vector record if found and accessible, None otherwise
 pub fn VectorDB::get(
   self : VectorDB,
-  id : @core.VectorId,
-) -> @core.VectorRecord? {
+  id : @types.VectorId,
+) -> @types.VectorRecord? {
   if self.is_tombstoned(id) {
     return None
   }
@@ -291,9 +291,9 @@ pub fn VectorDB::get(
 /// - attrs: Metadata attributes for filtering
 pub fn VectorDB::add(
   self : VectorDB,
-  id : @core.VectorId,
+  id : @types.VectorId,
   vector : Array[Double],
-  attrs : @core.Attrs,
+  attrs : @types.Attrs,
 ) -> Unit {
   // Check if this is a tombstoned ID in HNSW mode (can be re-added)
   let was_tombstoned = self.is_tombstoned(id)
@@ -347,9 +347,9 @@ pub fn VectorDB::add(
 /// Returns: true if a new vector was created, false if existing was updated
 pub fn VectorDB::upsert(
   self : VectorDB,
-  id : @core.VectorId,
+  id : @types.VectorId,
   vector : Array[Double],
-  attrs : @core.Attrs,
+  attrs : @types.Attrs,
 ) -> Bool {
   let existed = self.store.has(id)
   let (_, created) = self.store.add_or_update(id, vector, attrs, upsert=true)
@@ -396,7 +396,7 @@ pub fn VectorDB::upsert(
 /// - id: The vector ID to remove
 ///
 /// Returns: true if the vector was removed, false if not found or already deleted
-pub fn VectorDB::remove(self : VectorDB, id : @core.VectorId) -> Bool {
+pub fn VectorDB::remove(self : VectorDB, id : @types.VectorId) -> Bool {
   guard self.store.has(id) else { return false }
   // For HNSW, check if already tombstoned
   match self.hnsw {
@@ -434,8 +434,8 @@ pub fn VectorDB::search(
   self : VectorDB,
   query : Array[Double],
   k : Int,
-  filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
-) -> Array[@core.SearchHit] {
+  filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
+) -> Array[@types.SearchHit] {
   match self.strategy {
     Bruteforce =>
       match self.bruteforce {
@@ -468,8 +468,8 @@ pub fn VectorDB::search(
 pub fn VectorDB::find(
   self : VectorDB,
   query : Array[Double],
-  filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
-) -> @core.SearchHit? {
+  filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
+) -> @types.SearchHit? {
   let results = self.search(query, 1, filter)
   if results.is_empty() {
     None
@@ -504,7 +504,7 @@ pub fn VectorDB::search_with_expr(
   expr : @filter.FilterExpr?,
   attr_index : @attr.BasicAttrIndex?,
   strategy : @filter.FilterStrategy,
-) -> Array[@core.SearchHit] {
+) -> Array[@types.SearchHit] {
   match expr {
     None => self.search(query, k, None)
     Some(filter_expr) => {
@@ -556,16 +556,16 @@ fn VectorDB::search_candidates(
   self : VectorDB,
   query : Array[Double],
   k : Int,
-  candidates : Array[@core.VectorId],
-) -> Array[@core.SearchHit] {
+  candidates : Array[@types.VectorId],
+) -> Array[@types.SearchHit] {
   guard query.length() == self.store.dim else { return [] }
   if candidates.is_empty() {
     return []
   }
   let q = self.store.normalize_query(query)
-  let score_fn = @core.get_score_fn(self.store.metric)
+  let score_fn = @vecmath.get_score_fn(self.store.metric)
   let dim = self.store.dim
-  let results : Array[@core.SearchHit] = []
+  let results : Array[@types.SearchHit] = []
   for id in candidates {
     // Skip tombstoned IDs (HNSW deletions)
     if self.is_tombstoned(id) {
@@ -579,7 +579,7 @@ fn VectorDB::search_candidates(
         let attrs = self.store.attrs[idx]
         @collection.push_top_k(
           results,
-          @core.SearchHit::{ id, score, attrs },
+          @types.SearchHit::{ id, score, attrs },
           k,
           fn(hit) { hit.score },
         )
@@ -599,8 +599,8 @@ fn VectorDB::search_candidates(
 /// Returns: true if updated, false if ID not found
 pub fn VectorDB::update_attrs(
   self : VectorDB,
-  id : @core.VectorId,
-  attrs : @core.Attrs,
+  id : @types.VectorId,
+  attrs : @types.Attrs,
 ) -> Bool {
   self.store.update_attrs(id, attrs)
 }
@@ -693,7 +693,7 @@ pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
 pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
   let r = @binary.BinaryReader::new(data)
   let strategy_type = r.read_u32()
-  let (hnsw_params, ivf_params) : (@core.HNSWParams?, @core.IVFParams?) = match
+  let (hnsw_params, ivf_params) : (@types.HNSWParams?, @types.IVFParams?) = match
     strategy_type {
     0U => (None, None)
     1U => {
@@ -704,7 +704,7 @@ pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
       let seed = r.read_u64()
       let allow_replace_deleted = r.read_byte() != b'\x00'
       (
-        Some(@core.HNSWParams::{
+        Some(@types.HNSWParams::{
           m,
           ef_construction,
           ef_search,
@@ -718,18 +718,18 @@ pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
     _ => {
       let nlist = r.read_u32().reinterpret_as_int()
       let nprobe = r.read_u32().reinterpret_as_int()
-      (None, Some(@core.IVFParams::{ nlist, nprobe }))
+      (None, Some(@types.IVFParams::{ nlist, nprobe }))
     }
   }
   let store_len = r.read_u32().reinterpret_as_int()
   let store_bytes = r.read_bytes(store_len)
-  let store = @core.CoreStore::deserialize(store_bytes)
+  let store = @store.CoreStore::deserialize(store_bytes)
   match strategy_type {
     0U => {
       let _ = r.read_u32()
       {
         store,
-        strategy: @core.Bruteforce,
+        strategy: @types.Bruteforce,
         bruteforce: Some(@ann.BruteforceState::new(store.metric)),
         hnsw: None,
         ivf: None,
@@ -743,7 +743,7 @@ pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
       @ann.hnsw_deserialize(state, hnsw_bytes)
       {
         store,
-        strategy: @core.HNSW(params),
+        strategy: @types.HNSW(params),
         bruteforce: None,
         hnsw: Some(state),
         ivf: None,
@@ -757,7 +757,7 @@ pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
       @ann.ivf_deserialize(state, ivf_bytes, store.dim)
       {
         store,
-        strategy: @core.IVF(params),
+        strategy: @types.IVF(params),
         bruteforce: None,
         hnsw: None,
         ivf: Some(state),

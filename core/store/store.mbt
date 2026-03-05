@@ -5,10 +5,10 @@
 /// and supports O(1) compaction on remove.
 pub struct CoreStore {
   dim : Int
-  metric : Metric
-  mut ids : Array[VectorId]
+  metric : @types.Metric
+  mut ids : Array[@types.VectorId]
   mut data : Array[Double] // flattened: data[i*dim..(i+1)*dim] is vector i
-  mut attrs : Array[Attrs]
+  mut attrs : Array[@types.Attrs]
   pos : Map[Int64, Int] // id -> index mapping
   mut capacity : Int
   mut count : Int
@@ -18,7 +18,7 @@ pub struct CoreStore {
 /// Create a new CoreStore
 pub fn CoreStore::new(
   dim : Int,
-  metric : Metric,
+  metric : @types.Metric,
   capacity? : Int = 1024,
 ) -> CoreStore {
   guard dim > 0 else { abort("dim must be positive") }
@@ -26,9 +26,9 @@ pub fn CoreStore::new(
   {
     dim,
     metric,
-    ids: Array::make(cap, VectorId(0L)),
+    ids: Array::make(cap, @types.VectorId(0L)),
     data: Array::make(cap * dim, 0.0),
-    attrs: Array::make(cap, empty_attrs()),
+    attrs: Array::make(cap, @types.empty_attrs()),
     pos: {},
     capacity: cap,
     count: 0,
@@ -49,7 +49,7 @@ pub fn CoreStore::capacity(self : CoreStore) -> Int {
 
 ///|
 /// Check if an id exists in the store
-pub fn CoreStore::has(self : CoreStore, id : VectorId) -> Bool {
+pub fn CoreStore::has(self : CoreStore, id : @types.VectorId) -> Bool {
   self.pos.contains(id.to_int64())
 }
 
@@ -65,7 +65,7 @@ pub fn CoreStore::ensure_capacity(self : CoreStore, extra : Int) -> Bool {
     new_cap = new_cap * 2
   }
   // Resize ids
-  let new_ids = Array::make(new_cap, VectorId(0L))
+  let new_ids = Array::make(new_cap, @types.VectorId(0L))
   for i in 0..<self.count {
     new_ids[i] = self.ids[i]
   }
@@ -77,7 +77,7 @@ pub fn CoreStore::ensure_capacity(self : CoreStore, extra : Int) -> Bool {
   }
   self.data = new_data
   // Resize attrs
-  let new_attrs = Array::make(new_cap, empty_attrs())
+  let new_attrs = Array::make(new_cap, @types.empty_attrs())
   for i in 0..<self.count {
     new_attrs[i] = self.attrs[i]
   }
@@ -98,7 +98,7 @@ fn CoreStore::write_vector_at(
     self.data[base + i] = vector[i]
   }
   // Auto-normalize for cosine metric
-  if self.metric == Cosine {
+  if self.metric == @types.Cosine {
     let mut sum = 0.0
     for i in 0..<self.dim {
       let v = self.data[base + i]
@@ -113,13 +113,16 @@ fn CoreStore::write_vector_at(
 
 ///|
 /// Get index for an id
-pub fn CoreStore::get_index(self : CoreStore, id : VectorId) -> Int? {
+pub fn CoreStore::get_index(self : CoreStore, id : @types.VectorId) -> Int? {
   self.pos.get(id.to_int64())
 }
 
 ///|
 /// Get vector and attrs by index
-pub fn CoreStore::get_by_index(self : CoreStore, index : Int) -> VectorRecord {
+pub fn CoreStore::get_by_index(
+  self : CoreStore,
+  index : Int,
+) -> @types.VectorRecord {
   let base = index * self.dim
   let vec = Array::make(self.dim, 0.0)
   for i in 0..<self.dim {
@@ -130,7 +133,10 @@ pub fn CoreStore::get_by_index(self : CoreStore, index : Int) -> VectorRecord {
 
 ///|
 /// Get vector and attrs by id
-pub fn CoreStore::get(self : CoreStore, id : VectorId) -> VectorRecord? {
+pub fn CoreStore::get(
+  self : CoreStore,
+  id : @types.VectorId,
+) -> @types.VectorRecord? {
   match self.get_index(id) {
     Some(idx) => Some(self.get_by_index(idx))
     None => None
@@ -142,9 +148,9 @@ pub fn CoreStore::get(self : CoreStore, id : VectorId) -> VectorRecord? {
 /// If upsert is false and id exists, raises error.
 pub fn CoreStore::add_or_update(
   self : CoreStore,
-  id : VectorId,
+  id : @types.VectorId,
   vector : Array[Double],
-  attrs : Attrs,
+  attrs : @types.Attrs,
   upsert? : Bool = false,
 ) -> (Int, Bool) {
   guard vector.length() == self.dim else {
@@ -180,14 +186,17 @@ pub fn CoreStore::add_or_update(
 ///|
 /// Move info returned by remove
 pub struct MoveInfo {
-  moved_id : VectorId?
+  moved_id : @types.VectorId?
   moved_from : Int?
   moved_to : Int?
 } derive(Show)
 
 ///|
 /// Remove a vector by id. Returns move info if compaction occurred.
-pub fn CoreStore::remove_by_id(self : CoreStore, id : VectorId) -> MoveInfo? {
+pub fn CoreStore::remove_by_id(
+  self : CoreStore,
+  id : @types.VectorId,
+) -> MoveInfo? {
   match self.get_index(id) {
     None => None
     Some(idx) => {
@@ -223,8 +232,8 @@ pub fn CoreStore::remove_by_id(self : CoreStore, id : VectorId) -> MoveInfo? {
 /// Update only attrs for an id. Returns true if updated.
 pub fn CoreStore::update_attrs(
   self : CoreStore,
-  id : VectorId,
-  attrs : Attrs,
+  id : @types.VectorId,
+  attrs : @types.Attrs,
 ) -> Bool {
   match self.get_index(id) {
     Some(idx) => {
@@ -243,7 +252,7 @@ pub fn CoreStore::shrink_to_fit(self : CoreStore) -> Unit {
     return
   }
   // Shrink ids
-  let new_ids = Array::make(n, VectorId(0L))
+  let new_ids = Array::make(n, @types.VectorId(0L))
   for i in 0..<self.count {
     new_ids[i] = self.ids[i]
   }
@@ -255,7 +264,7 @@ pub fn CoreStore::shrink_to_fit(self : CoreStore) -> Unit {
   }
   self.data = new_data
   // Shrink attrs
-  let new_attrs = Array::make(n, empty_attrs())
+  let new_attrs = Array::make(n, @types.empty_attrs())
   for i in 0..<self.count {
     new_attrs[i] = self.attrs[i]
   }
@@ -269,10 +278,10 @@ pub fn CoreStore::normalize_query(
   self : CoreStore,
   q : Array[Double],
 ) -> Array[Double] {
-  if self.metric != Cosine {
+  if self.metric != @types.Cosine {
     return q
   }
-  normalize(q)
+  @vecmath.normalize(q)
 }
 
 ///|
@@ -283,9 +292,9 @@ pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
   w.push_u32(self.dim.reinterpret_as_uint())
   w.push_u32(
     match self.metric {
-      Cosine => 0U
-      L2 => 1U
-      Dot => 2U
+      @types.Cosine => 0U
+      @types.L2 => 1U
+      @types.Dot => 2U
     },
   )
   w.push_u32(self.count.reinterpret_as_uint())
@@ -312,20 +321,20 @@ pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
       // Write value type and value
       match attrs.get(key) {
         None => w.push_u32(0U)
-        Some(Null) => w.push_u32(0U)
-        Some(Bool(b)) => {
+        Some(@types.Null) => w.push_u32(0U)
+        Some(@types.Bool(b)) => {
           w.push_u32(1U)
           w.push_u32(if b { 1U } else { 0U })
         }
-        Some(AttrValue::Int(n)) => {
+        Some(@types.AttrValue::Int(n)) => {
           w.push_u32(2U)
           w.push_i64(n)
         }
-        Some(Float(f)) => {
+        Some(@types.Float(f)) => {
           w.push_u32(3U)
           w.push_f64(f)
         }
-        Some(AttrValue::String(s)) => {
+        Some(@types.AttrValue::String(s)) => {
           w.push_u32(4U)
           let s_chars = s.to_array()
           w.push_u32(s_chars.length().reinterpret_as_uint())
@@ -346,16 +355,16 @@ pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
   // Read header
   let dim = r.read_u32().reinterpret_as_int()
   let metric = match r.read_u32() {
-    0U => Cosine
-    1U => L2
-    _ => Dot
+    0U => @types.Cosine
+    1U => @types.L2
+    _ => @types.Dot
   }
   let count = r.read_u32().reinterpret_as_int()
   let store = CoreStore::new(dim, metric, capacity=count)
   // Read ids
   for i in 0..<count {
     let id_val = r.read_u64().reinterpret_as_int64()
-    store.ids[i] = VectorId(id_val)
+    store.ids[i] = @types.VectorId(id_val)
     store.pos.set(id_val, i)
   }
   // Read data
@@ -364,7 +373,7 @@ pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
   }
   // Read attrs
   for i in 0..<count {
-    let attrs = empty_attrs()
+    let attrs = @types.empty_attrs()
     let num_entries = r.read_u32().reinterpret_as_int()
     for _ in 0..<num_entries {
       // Read key as chars
@@ -376,18 +385,18 @@ pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
       let key = String::from_array(key_chars[:])
       // Read value
       let value_type = r.read_u32()
-      let value : AttrValue = match value_type {
-        0U => Null
-        1U => Bool(r.read_u32() != 0U)
-        2U => AttrValue::Int(r.read_i64())
-        3U => Float(r.read_f64())
+      let value : @types.AttrValue = match value_type {
+        0U => @types.Null
+        1U => @types.Bool(r.read_u32() != 0U)
+        2U => @types.AttrValue::Int(r.read_i64())
+        3U => @types.Float(r.read_f64())
         _ => {
           let s_len = r.read_u32().reinterpret_as_int()
           let s_chars : Array[Char] = []
           for _ in 0..<s_len {
             s_chars.push(r.read_u32().reinterpret_as_int().unsafe_to_char())
           }
-          AttrValue::String(String::from_array(s_chars[:]))
+          @types.AttrValue::String(String::from_array(s_chars[:]))
         }
       }
       attrs.set(key, value)

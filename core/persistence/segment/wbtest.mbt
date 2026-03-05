@@ -2,25 +2,28 @@
 
 ///|
 test "index_file/decode_metric_all" {
-  inspect(decode_metric(0) == @core.Cosine, content="true")
-  inspect(decode_metric(1) == @core.L2, content="true")
-  inspect(decode_metric(2) == @core.Dot, content="true")
+  inspect(decode_metric(0) == @types.Cosine, content="true")
+  inspect(decode_metric(1) == @types.L2, content="true")
+  inspect(decode_metric(2) == @types.Dot, content="true")
   // Unknown codes default to Cosine
-  inspect(decode_metric(99) == @core.Cosine, content="true")
+  inspect(decode_metric(99) == @types.Cosine, content="true")
 }
 
 ///|
 test "index_file/encode_metric_all" {
-  inspect(encode_metric(@core.Cosine), content="0")
-  inspect(encode_metric(@core.L2), content="1")
-  inspect(encode_metric(@core.Dot), content="2")
+  inspect(encode_metric(@types.Cosine), content="0")
+  inspect(encode_metric(@types.L2), content="1")
+  inspect(encode_metric(@types.Dot), content="2")
 }
 
 ///|
 test "index_file/encode_strategy_all" {
-  inspect(encode_strategy(@core.Bruteforce), content="0")
-  inspect(encode_strategy(@core.HNSW(@core.HNSWParams::default())), content="1")
-  inspect(encode_strategy(@core.IVF({ nlist: 4, nprobe: 2 })), content="2")
+  inspect(encode_strategy(@types.Bruteforce), content="0")
+  inspect(
+    encode_strategy(@types.HNSW(@types.HNSWParams::default())),
+    content="1",
+  )
+  inspect(encode_strategy(@types.IVF({ nlist: 4, nprobe: 2 })), content="2")
 }
 
 ///|
@@ -32,18 +35,18 @@ test "index_file/decode_strategy_type" {
 
 ///|
 test "index_file/header_from_store" {
-  let store = @core.CoreStore::new(4, @core.L2, capacity=10)
+  let store = @store.CoreStore::new(4, @types.L2, capacity=10)
   for i in 1..<=3 {
     let _ = store.add_or_update(
-      @core.VectorId::from_int(i),
+      @types.VectorId::from_int(i),
       [1.0, 2.0, 3.0, 4.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
       upsert=false,
     )
   }
   let header = IndexHeader::from_store(
     store,
-    @core.IVF({ nlist: 8, nprobe: 2 }),
+    @types.IVF({ nlist: 8, nprobe: 2 }),
     true,
   )
   inspect(header.metric_code, content="1") // L2
@@ -65,7 +68,7 @@ test "index_file/utf8_segment_names" {
   // Test segment names with various UTF-8 encodings
   let entries = [
     IndexEntry::{
-      id: @core.VectorId::from_int(1),
+      id: @types.VectorId::from_int(1),
       ptr: DataPointer::{
         segment: "日本語セグメント",
         offset: 8,
@@ -73,7 +76,7 @@ test "index_file/utf8_segment_names" {
       },
     },
     IndexEntry::{
-      id: @core.VectorId::from_int(2),
+      id: @types.VectorId::from_int(2),
       ptr: DataPointer::{ segment: "emoji_🎉_test", offset: 8, length: 48 },
     },
   ]
@@ -120,7 +123,7 @@ test "index_file/truncated_entry" {
   }
   let entries = [
     IndexEntry::{
-      id: @core.VectorId::from_int(1),
+      id: @types.VectorId::from_int(1),
       ptr: DataPointer::{ segment: "test", offset: 8, length: 32 },
     },
   ]

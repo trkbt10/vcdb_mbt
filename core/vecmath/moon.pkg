@@ -1,4 +1,3 @@
 import {
-  "moonbitlang/core/bench",
   "trkbt10/vcdb/core/types",
 }

@@ -2,20 +2,20 @@
 /// IVF (Inverted File) index implementation.
 /// Uses k-means clustering for approximate nearest neighbor search.
 pub struct IVFState {
-  metric : @core.Metric
+  metric : @types.Metric
   nlist : Int // number of clusters
   nprobe : Int // number of clusters to search
   mut centroid_count : Int
   centroids : Array[Double] // flattened: centroids[c*dim..(c+1)*dim]
-  lists : Array[Array[@core.VectorId]] // posting lists
+  lists : Array[Array[@types.VectorId]] // posting lists
   id_to_list : Map[Int64, Int] // id -> list index
 }
 
 ///|
 /// Create IVF state
 pub fn IVFState::new(
-  params : @core.IVFParams,
-  metric : @core.Metric,
+  params : @types.IVFParams,
+  metric : @types.Metric,
   dim : Int,
 ) -> IVFState {
   let nlist = if params.nlist < 1 { 1 } else { params.nlist }
@@ -31,7 +31,7 @@ pub fn IVFState::new(
   } else {
     params.nprobe
   }
-  let lists : Array[Array[@core.VectorId]] = []
+  let lists : Array[Array[@types.VectorId]] = []
   for _ in 0..<nlist {
     lists.push([])
   }
@@ -50,11 +50,11 @@ pub fn IVFState::new(
 /// Find nearest centroid to a vector
 fn nearest_centroid(
   state : IVFState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   vec : Array[Double],
 ) -> Int {
   let dim = store.dim
-  let score_fn = @core.get_score_fn(state.metric)
+  let score_fn = @vecmath.get_score_fn(state.metric)
   let mut best = -1
   let mut best_score = -1.0e308
   let count = if state.centroid_count < 1 { 1 } else { state.centroid_count }
@@ -77,8 +77,8 @@ fn nearest_centroid(
 /// Add a vector to IVF
 pub fn ivf_add(
   state : IVFState,
-  store : @core.CoreStore,
-  id : @core.VectorId,
+  store : @store.CoreStore,
+  id : @types.VectorId,
 ) -> Unit {
   with_store_vector(store, id, fn(_, vec) {
     // Initialize centroids with first nlist vectors
@@ -104,8 +104,8 @@ pub fn ivf_add(
 /// Use this after training to reassign vectors to the trained centroids
 pub fn ivf_assign(
   state : IVFState,
-  store : @core.CoreStore,
-  id : @core.VectorId,
+  store : @store.CoreStore,
+  id : @types.VectorId,
 ) -> Unit {
   with_store_vector(store, id, fn(_, vec) {
     // Always assign to nearest existing centroid (no bootstrap)
@@ -117,7 +117,7 @@ pub fn ivf_assign(
 
 ///|
 /// Remove a vector from IVF
-pub fn ivf_remove(state : IVFState, id : @core.VectorId) -> Unit {
+pub fn ivf_remove(state : IVFState, id : @types.VectorId) -> Unit {
   match state.id_to_list.get(id.to_int64()) {
     None => ()
     Some(li) => {
@@ -147,11 +147,11 @@ pub fn ivf_remove(state : IVFState, id : @core.VectorId) -> Unit {
 /// IVF search - find k nearest neighbors
 pub fn ivf_search(
   state : IVFState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   q : Array[Double],
   k : Int,
-  filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
-) -> Array[@core.SearchHit] {
+  filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
+) -> Array[@types.SearchHit] {
   let dim = store.dim
   guard q.length() == dim else {
     abort(
@@ -163,7 +163,7 @@ pub fn ivf_search(
   }
   // Normalize query for cosine
   let query = store.normalize_query(q)
-  let score_fn = @core.get_score_fn(state.metric)
+  let score_fn = @vecmath.get_score_fn(state.metric)
   // Score all centroids
   let scores : Array[(Int, Double)] = []
   let count = if state.centroid_count < 1 { 1 } else { state.centroid_count }
@@ -179,7 +179,7 @@ pub fn ivf_search(
   } else {
     scores.length()
   }
-  let out : Array[@core.SearchHit] = []
+  let out : Array[@types.SearchHit] = []
   for i in 0..<probe {
     let (c, _) = scores[i]
     let list = state.lists[c]
@@ -197,7 +197,7 @@ pub fn ivf_search(
           let s = score_fn(store.data, base, query, dim)
           push_search_hit_top_k(
             out,
-            @core.SearchHit::{ id, score: s, attrs },
+            @types.SearchHit::{ id, score: s, attrs },
             k,
           )
         }
@@ -211,10 +211,10 @@ pub fn ivf_search(
 /// IVF find one - returns the best match
 pub fn ivf_find(
   state : IVFState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   q : Array[Double],
-  filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
-) -> @core.SearchHit? {
+  filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
+) -> @types.SearchHit? {
   let results = ivf_search(state, store, q, 1, filter)
   first_search_hit(results)
 }
@@ -266,7 +266,7 @@ pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
     let list_len = r.read_u32().reinterpret_as_int()
     for _ in 0..<list_len {
       let id_val = r.read_u64().reinterpret_as_int64()
-      let id = @core.VectorId(id_val)
+      let id = @types.VectorId(id_val)
       state.lists[li].push(id)
       state.id_to_list.set(id_val, li)
     }
@@ -277,7 +277,7 @@ pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
 /// Train IVF centroids using k-means++ initialization
 pub fn ivf_train(
   state : IVFState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   iterations? : Int = 10,
 ) -> Unit {
   if store.count == 0 {

@@ -26,7 +26,7 @@ fn Rng::next(self : Rng) -> Double {
 ///|
 /// HNSW state
 pub struct HNSWState {
-  metric : @core.Metric
+  metric : @types.Metric
   m : Int // max connections per node
   ef_construction : Int // construction beam width
   ef_search : Int // search beam width
@@ -43,8 +43,8 @@ pub struct HNSWState {
 ///|
 /// Create HNSW state
 pub fn HNSWState::new(
-  params : @core.HNSWParams,
-  metric : @core.Metric,
+  params : @types.HNSWParams,
+  metric : @types.Metric,
   capacity : Int,
 ) -> HNSWState {
   let m = params.m
@@ -111,7 +111,7 @@ fn HNSWState::ensure_levels(self : HNSWState, level : Int) -> Unit {
 /// Compute score between query and vector at index (inline for performance)
 fn hnsw_score(
   state : HNSWState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   idx : Int,
   q : Array[Double],
 ) -> Double {
@@ -123,8 +123,8 @@ fn hnsw_score(
   }
   // Inline score computation to avoid function lookup overhead
   match state.metric {
-    Cosine | Dot => @core.dot_at(store.data, base, q, dim)
-    L2 => @core.l2neg_at(store.data, base, q, dim)
+    Cosine | Dot => @vecmath.dot_at(store.data, base, q, dim)
+    L2 => @vecmath.l2neg_at(store.data, base, q, dim)
   }
 }
 
@@ -132,7 +132,7 @@ fn hnsw_score(
 /// Greedy descent from entry point to target through upper layers
 fn greedy_descent(
   state : HNSWState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   ep : Int,
   target : Array[Double],
   from_level : Int,
@@ -177,7 +177,7 @@ fn greedy_descent(
 /// Search layer - explore neighbors at a given level
 fn hnsw_search_layer(
   state : HNSWState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   entry : Int,
   target : Array[Double],
   level : Int,
@@ -254,7 +254,7 @@ fn prune_neighbors_by_distance(
   neighbors : Array[Int],
   node_idx : Int,
   m : Int,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   score_fn : (Array[Double], Int, Array[Double], Int) -> Double,
 ) -> Unit {
   if neighbors.length() <= m {
@@ -289,7 +289,7 @@ fn prune_neighbors_by_distance(
 /// Connect node mutually with neighbors
 fn connect_mutually(
   state : HNSWState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   a : Int,
   neighbors : Array[Int],
   level : Int,
@@ -302,7 +302,7 @@ fn connect_mutually(
     state.links[level].push([])
   }
   let la = state.links[level][a]
-  let score_fn = @core.get_score_fn(state.metric)
+  let score_fn = @vecmath.get_score_fn(state.metric)
   for b in neighbors {
     if b == a {
       continue
@@ -347,8 +347,8 @@ fn connect_mutually(
 /// Add a vector to HNSW
 pub fn hnsw_add(
   state : HNSWState,
-  store : @core.CoreStore,
-  id : @core.VectorId,
+  store : @store.CoreStore,
+  id : @types.VectorId,
 ) -> Unit {
   with_store_vector(store, id, fn(at, vec) {
     state.ensure_capacity(at + 1)
@@ -420,8 +420,8 @@ pub fn hnsw_add(
 /// Remove a vector from HNSW (mark as tombstone)
 pub fn hnsw_remove(
   state : HNSWState,
-  id : @core.VectorId,
-  store : @core.CoreStore,
+  id : @types.VectorId,
+  store : @store.CoreStore,
 ) -> Unit {
   match store.get_index(id) {
     None => ()
@@ -433,11 +433,11 @@ pub fn hnsw_remove(
 /// Search HNSW for k nearest neighbors
 pub fn hnsw_search(
   state : HNSWState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   q : Array[Double],
   k : Int,
-  filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
-) -> Array[@core.SearchHit] {
+  filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
+) -> Array[@types.SearchHit] {
   guard q.length() == store.dim else {
     abort(
       "dim mismatch: got " +
@@ -482,7 +482,7 @@ pub fn hnsw_search(
     state.ef_search,
   )
   // Convert to SearchHit and apply filter
-  let out : Array[@core.SearchHit] = []
+  let out : Array[@types.SearchHit] = []
   for c in candidates {
     if c.idx >= store.count {
       continue
@@ -497,7 +497,7 @@ pub fn hnsw_search(
       Some(f) => if not(f(id, attrs)) { continue }
       None => ()
     }
-    push_search_hit_top_k(out, @core.SearchHit::{ id, score: c.s, attrs }, k)
+    push_search_hit_top_k(out, @types.SearchHit::{ id, score: c.s, attrs }, k)
   }
   out
 }
@@ -506,10 +506,10 @@ pub fn hnsw_search(
 /// Find single best match in HNSW
 pub fn hnsw_find(
   state : HNSWState,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   q : Array[Double],
-  filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
-) -> @core.SearchHit? {
+  filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
+) -> @types.SearchHit? {
   let results = hnsw_search(state, store, q, 1, filter)
   first_search_hit(results)
 }

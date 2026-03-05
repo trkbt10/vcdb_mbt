@@ -1,7 +1,8 @@
 import {
   "moonbitlang/core/bench",
   "moonbitlang/core/strconv",
-  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/types",
+  "trkbt10/vcdb/core/store",
   "trkbt10/vcdb/core/persistence/codec",
   "trkbt10/vcdb/core/persistence/segment",
   "trkbt10/vcdb/core/storage",

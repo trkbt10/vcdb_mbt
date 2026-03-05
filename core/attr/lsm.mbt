@@ -29,7 +29,7 @@ fn Memtable::new() -> Memtable {
 pub struct LSMAttrIndex {
   memtable : Memtable // Value memtable
   exists_memtable : Memtable // Existence memtable
-  data : Map[Int64, @core.Attrs] // Direct attrs storage
+  data : Map[Int64, @types.Attrs] // Direct attrs storage
   flush_threshold : Int // Auto-flush threshold (default 1000)
 }
 
@@ -62,7 +62,10 @@ fn lsm_bytes_to_hex(b : Bytes) -> String {
 
 ///|
 /// Encode memtable key: attrKey + 0x00 + encoded value
-fn lsm_encode_memtable_key(attr_key : String, value : @core.AttrValue) -> Bytes {
+fn lsm_encode_memtable_key(
+  attr_key : String,
+  value : @types.AttrValue,
+) -> Bytes {
   let w = @binary.BinaryWriter::new()
   // Write attr_key as full UTF-8 to preserve Unicode
   w.push_bytes(attr_key.to_bytes())
@@ -162,8 +165,8 @@ fn memtable_remove_id(mt : Memtable, key : Bytes, id : Int64) -> Unit {
 /// Set attributes for an ID
 pub fn LSMAttrIndex::set_attrs(
   self : LSMAttrIndex,
-  id : @core.VectorId,
-  attrs : @core.Attrs,
+  id : @types.VectorId,
+  attrs : @types.Attrs,
 ) -> Unit {
   let id_val = id.to_int64()
   // Remove old attrs
@@ -192,8 +195,8 @@ pub fn LSMAttrIndex::set_attrs(
 /// Get attributes for an ID
 pub fn LSMAttrIndex::get_attrs(
   self : LSMAttrIndex,
-  id : @core.VectorId,
-) -> @core.Attrs? {
+  id : @types.VectorId,
+) -> @types.Attrs? {
   self.data.get(id.to_int64())
 }
 
@@ -201,7 +204,7 @@ pub fn LSMAttrIndex::get_attrs(
 /// Remove an ID from the index
 pub fn LSMAttrIndex::remove_id(
   self : LSMAttrIndex,
-  id : @core.VectorId,
+  id : @types.VectorId,
 ) -> Unit {
   let id_val = id.to_int64()
   match self.data.get(id_val) {
@@ -223,8 +226,8 @@ pub fn LSMAttrIndex::remove_id(
 pub fn LSMAttrIndex::eq(
   self : LSMAttrIndex,
   key : String,
-  value : @core.AttrValue,
-) -> Array[@core.VectorId] {
+  value : @types.AttrValue,
+) -> Array[@types.VectorId] {
   let mem_key = lsm_encode_memtable_key(key, value)
   match memtable_get(self.memtable, mem_key) {
     None => []
@@ -241,7 +244,7 @@ pub fn LSMAttrIndex::eq(
 pub fn LSMAttrIndex::exists(
   self : LSMAttrIndex,
   key : String,
-) -> Array[@core.VectorId] {
+) -> Array[@types.VectorId] {
   let exists_key = lsm_encode_exists_key(key)
   match memtable_get(self.exists_memtable, exists_key) {
     None => []
@@ -259,10 +262,10 @@ pub fn LSMAttrIndex::exists(
 pub fn LSMAttrIndex::range(
   self : LSMAttrIndex,
   key : String,
-  range : @core.NumericRange,
-) -> Array[@core.VectorId]? {
+  range : @types.NumericRange,
+) -> Array[@types.VectorId]? {
   // Scan through data for matching numeric values
-  let result : Array[@core.VectorId] = []
+  let result : Array[@types.VectorId] = []
   let seen : Map[Int64, Bool] = {}
   for entry in self.data {
     let (id_val, attrs) = entry
@@ -274,7 +277,7 @@ pub fn LSMAttrIndex::range(
           Some(num) =>
             if range.matches(num) && not(seen.contains(id_val)) {
               seen.set(id_val, true)
-              result.push(@core.VectorId(id_val))
+              result.push(@types.VectorId(id_val))
             }
         }
     }

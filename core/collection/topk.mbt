@@ -100,7 +100,7 @@ pub fn[T : Scored] push_sorted_desc(
 
 ///|
 /// Scored wrapper for SearchHit
-pub impl Scored for @core.SearchHit with score(self) -> Double {
+pub impl Scored for @types.SearchHit with score(self) -> Double {
   self.score
 }
 

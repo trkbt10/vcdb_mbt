@@ -44,7 +44,7 @@ struct BPTree {
 pub struct BPTreeAttrIndex {
   field_trees : Map[String, BPTree] // Per-field B+ trees
   exists_trees : Map[String, BPTree] // Existence B+ trees
-  data : Map[Int64, @core.Attrs] // Direct storage for attrs
+  data : Map[Int64, @types.Attrs] // Direct storage for attrs
   order : Int // Node order (default 128)
 }
 
@@ -84,7 +84,7 @@ fn bytes_equal(a : Bytes, b : Bytes) -> Bool {
 
 ///|
 /// Encode AttrValue to order-preserving bytes
-fn encode_attr_value(value : @core.AttrValue) -> Bytes {
+fn encode_attr_value(value : @types.AttrValue) -> Bytes {
   let w = @binary.BinaryWriter::new()
   match value {
     Null => w.push_byte(b'\x00')
@@ -262,7 +262,7 @@ fn bptree_range(
   tree : BPTree,
   lo : Bytes?,
   hi : Bytes?,
-  range : @core.NumericRange,
+  range : @types.NumericRange,
 ) -> Array[Int64] {
   let result : Array[Int64] = []
   // Start from leftmost leaf
@@ -372,8 +372,8 @@ fn get_or_create_exists_tree(index : BPTreeAttrIndex, field : String) -> BPTree 
 /// Set attributes for an ID
 pub fn BPTreeAttrIndex::set_attrs(
   self : BPTreeAttrIndex,
-  id : @core.VectorId,
-  attrs : @core.Attrs,
+  id : @types.VectorId,
+  attrs : @types.Attrs,
 ) -> Unit {
   let id_val = id.to_int64()
   // Remove old attrs from trees
@@ -414,8 +414,8 @@ pub fn BPTreeAttrIndex::set_attrs(
 /// Get attributes for an ID
 pub fn BPTreeAttrIndex::get_attrs(
   self : BPTreeAttrIndex,
-  id : @core.VectorId,
-) -> @core.Attrs? {
+  id : @types.VectorId,
+) -> @types.Attrs? {
   self.data.get(id.to_int64())
 }
 
@@ -423,7 +423,7 @@ pub fn BPTreeAttrIndex::get_attrs(
 /// Remove an ID from the index
 pub fn BPTreeAttrIndex::remove_id(
   self : BPTreeAttrIndex,
-  id : @core.VectorId,
+  id : @types.VectorId,
 ) -> Unit {
   let id_val = id.to_int64()
   match self.data.get(id_val) {
@@ -452,8 +452,8 @@ pub fn BPTreeAttrIndex::remove_id(
 pub fn BPTreeAttrIndex::eq(
   self : BPTreeAttrIndex,
   key : String,
-  value : @core.AttrValue,
-) -> Array[@core.VectorId] {
+  value : @types.AttrValue,
+) -> Array[@types.VectorId] {
   match self.field_trees.get(key) {
     None => []
     Some(tree) => {
@@ -471,7 +471,7 @@ pub fn BPTreeAttrIndex::eq(
 pub fn BPTreeAttrIndex::exists(
   self : BPTreeAttrIndex,
   key : String,
-) -> Array[@core.VectorId] {
+) -> Array[@types.VectorId] {
   match self.exists_trees.get(key) {
     None => []
     Some(tree) => {
@@ -489,8 +489,8 @@ pub fn BPTreeAttrIndex::exists(
 pub fn BPTreeAttrIndex::range(
   self : BPTreeAttrIndex,
   key : String,
-  range : @core.NumericRange,
-) -> Array[@core.VectorId]? {
+  range : @types.NumericRange,
+) -> Array[@types.VectorId]? {
   match self.field_trees.get(key) {
     None => Some([])
     Some(tree) => {

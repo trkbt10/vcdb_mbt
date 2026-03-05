@@ -90,7 +90,7 @@ pub fn WalRuntime::append(
 /// Returns the number of records applied
 pub fn WalRuntime::replay_into(
   self : WalRuntime,
-  store : @core.CoreStore,
+  store : @store.CoreStore,
 ) -> Int raise @storage.IOError {
   if not(self.storage.exists(self.path)) {
     return 0
@@ -117,7 +117,7 @@ pub fn WalRuntime::replay_into(
           None => ()
           Some(vector) => {
             let attrs = match record.attrs {
-              None => @core.empty_attrs()
+              None => @types.empty_attrs()
               Some(a) => a
             }
             let _ = store.add_or_update(record.id, vector, attrs, upsert=true)

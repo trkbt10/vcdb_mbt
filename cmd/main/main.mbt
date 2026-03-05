@@ -26,7 +26,7 @@ fn main {
 fn demo_bruteforce() -> Unit {
   println("--- Demo 1: Bruteforce Search ---")
 
-  let db = @vcdb.VectorDB::with_dim(3)
+  let db = @facade.VectorDB::with_dim(3)
 
   // Add sample vectors representing documents/items
   // Simulating embeddings for: "apple", "banana", "orange", "grape", "melon"
@@ -40,9 +40,9 @@ fn demo_bruteforce() -> Unit {
 
   for item in items {
     let (id, name, vec) = item
-    let attrs = @core.empty_attrs()
-    attrs.set("name", @core.String(name))
-    db.add(@core.VectorId::from_int(id), vec, attrs)
+    let attrs = @types.empty_attrs()
+    attrs.set("name", @types.String(name))
+    db.add(@types.VectorId::from_int(id), vec, attrs)
   }
 
   println("Added \{db.size()} items to database")
@@ -55,7 +55,7 @@ fn demo_bruteforce() -> Unit {
   println("Top 3 results:")
   for i, hit in results.iter2() {
     let name = match hit.attrs.get("name") {
-      Some(@core.String(s)) => s
+      Some(@types.String(s)) => s
       _ => "unknown"
     }
     println("  \{i + 1}. \{name} (id=\{hit.id.to_int64()}, score=\{hit.score})")
@@ -67,7 +67,7 @@ fn demo_bruteforce() -> Unit {
 fn demo_hnsw() -> Unit {
   println("--- Demo 2: HNSW Approximate Search ---")
 
-  let db = @vcdb.VectorDB::with_hnsw(4, metric=@core.Dot)
+  let db = @facade.VectorDB::with_hnsw(4, metric=@types.Dot)
 
   // Add 100 vectors
   for i in 0..<100 {
@@ -77,9 +77,9 @@ fn demo_hnsw() -> Unit {
       (i % 7).to_double() / 7.0,
       (i % 13).to_double() / 13.0,
     ]
-    let attrs = @core.empty_attrs()
-    attrs.set("index", @core.Int(i.to_int64()))
-    db.add(@core.VectorId::from_int(i), v, attrs)
+    let attrs = @types.empty_attrs()
+    attrs.set("index", @types.Int(i.to_int64()))
+    db.add(@types.VectorId::from_int(i), v, attrs)
   }
 
   println("Added \{db.size()} vectors with HNSW index")
@@ -92,7 +92,7 @@ fn demo_hnsw() -> Unit {
   println("Top 5 results:")
   for i, hit in results.iter2() {
     let idx = match hit.attrs.get("index") {
-      Some(@core.Int(n)) => n.to_string()
+      Some(@types.Int(n)) => n.to_string()
       _ => "?"
     }
     println(
@@ -106,7 +106,7 @@ fn demo_hnsw() -> Unit {
 fn demo_filtered_search() -> Unit {
   println("--- Demo 3: Search with Attribute Filter ---")
 
-  let db = @vcdb.VectorDB::with_dim(2)
+  let db = @facade.VectorDB::with_dim(2)
 
   // Add products with categories
   let products = [
@@ -120,18 +120,18 @@ fn demo_filtered_search() -> Unit {
 
   for product in products {
     let (id, name, category, vec) = product
-    let attrs = @core.empty_attrs()
-    attrs.set("name", @core.String(name))
-    attrs.set("category", @core.String(category))
-    db.add(@core.VectorId::from_int(id), vec, attrs)
+    let attrs = @types.empty_attrs()
+    attrs.set("name", @types.String(name))
+    attrs.set("category", @types.String(category))
+    db.add(@types.VectorId::from_int(id), vec, attrs)
   }
 
   println("Added \{db.size()} products")
 
   // Search only in electronics category
-  let filter = fn(_id : @core.VectorId, attrs : @core.Attrs) -> Bool {
+  let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
     match attrs.get("category") {
-      Some(@core.String(s)) => s == "electronics"
+      Some(@types.String(s)) => s == "electronics"
       _ => false
     }
   }
@@ -143,7 +143,7 @@ fn demo_filtered_search() -> Unit {
   println("Results:")
   for i, hit in results.iter2() {
     let name = match hit.attrs.get("name") {
-      Some(@core.String(s)) => s
+      Some(@types.String(s)) => s
       _ => "unknown"
     }
     println("  \{i + 1}. \{name} (score=\{format_score(hit.score)})")
@@ -155,14 +155,14 @@ fn demo_filtered_search() -> Unit {
 fn demo_serialization() -> Unit {
   println("--- Demo 4: Serialization & Persistence ---")
 
-  let db = @vcdb.VectorDB::with_hnsw(3, metric=@core.Cosine)
+  let db = @facade.VectorDB::with_hnsw(3, metric=@types.Cosine)
 
   // Add data
   for i in 1..<=10 {
-    let attrs = @core.empty_attrs()
-    attrs.set("label", @core.String("item-\{i}"))
+    let attrs = @types.empty_attrs()
+    attrs.set("label", @types.String("item-\{i}"))
     db.add(
-      @core.VectorId::from_int(i),
+      @types.VectorId::from_int(i),
       [i.to_double() / 10.0, (10 - i).to_double() / 10.0, 0.5],
       attrs,
     )
@@ -175,7 +175,7 @@ fn demo_serialization() -> Unit {
   )
 
   // Deserialize
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @facade.VectorDB::deserialize(bytes)
   println("Restored DB: \{db2.size()} vectors")
 
   // Verify search works on restored DB
@@ -185,7 +185,7 @@ fn demo_serialization() -> Unit {
   println("Search on restored DB for [1.0, 0.0, 0.5]:")
   for i, hit in results.iter2() {
     let label = match hit.attrs.get("label") {
-      Some(@core.String(s)) => s
+      Some(@types.String(s)) => s
       _ => "?"
     }
     println("  \{i + 1}. \{label} (score=\{format_score(hit.score)})")
@@ -207,34 +207,34 @@ fn demo_metrics() -> Unit {
   let query = [1.0, 0.0, 0.0]
 
   // Cosine: direction matters, not magnitude
-  let db_cosine = @vcdb.VectorDB::new({
+  let db_cosine = @facade.VectorDB::new({
     dim: 3,
-    metric: @core.Cosine,
+    metric: @types.Cosine,
     capacity: 10,
-    strategy: @core.Bruteforce,
+    strategy: @types.Bruteforce,
   })
 
   // Dot: both direction and magnitude matter
-  let db_dot = @vcdb.VectorDB::new({
+  let db_dot = @facade.VectorDB::new({
     dim: 3,
-    metric: @core.Dot,
+    metric: @types.Dot,
     capacity: 10,
-    strategy: @core.Bruteforce,
+    strategy: @types.Bruteforce,
   })
 
   // L2: distance matters
-  let db_l2 = @vcdb.VectorDB::new({
+  let db_l2 = @facade.VectorDB::new({
     dim: 3,
-    metric: @core.L2,
+    metric: @types.L2,
     capacity: 10,
-    strategy: @core.Bruteforce,
+    strategy: @types.Bruteforce,
   })
 
   for vec in vectors {
     let (id, v) = vec
-    db_cosine.add(@core.VectorId::from_int(id), v, @core.empty_attrs())
-    db_dot.add(@core.VectorId::from_int(id), v, @core.empty_attrs())
-    db_l2.add(@core.VectorId::from_int(id), v, @core.empty_attrs())
+    db_cosine.add(@types.VectorId::from_int(id), v, @types.empty_attrs())
+    db_dot.add(@types.VectorId::from_int(id), v, @types.empty_attrs())
+    db_l2.add(@types.VectorId::from_int(id), v, @types.empty_attrs())
   }
 
   println("Vectors: id=1 [1,0,0], id=2 [2,0,0], id=3 [0,1,0]")

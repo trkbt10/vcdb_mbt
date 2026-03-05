@@ -4,7 +4,7 @@
 
 ///|
 /// Global instance storage
-let instances : @hashmap.HashMap[Int, @vcdb.VectorDB] = @hashmap.new()
+let instances : @hashmap.HashMap[Int, @facade.VectorDB] = @hashmap.new()
 
 ///|
 priv struct Counter {
@@ -16,7 +16,7 @@ let counter : Counter = { value: 1 }
 
 ///|
 pub fn vcdb_create(dim : Int) -> Int {
-  let db = @vcdb.VectorDB::with_dim(dim)
+  let db = @facade.VectorDB::with_dim(dim)
   let id = counter.value
   counter.value = counter.value + 1
   instances[id] = db
@@ -25,7 +25,7 @@ pub fn vcdb_create(dim : Int) -> Int {
 
 ///|
 pub fn vcdb_create_hnsw(dim : Int) -> Int {
-  let db = @vcdb.VectorDB::with_hnsw(dim)
+  let db = @facade.VectorDB::with_hnsw(dim)
   let id = counter.value
   counter.value = counter.value + 1
   instances[id] = db
@@ -34,7 +34,7 @@ pub fn vcdb_create_hnsw(dim : Int) -> Int {
 
 ///|
 pub fn vcdb_create_ivf(dim : Int) -> Int {
-  let db = @vcdb.VectorDB::with_ivf(dim)
+  let db = @facade.VectorDB::with_ivf(dim)
   let id = counter.value
   counter.value = counter.value + 1
   instances[id] = db
@@ -70,11 +70,11 @@ pub fn vcdb_add(
 ) -> Int {
   match instances.get(instance_id) {
     Some(db) => {
-      let id = @core.VectorId(vector_id.to_int64())
+      let id = @types.VectorId(vector_id.to_int64())
       if db.has(id) {
         return -2
       }
-      let attrs = @core.empty_attrs()
+      let attrs = @types.empty_attrs()
       db.add(id, vector, attrs)
       0
     }
@@ -90,8 +90,8 @@ pub fn vcdb_upsert(
 ) -> Int {
   match instances.get(instance_id) {
     Some(db) => {
-      let attrs = @core.empty_attrs()
-      let _ = db.upsert(@core.VectorId(vector_id.to_int64()), vector, attrs)
+      let attrs = @types.empty_attrs()
+      let _ = db.upsert(@types.VectorId(vector_id.to_int64()), vector, attrs)
       0
     }
     None => -1
@@ -102,7 +102,7 @@ pub fn vcdb_upsert(
 pub fn vcdb_get(instance_id : Int, vector_id : Int) -> (Array[Double], Int) {
   match instances.get(instance_id) {
     Some(db) =>
-      match db.get(@core.VectorId(vector_id.to_int64())) {
+      match db.get(@types.VectorId(vector_id.to_int64())) {
         Some(record) => (record.vector, 1)
         None => ([], 0)
       }
@@ -132,7 +132,12 @@ pub fn vcdb_search(
 ///|
 pub fn vcdb_has(instance_id : Int, vector_id : Int) -> Int {
   match instances.get(instance_id) {
-    Some(db) => if db.has(@core.VectorId(vector_id.to_int64())) { 1 } else { 0 }
+    Some(db) =>
+      if db.has(@types.VectorId(vector_id.to_int64())) {
+        1
+      } else {
+        0
+      }
     None => -1
   }
 }
@@ -141,7 +146,7 @@ pub fn vcdb_has(instance_id : Int, vector_id : Int) -> Int {
 pub fn vcdb_remove(instance_id : Int, vector_id : Int) -> Int {
   match instances.get(instance_id) {
     Some(db) =>
-      if db.remove(@core.VectorId(vector_id.to_int64())) {
+      if db.remove(@types.VectorId(vector_id.to_int64())) {
         1
       } else {
         0
@@ -160,7 +165,7 @@ pub fn vcdb_serialize(instance_id : Int) -> Bytes {
 
 ///|
 pub fn vcdb_deserialize(data : Bytes) -> Int {
-  let db = @vcdb.VectorDB::deserialize(data)
+  let db = @facade.VectorDB::deserialize(data)
   let id = counter.value
   counter.value = counter.value + 1
   instances[id] = db

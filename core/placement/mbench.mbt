@@ -32,7 +32,7 @@ test "bench/crush_locate_4_targets" (b : @bench.T) {
     CrushTarget::new("node4"),
   ]
   let map = CrushMap::new(16, 2, targets)
-  let id = @core.VectorId::from_int(12345)
+  let id = @types.VectorId::from_int(12345)
   b.bench(fn() {
     let result = crush_locate(id, map)
     b.keep(result.pg)
@@ -50,7 +50,7 @@ test "bench/crush_locate_batch_100" (b : @bench.T) {
   b.bench(fn() {
     let mut sum = 0
     for i in 0..<100 {
-      let result = crush_locate(@core.VectorId::from_int(i), map)
+      let result = crush_locate(@types.VectorId::from_int(i), map)
       sum = sum + result.pg
     }
     b.keep(sum)
@@ -66,7 +66,7 @@ test "bench/crush_primary" (b : @bench.T) {
     CrushTarget::new("node3"),
   ]
   let map = CrushMap::new(16, 1, targets)
-  let id = @core.VectorId::from_int(999)
+  let id = @types.VectorId::from_int(999)
   b.bench(fn() {
     match crush_primary(id, map) {
       Some(s) => b.keep(s.length())
@@ -99,7 +99,7 @@ test "bench/crush_plan_rebalance_no_change" (b : @bench.T) {
   let crush = CrushMap::new(8, 2, targets)
   let segments : Array[SegmentEntry] = []
   for i in 0..<8 {
-    let primary = match crush_primary(@core.VectorId::from_int(i), crush) {
+    let primary = match crush_primary(@types.VectorId::from_int(i), crush) {
       Some(p) => p
       None => "node1"
     }
@@ -136,7 +136,7 @@ test "bench/crush_plan_rebalance_with_change" (b : @bench.T) {
   let new_crush = CrushMap::new(8, 2, new_targets)
   let segments : Array[SegmentEntry] = []
   for i in 0..<8 {
-    let primary = match crush_primary(@core.VectorId::from_int(i), old_crush) {
+    let primary = match crush_primary(@types.VectorId::from_int(i), old_crush) {
       Some(p) => p
       None => "node1"
     }

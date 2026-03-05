@@ -457,7 +457,7 @@ pub fn vector_to_json(vec : Array[Double]) -> JsonValue {
 
 ///|
 /// Convert Attrs to JsonValue
-pub fn attrs_to_json(attrs : @core.Attrs) -> JsonValue {
+pub fn attrs_to_json(attrs : @types.Attrs) -> JsonValue {
   let obj : Map[String, JsonValue] = {}
   for key in attrs.keys() {
     match attrs.get(key) {
@@ -470,7 +470,7 @@ pub fn attrs_to_json(attrs : @core.Attrs) -> JsonValue {
 
 ///|
 /// Convert AttrValue to JsonValue
-pub fn attr_value_to_json(value : @core.AttrValue) -> JsonValue {
+pub fn attr_value_to_json(value : @types.AttrValue) -> JsonValue {
   match value {
     Null => JNull
     Bool(b) => JBool(b)
@@ -482,30 +482,30 @@ pub fn attr_value_to_json(value : @core.AttrValue) -> JsonValue {
 
 ///|
 /// Convert JsonValue to AttrValue
-pub fn json_to_attr_value(json : JsonValue) -> @core.AttrValue {
+pub fn json_to_attr_value(json : JsonValue) -> @types.AttrValue {
   match json {
-    JNull => @core.Null
-    JBool(b) => @core.Bool(b)
+    JNull => @types.Null
+    JBool(b) => @types.Bool(b)
     JNumber(n) => {
       let int_val = n.to_int64()
       if n == int_val.to_double() && n.abs() < 9007199254740992.0 {
-        @core.Int(int_val)
+        @types.Int(int_val)
       } else {
-        @core.Float(n)
+        @types.Float(n)
       }
     }
-    JString(s) => @core.String(s)
-    JArray(_) => @core.Null // Arrays not supported as attr values
-    JObject(_) => @core.Null
+    JString(s) => @types.String(s)
+    JArray(_) => @types.Null // Arrays not supported as attr values
+    JObject(_) => @types.Null
   } // Objects not supported as attr values
 }
 
 ///|
 /// Convert JsonValue (object) to Attrs
-pub fn json_to_attrs(json : JsonValue) -> @core.Attrs? {
+pub fn json_to_attrs(json : JsonValue) -> @types.Attrs? {
   match json {
     JObject(obj) => {
-      let attrs = @core.empty_attrs()
+      let attrs = @types.empty_attrs()
       for kv in obj {
         let (key, value) = kv
         attrs.set(key, json_to_attr_value(value))

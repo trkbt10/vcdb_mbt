@@ -1,13 +1,13 @@
 ///|
 /// Encode attrs option as JSON UTF-8 bytes.
-pub fn encode_attrs_json(attrs : @core.Attrs?) -> Bytes {
+pub fn encode_attrs_json(attrs : @types.Attrs?) -> Bytes {
   encode_utf8(attrs_to_json(attrs))
 }
 
 ///|
 /// Decode attrs option from JSON UTF-8 bytes.
 /// Empty bytes are treated as None.
-pub fn decode_attrs_json(bytes : Bytes) -> @core.Attrs? {
+pub fn decode_attrs_json(bytes : Bytes) -> @types.Attrs? {
   if bytes.length() == 0 {
     return None
   }
@@ -16,7 +16,7 @@ pub fn decode_attrs_json(bytes : Bytes) -> @core.Attrs? {
 
 ///|
 /// Convert attrs option to JSON string.
-pub fn attrs_to_json(attrs : @core.Attrs?) -> String {
+pub fn attrs_to_json(attrs : @types.Attrs?) -> String {
   match attrs {
     None => "null"
     Some(a) => {
@@ -51,7 +51,7 @@ pub fn attrs_to_json(attrs : @core.Attrs?) -> String {
 
 ///|
 /// Parse attrs option from JSON string.
-pub fn parse_attrs_json(json : String) -> @core.Attrs? {
+pub fn parse_attrs_json(json : String) -> @types.Attrs? {
   let json = json.trim(chars=" \t\n\r").to_string()
   if json == "null" {
     return None
@@ -59,7 +59,7 @@ pub fn parse_attrs_json(json : String) -> @core.Attrs? {
   if not(json.has_prefix("{")) || not(json.has_suffix("}")) {
     return None
   }
-  let attrs = @core.empty_attrs()
+  let attrs = @types.empty_attrs()
   let content = json.unsafe_substring(start=1, end=json.length() - 1)
   if content.trim(chars=" \t\n\r").length() == 0 {
     return Some(attrs)
@@ -169,7 +169,7 @@ pub fn decode_utf8(bytes : Bytes) -> String {
 }
 
 ///|
-fn push_attr_value_json(chars : Array[Char], value : @core.AttrValue) -> Unit {
+fn push_attr_value_json(chars : Array[Char], value : @types.AttrValue) -> Unit {
   match value {
     Null => {
       chars.push('n')
@@ -319,7 +319,10 @@ fn hex_char_value(c : Char) -> Int {
 }
 
 ///|
-fn parse_json_value(chars : Array[Char], start : Int) -> (@core.AttrValue, Int) {
+fn parse_json_value(
+  chars : Array[Char],
+  start : Int,
+) -> (@types.AttrValue, Int) {
   let mut i = start
   while i < chars.length() &&
         (

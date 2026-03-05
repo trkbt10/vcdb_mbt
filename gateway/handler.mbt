@@ -6,7 +6,7 @@
 /// Handle upsert points into a collection
 /// Returns (count, needs_persist) - caller should persist if needed
 pub fn handle_upsert(
-  db : @vcdb.VectorDB,
+  db : @facade.VectorDB,
   req : UpsertRequest,
 ) -> Result[Int, GatewayError] {
   let dim = db.dim()
@@ -16,7 +16,7 @@ pub fn handle_upsert(
     if vec_dim != dim {
       return Err(DimensionMismatch(expected=dim, got=vec_dim))
     }
-    let id = @core.VectorId::from_int64(point.id)
+    let id = @types.VectorId::from_int64(point.id)
     let _ = db.upsert(id, point.vector, point.payload)
     count = count + 1
   }
@@ -26,7 +26,7 @@ pub fn handle_upsert(
 ///|
 /// Handle search in a collection
 pub fn handle_search(
-  db : @vcdb.VectorDB,
+  db : @facade.VectorDB,
   req : SearchRequest,
 ) -> Result[SearchResponse, GatewayError] {
   let dim = db.dim()
@@ -54,10 +54,10 @@ pub fn handle_search(
 ///|
 /// Handle get point by ID
 pub fn handle_get_point(
-  db : @vcdb.VectorDB,
+  db : @facade.VectorDB,
   id : Int64,
 ) -> Result[PointResponse, GatewayError] {
-  let vec_id = @core.VectorId::from_int64(id)
+  let vec_id = @types.VectorId::from_int64(id)
   match db.get(vec_id) {
     Some(record) => Ok({ id, payload: record.attrs, vector: record.vector })
     None => Err(NotFound("Point with id " + id.to_string() + " not found"))
@@ -67,10 +67,10 @@ pub fn handle_get_point(
 ///|
 /// Handle delete point by ID
 pub fn handle_delete_point(
-  db : @vcdb.VectorDB,
+  db : @facade.VectorDB,
   id : Int64,
 ) -> Result[Unit, GatewayError] {
-  let vec_id = @core.VectorId::from_int64(id)
+  let vec_id = @types.VectorId::from_int64(id)
   if not(db.has(vec_id)) {
     return Err(NotFound("Point with id " + id.to_string() + " not found"))
   }
@@ -121,7 +121,7 @@ pub fn[S : @storage.Storage] handle_get_collection(
 pub fn[S : @storage.Storage, T] with_collection(
   manager : CollectionManager[S],
   name : String,
-  handler : (@vcdb.VectorDB) -> Result[T, GatewayError],
+  handler : (@facade.VectorDB) -> Result[T, GatewayError],
 ) -> Result[T, GatewayError] {
   match manager.get(name) {
     Some(db) => handler(db)

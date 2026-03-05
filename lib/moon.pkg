@@ -1,6 +1,6 @@
 import {
-  "trkbt10/vcdb",
-  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/facade",
+  "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/gateway",
   "moonbitlang/core/hashmap",

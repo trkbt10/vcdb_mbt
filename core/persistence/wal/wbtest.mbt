@@ -2,10 +2,10 @@
 
 ///|
 test "wal/record_roundtrip" {
-  let attrs = @core.empty_attrs()
-  attrs.set("key", @core.String("value"))
+  let attrs = @types.empty_attrs()
+  attrs.set("key", @types.String("value"))
   let record = WalRecord::upsert(
-    @core.VectorId::from_int(42),
+    @types.VectorId::from_int(42),
     [1.0, 2.0, 3.0],
     attrs,
   )
@@ -28,8 +28,8 @@ test "wal/record_roundtrip" {
 ///|
 test "wal/segment_encoding" {
   let records = [
-    WalRecord::upsert(@core.VectorId::from_int(1), [1.0], @core.empty_attrs()),
-    WalRecord::remove(@core.VectorId::from_int(2)),
+    WalRecord::upsert(@types.VectorId::from_int(1), [1.0], @types.empty_attrs()),
+    WalRecord::remove(@types.VectorId::from_int(2)),
   ]
   let segment = encode_wal_segment(records)
   // Should have header (8) + records + footer (8)
@@ -42,12 +42,12 @@ test "wal/segment_encoding" {
 test "wal/decode_records" {
   let records = [
     WalRecord::upsert(
-      @core.VectorId::from_int(1),
+      @types.VectorId::from_int(1),
       [1.0, 2.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
     ),
-    WalRecord::set_attrs(@core.VectorId::from_int(2), @core.empty_attrs()),
-    WalRecord::remove(@core.VectorId::from_int(3)),
+    WalRecord::set_attrs(@types.VectorId::from_int(2), @types.empty_attrs()),
+    WalRecord::remove(@types.VectorId::from_int(3)),
   ]
   let segment = encode_wal_segment(records)
   let decoded = decode_wal_records(segment)
@@ -61,26 +61,26 @@ test "wal/replay" {
   // Create WAL records
   let records = [
     WalRecord::upsert(
-      @core.VectorId::from_int(1),
+      @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
     ),
     WalRecord::upsert(
-      @core.VectorId::from_int(2),
+      @types.VectorId::from_int(2),
       [0.0, 1.0, 0.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
     ),
   ]
   wal.append(records) catch {
     _ => ()
   }
   // Replay into store
-  let store = @core.CoreStore::new(3, @core.Dot)
+  let store = @store.CoreStore::new(3, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="2")
   inspect(store.size(), content="2")
-  inspect(store.has(@core.VectorId::from_int(1)), content="true")
-  inspect(store.has(@core.VectorId::from_int(2)), content="true")
+  inspect(store.has(@types.VectorId::from_int(1)), content="true")
+  inspect(store.has(@types.VectorId::from_int(2)), content="true")
 }
 
 ///|
@@ -89,26 +89,26 @@ test "wal/replay_remove" {
   let wal = WalRuntime::new(storage, "test_remove.wal")
   let records = [
     WalRecord::upsert(
-      @core.VectorId::from_int(1),
+      @types.VectorId::from_int(1),
       [1.0, 0.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
     ),
     WalRecord::upsert(
-      @core.VectorId::from_int(2),
+      @types.VectorId::from_int(2),
       [0.0, 1.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
     ),
-    WalRecord::remove(@core.VectorId::from_int(1)),
+    WalRecord::remove(@types.VectorId::from_int(1)),
   ]
   wal.append(records) catch {
     _ => ()
   }
-  let store = @core.CoreStore::new(2, @core.Dot)
+  let store = @store.CoreStore::new(2, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="3")
   // id=1 should be removed
-  inspect(store.has(@core.VectorId::from_int(1)), content="false")
-  inspect(store.has(@core.VectorId::from_int(2)), content="true")
+  inspect(store.has(@types.VectorId::from_int(1)), content="false")
+  inspect(store.has(@types.VectorId::from_int(2)), content="true")
 }
 
 ///|
@@ -116,46 +116,46 @@ test "wal/e2e_crud_replay" {
   let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "e2e.wal")
   // Simulate CRUD operations
-  let attrs1 = @core.empty_attrs()
-  attrs1.set("tag", @core.String("A"))
-  let attrs2 = @core.empty_attrs()
-  attrs2.set("tag", @core.String("B"))
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("tag", @types.String("A"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("tag", @types.String("B"))
   let records = [
-    WalRecord::upsert(@core.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs1),
-    WalRecord::upsert(@core.VectorId::from_int(2), [0.0, 1.0, 0.0], attrs2),
+    WalRecord::upsert(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs1),
+    WalRecord::upsert(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], attrs2),
     WalRecord::upsert(
-      @core.VectorId::from_int(3),
+      @types.VectorId::from_int(3),
       [0.0, 0.0, 1.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
     ),
     WalRecord::set_attrs(
-      @core.VectorId::from_int(3),
+      @types.VectorId::from_int(3),
       {
-        let a = @core.empty_attrs()
-        a.set("tag", @core.String("C"))
+        let a = @types.empty_attrs()
+        a.set("tag", @types.String("C"))
         a
       },
     ),
-    WalRecord::remove(@core.VectorId::from_int(2)),
+    WalRecord::remove(@types.VectorId::from_int(2)),
   ]
   wal.append(records) catch {
     _ => ()
   }
   // Replay into a new store
-  let store = @core.CoreStore::new(3, @core.Dot)
+  let store = @store.CoreStore::new(3, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="5")
   // Verify state after replay
   inspect(store.size(), content="2") // 3 added - 1 removed
-  inspect(store.has(@core.VectorId::from_int(1)), content="true")
-  inspect(store.has(@core.VectorId::from_int(2)), content="false") // removed
-  inspect(store.has(@core.VectorId::from_int(3)), content="true")
+  inspect(store.has(@types.VectorId::from_int(1)), content="true")
+  inspect(store.has(@types.VectorId::from_int(2)), content="false") // removed
+  inspect(store.has(@types.VectorId::from_int(3)), content="true")
   // Verify attrs were updated
-  let record3 = store.get(@core.VectorId::from_int(3))
+  let record3 = store.get(@types.VectorId::from_int(3))
   match record3 {
     Some(r) =>
       match r.attrs.get("tag") {
-        Some(@core.String(s)) => inspect(s, content="C")
+        Some(@types.String(s)) => inspect(s, content="C")
         _ => inspect(false, content="true")
       }
     None => inspect(false, content="true")
@@ -169,11 +169,11 @@ test "wal/large_batch" {
   // Add 100 vectors
   let records : Array[WalRecord] = []
   for i in 1..<=100 {
-    let attrs = @core.empty_attrs()
-    attrs.set("index", @core.Int(i.to_int64()))
+    let attrs = @types.empty_attrs()
+    attrs.set("index", @types.Int(i.to_int64()))
     records.push(
       WalRecord::upsert(
-        @core.VectorId::from_int(i),
+        @types.VectorId::from_int(i),
         [i.to_double() / 100.0, 1.0 - i.to_double() / 100.0, 0.0],
         attrs,
       ),
@@ -183,25 +183,25 @@ test "wal/large_batch" {
     _ => ()
   }
   // Replay
-  let store = @core.CoreStore::new(3, @core.Dot)
+  let store = @store.CoreStore::new(3, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="100")
   inspect(store.size(), content="100")
   // Verify first and last
-  inspect(store.has(@core.VectorId::from_int(1)), content="true")
-  inspect(store.has(@core.VectorId::from_int(100)), content="true")
+  inspect(store.has(@types.VectorId::from_int(1)), content="true")
+  inspect(store.has(@types.VectorId::from_int(100)), content="true")
 }
 
 ///|
 test "wal/attr_types_roundtrip" {
-  let attrs = @core.empty_attrs()
-  attrs.set("string_val", @core.String("hello world"))
-  attrs.set("int_val", @core.Int(42L))
-  attrs.set("float_val", @core.Float(3.14159))
-  attrs.set("bool_val", @core.Bool(true))
-  attrs.set("null_val", @core.Null)
+  let attrs = @types.empty_attrs()
+  attrs.set("string_val", @types.String("hello world"))
+  attrs.set("int_val", @types.Int(42L))
+  attrs.set("float_val", @types.Float(3.14159))
+  attrs.set("bool_val", @types.Bool(true))
+  attrs.set("null_val", @types.Null)
   let record = WalRecord::upsert(
-    @core.VectorId::from_int(999),
+    @types.VectorId::from_int(999),
     [1.0, 2.0, 3.0],
     attrs,
   )
@@ -224,15 +224,15 @@ test "wal/attr_types_roundtrip" {
       match r.attrs {
         Some(a) => {
           match a.get("string_val") {
-            Some(@core.String(s)) => inspect(s, content="hello world")
+            Some(@types.String(s)) => inspect(s, content="hello world")
             _ => inspect(false, content="true")
           }
           match a.get("int_val") {
-            Some(@core.Int(n)) => inspect(n, content="42")
+            Some(@types.Int(n)) => inspect(n, content="42")
             _ => inspect(false, content="true")
           }
           match a.get("bool_val") {
-            Some(@core.Bool(b)) => inspect(b, content="true")
+            Some(@types.Bool(b)) => inspect(b, content="true")
             _ => inspect(false, content="true")
           }
         }
@@ -245,9 +245,9 @@ test "wal/attr_types_roundtrip" {
 
 ///|
 test "wal/set_attrs_record" {
-  let attrs = @core.empty_attrs()
-  attrs.set("key", @core.String("value"))
-  let record = WalRecord::set_attrs(@core.VectorId::from_int(100), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("key", @types.String("value"))
+  let record = WalRecord::set_attrs(@types.VectorId::from_int(100), attrs)
   let encoded = encode_wal_record(record)
   let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
@@ -264,7 +264,7 @@ test "wal/set_attrs_record" {
 
 ///|
 test "wal/remove_record" {
-  let record = WalRecord::remove(@core.VectorId::from_int(50))
+  let record = WalRecord::remove(@types.VectorId::from_int(50))
   let encoded = encode_wal_record(record)
   let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
@@ -299,7 +299,7 @@ test "wal/record_type_conversion" {
 ///|
 test "wal/corrupted_checksum" {
   let records = [
-    WalRecord::upsert(@core.VectorId::from_int(1), [1.0], @core.empty_attrs()),
+    WalRecord::upsert(@types.VectorId::from_int(1), [1.0], @types.empty_attrs()),
   ]
   let segment = encode_wal_segment(records)
   // Corrupt the checksum (last 4 bytes)
@@ -318,9 +318,9 @@ test "wal/corrupted_checksum" {
 ///|
 test "wal/empty_attrs" {
   let record = WalRecord::upsert(
-    @core.VectorId::from_int(1),
+    @types.VectorId::from_int(1),
     [1.0, 2.0],
-    @core.empty_attrs(),
+    @types.empty_attrs(),
   )
   let encoded = encode_wal_record(record)
   let reader = @binary.BinaryReader::new(encoded)
@@ -350,7 +350,7 @@ test "wal/truncate" {
   let wal = WalRuntime::new(storage, "truncate.wal")
   // Append some records
   let records = [
-    WalRecord::upsert(@core.VectorId::from_int(1), [1.0], @core.empty_attrs()),
+    WalRecord::upsert(@types.VectorId::from_int(1), [1.0], @types.empty_attrs()),
   ]
   wal.append(records) catch {
     _ => ()
@@ -366,10 +366,10 @@ test "wal/truncate" {
 
 ///|
 test "wal/json_escape_special" {
-  let attrs = @core.empty_attrs()
-  attrs.set("text", @core.String("hello\nworld\ttab\"quote\\backslash"))
-  attrs.set("cr", @core.String("line\rwith\rCR"))
-  let record = WalRecord::upsert(@core.VectorId::from_int(1), [1.0], attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("text", @types.String("hello\nworld\ttab\"quote\\backslash"))
+  attrs.set("cr", @types.String("line\rwith\rCR"))
+  let record = WalRecord::upsert(@types.VectorId::from_int(1), [1.0], attrs)
   let encoded = encode_wal_record(record)
   let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
@@ -378,7 +378,7 @@ test "wal/json_escape_special" {
       match r.attrs {
         Some(a) =>
           match a.get("text") {
-            Some(@core.String(s)) =>
+            Some(@types.String(s)) =>
               inspect(
                 s == "hello\nworld\ttab\"quote\\backslash",
                 content="true",
@@ -393,10 +393,10 @@ test "wal/json_escape_special" {
 
 ///|
 test "wal/attrs_float" {
-  let attrs = @core.empty_attrs()
-  attrs.set("pi", @core.Float(3.14159))
-  attrs.set("neg", @core.Float(-2.5))
-  let record = WalRecord::set_attrs(@core.VectorId::from_int(1), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("pi", @types.Float(3.14159))
+  attrs.set("neg", @types.Float(-2.5))
+  let record = WalRecord::set_attrs(@types.VectorId::from_int(1), attrs)
   let encoded = encode_wal_record(record)
   let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
@@ -405,7 +405,7 @@ test "wal/attrs_float" {
       match r.attrs {
         Some(a) =>
           match a.get("pi") {
-            Some(@core.Float(f)) =>
+            Some(@types.Float(f)) =>
               inspect((f - 3.14159).abs() < 0.001, content="true")
             _ => inspect(false, content="true")
           }
@@ -417,10 +417,10 @@ test "wal/attrs_float" {
 
 ///|
 test "wal/attrs_bool" {
-  let attrs = @core.empty_attrs()
-  attrs.set("active", @core.Bool(true))
-  attrs.set("deleted", @core.Bool(false))
-  let record = WalRecord::set_attrs(@core.VectorId::from_int(1), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("active", @types.Bool(true))
+  attrs.set("deleted", @types.Bool(false))
+  let record = WalRecord::set_attrs(@types.VectorId::from_int(1), attrs)
   let encoded = encode_wal_record(record)
   let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
@@ -429,11 +429,11 @@ test "wal/attrs_bool" {
       match r.attrs {
         Some(a) => {
           match a.get("active") {
-            Some(@core.Bool(b)) => inspect(b, content="true")
+            Some(@types.Bool(b)) => inspect(b, content="true")
             _ => inspect(false, content="true")
           }
           match a.get("deleted") {
-            Some(@core.Bool(b)) => inspect(b, content="false")
+            Some(@types.Bool(b)) => inspect(b, content="false")
             _ => inspect(false, content="true")
           }
         }
@@ -516,7 +516,7 @@ test "wal/runtime_corrupted" {
   )
   storage.write("corrupted.wal", corrupted)
   let wal = WalRuntime::new(storage, "corrupted.wal")
-  let store = @core.CoreStore::new(3, @core.Dot)
+  let store = @store.CoreStore::new(3, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="0")
 }
@@ -525,7 +525,7 @@ test "wal/runtime_corrupted" {
 test "wal/runtime_empty" {
   let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "new.wal")
-  let store = @core.CoreStore::new(3, @core.Dot)
+  let store = @store.CoreStore::new(3, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="0")
 }
@@ -540,9 +540,9 @@ test "wal/runtime_size_exists" {
   // Append some records
   let records = [
     WalRecord::upsert(
-      @core.VectorId::from_int(1),
+      @types.VectorId::from_int(1),
       [1.0, 2.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
     ),
   ]
   wal.append(records) catch {
@@ -568,13 +568,13 @@ test "wal/runtime_setattrs_nonexistent" {
   let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "setattrs.wal")
   // SetAttrs for ID that doesn't exist in store
-  let attrs = @core.empty_attrs()
-  attrs.set("key", @core.String("value"))
-  let records = [WalRecord::set_attrs(@core.VectorId::from_int(999), attrs)]
+  let attrs = @types.empty_attrs()
+  attrs.set("key", @types.String("value"))
+  let records = [WalRecord::set_attrs(@types.VectorId::from_int(999), attrs)]
   wal.append(records) catch {
     _ => ()
   }
-  let store = @core.CoreStore::new(2, @core.Dot)
+  let store = @store.CoreStore::new(2, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   // SetAttrs increments count but doesn't create new vector
   inspect(count, content="1")
@@ -586,11 +586,11 @@ test "wal/runtime_remove_nonexistent" {
   let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "remove.wal")
   // Remove ID that doesn't exist
-  let records = [WalRecord::remove(@core.VectorId::from_int(999))]
+  let records = [WalRecord::remove(@types.VectorId::from_int(999))]
   wal.append(records) catch {
     _ => ()
   }
-  let store = @core.CoreStore::new(2, @core.Dot)
+  let store = @store.CoreStore::new(2, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="1")
   inspect(store.size(), content="0")
@@ -602,7 +602,7 @@ test "wal/runtime_append_existing" {
   let wal = WalRuntime::new(storage, "append.wal")
   // First append
   let records1 = [
-    WalRecord::upsert(@core.VectorId::from_int(1), [1.0], @core.empty_attrs()),
+    WalRecord::upsert(@types.VectorId::from_int(1), [1.0], @types.empty_attrs()),
   ]
   wal.append(records1) catch {
     _ => ()
@@ -610,7 +610,7 @@ test "wal/runtime_append_existing" {
   let size1 = wal.size()
   // Second append
   let records2 = [
-    WalRecord::upsert(@core.VectorId::from_int(2), [2.0], @core.empty_attrs()),
+    WalRecord::upsert(@types.VectorId::from_int(2), [2.0], @types.empty_attrs()),
   ]
   wal.append(records2) catch {
     _ => ()
@@ -619,7 +619,7 @@ test "wal/runtime_append_existing" {
   // Should have grown
   inspect(size2 > size1, content="true")
   // Replay should have 2 vectors
-  let store = @core.CoreStore::new(1, @core.Dot)
+  let store = @store.CoreStore::new(1, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="2")
   inspect(store.size(), content="2")
@@ -632,7 +632,7 @@ test "wal/upsert_no_attrs" {
   // Create record manually without attrs
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
   }
@@ -645,11 +645,11 @@ test "wal/upsert_no_attrs" {
 
 ///|
 test "wal/utf8_multibyte" {
-  let attrs = @core.empty_attrs()
-  attrs.set("emoji", @core.String("hello 👋"))
-  attrs.set("japanese", @core.String("こんにちは"))
-  attrs.set("mixed", @core.String("abc日本語123"))
-  let record = WalRecord::upsert(@core.VectorId::from_int(1), [1.0], attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("emoji", @types.String("hello 👋"))
+  attrs.set("japanese", @types.String("こんにちは"))
+  attrs.set("mixed", @types.String("abc日本語123"))
+  let record = WalRecord::upsert(@types.VectorId::from_int(1), [1.0], attrs)
   let encoded = encode_wal_record(record)
   let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
@@ -658,7 +658,7 @@ test "wal/utf8_multibyte" {
       match r.attrs {
         Some(a) =>
           match a.get("mixed") {
-            Some(@core.String(s)) => inspect(s.length() > 0, content="true")
+            Some(@types.String(s)) => inspect(s.length() > 0, content="true")
             _ => inspect(false, content="true")
           }
         None => inspect(false, content="true")
@@ -669,10 +669,10 @@ test "wal/utf8_multibyte" {
 
 ///|
 test "wal/attrs_negative" {
-  let attrs = @core.empty_attrs()
-  attrs.set("neg_int", @core.Int(-42L))
-  attrs.set("neg_float", @core.Float(-3.14))
-  let record = WalRecord::set_attrs(@core.VectorId::from_int(1), attrs)
+  let attrs = @types.empty_attrs()
+  attrs.set("neg_int", @types.Int(-42L))
+  attrs.set("neg_float", @types.Float(-3.14))
+  let record = WalRecord::set_attrs(@types.VectorId::from_int(1), attrs)
   let encoded = encode_wal_record(record)
   let reader = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(reader)
@@ -681,7 +681,7 @@ test "wal/attrs_negative" {
       match r.attrs {
         Some(a) =>
           match a.get("neg_int") {
-            Some(@core.Int(n)) => inspect(n, content="-42")
+            Some(@types.Int(n)) => inspect(n, content="-42")
             _ => inspect(false, content="true")
           }
         None => inspect(false, content="true")
@@ -694,19 +694,19 @@ test "wal/attrs_negative" {
 test "wal/segment_mixed_types" {
   let records = [
     WalRecord::upsert(
-      @core.VectorId::from_int(1),
+      @types.VectorId::from_int(1),
       [1.0, 2.0],
-      @core.empty_attrs(),
+      @types.empty_attrs(),
     ),
     WalRecord::set_attrs(
-      @core.VectorId::from_int(1),
+      @types.VectorId::from_int(1),
       {
-        let a = @core.empty_attrs()
-        a.set("key", @core.String("value"))
+        let a = @types.empty_attrs()
+        a.set("key", @types.String("value"))
         a
       },
     ),
-    WalRecord::remove(@core.VectorId::from_int(2)),
+    WalRecord::remove(@types.VectorId::from_int(2)),
   ]
   let segment = encode_wal_segment(records)
   let decoded = decode_wal_records(segment)
@@ -719,12 +719,12 @@ test "wal/segment_mixed_types" {
 ///|
 test "wal/large_int64_ids" {
   // Test with IDs that exceed 32-bit range
-  let large_id = @core.VectorId(0x1_0000_0001L) // 4294967297, larger than u32 max
-  let negative_id = @core.VectorId(-1L)
-  let max_id = @core.VectorId(9223372036854775807L) // Int64 max
-  let record1 = WalRecord::upsert(large_id, [1.0], @core.empty_attrs())
+  let large_id = @types.VectorId(0x1_0000_0001L) // 4294967297, larger than u32 max
+  let negative_id = @types.VectorId(-1L)
+  let max_id = @types.VectorId(9223372036854775807L) // Int64 max
+  let record1 = WalRecord::upsert(large_id, [1.0], @types.empty_attrs())
   let record2 = WalRecord::remove(negative_id)
-  let record3 = WalRecord::set_attrs(max_id, @core.empty_attrs())
+  let record3 = WalRecord::set_attrs(max_id, @types.empty_attrs())
   // Encode and decode
   let encoded1 = encode_wal_record(record1)
   let decoded1 = decode_wal_record(@binary.BinaryReader::new(encoded1))
@@ -750,14 +750,14 @@ test "wal/large_int64_ids" {
 test "wal/replay_large_ids" {
   let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "large_ids.wal")
-  let large_id = @core.VectorId(0x1_0000_0001L)
+  let large_id = @types.VectorId(0x1_0000_0001L)
   let records = [
-    WalRecord::upsert(large_id, [1.0, 2.0, 3.0], @core.empty_attrs()),
+    WalRecord::upsert(large_id, [1.0, 2.0, 3.0], @types.empty_attrs()),
   ]
   wal.append(records) catch {
     _ => ()
   }
-  let store = @core.CoreStore::new(3, @core.Dot)
+  let store = @store.CoreStore::new(3, @types.Dot)
   let count = wal.replay_into(store) catch { _ => 0 }
   inspect(count, content="1")
   inspect(store.has(large_id), content="true")
@@ -766,11 +766,11 @@ test "wal/replay_large_ids" {
 ///|
 test "wal/truncated_record" {
   // Create a valid WAL segment
-  let attrs = @core.empty_attrs()
-  attrs.set("key", @core.String("value"))
+  let attrs = @types.empty_attrs()
+  attrs.set("key", @types.String("value"))
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: Some(attrs),
     vector: Some([1.0, 2.0, 3.0]),
   }
@@ -794,7 +794,7 @@ test "wal/corrupted_checksum_rejected" {
   // Create valid WAL segment with footer
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
   }
@@ -813,7 +813,7 @@ test "wal/corrupted_checksum_rejected" {
   storage.atomic_write("test.wal", corrupted)
   // Replay should fail with checksum error
   let wal = WalRuntime::new(storage, "test.wal")
-  let store = @core.CoreStore::new(2, @core.Cosine)
+  let store = @store.CoreStore::new(2, @types.Cosine)
   let mut replay_failed = false
   let _ = wal.replay_into(store) catch {
     IoFailed(_) => {
@@ -854,7 +854,7 @@ test "wal/replay_after_truncate" {
   // Append some records
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
   }
@@ -864,7 +864,7 @@ test "wal/replay_after_truncate" {
   // Truncate to header-only
   wal.truncate()
   // Replay should succeed with 0 records (not raise error)
-  let store = @core.CoreStore::new(2, @core.Cosine)
+  let store = @store.CoreStore::new(2, @types.Cosine)
   let applied = wal.replay_into(store) catch { _ => -1 }
   inspect(applied, content="0")
 }
@@ -872,9 +872,9 @@ test "wal/replay_after_truncate" {
 ///|
 test "wal/json_exponent_notation" {
   // Create attrs with a small float that serializes to exponent form
-  let attrs = @core.empty_attrs()
+  let attrs = @types.empty_attrs()
   let tiny_val = 0.0000001 // 1e-7
-  attrs.set("tiny", @core.Float(tiny_val))
+  attrs.set("tiny", @types.Float(tiny_val))
   // Encode to JSON
   let encoded = encode_attrs_json(Some(attrs))
   // Decode back
@@ -886,7 +886,7 @@ test "wal/json_exponent_notation" {
         None => inspect(false, content="true")
         Some(val) =>
           match val {
-            @core.Float(f) => inspect(f < 0.000001 && f > 0.0, content="true")
+            @types.Float(f) => inspect(f < 0.000001 && f > 0.0, content="true")
             _ => inspect(false, content="true") // Should be Float, not Null
           }
       }
@@ -924,7 +924,7 @@ test "wal/append_writes_footer" {
   let wal = WalRuntime::new(storage, "footer.wal")
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
   }
@@ -954,7 +954,7 @@ test "wal/append_reinit_invalid_header" {
   let wal = WalRuntime::new(storage, "invalid.wal")
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
   }
@@ -977,7 +977,7 @@ test "wal/append_rejects_corrupted_checksum" {
   let wal = WalRuntime::new(storage, "corrupt.wal")
   let record1 : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
   }
@@ -1001,7 +1001,7 @@ test "wal/append_rejects_corrupted_checksum" {
   // Append to corrupted WAL - should start fresh
   let record2 : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(2),
+    id: @types.VectorId::from_int(2),
     attrs: None,
     vector: Some([3.0, 4.0]),
   }
@@ -1024,7 +1024,7 @@ test "wal/replay_rejects_invalid_header" {
   let garbage = Bytes::new(20) // >= 16 bytes but not a WAL
   storage.atomic_write("garbage.wal", garbage)
   let wal = WalRuntime::new(storage, "garbage.wal")
-  let store = @core.CoreStore::new(2, @core.Cosine)
+  let store = @store.CoreStore::new(2, @types.Cosine)
   let mut replay_failed = false
   let _ = wal.replay_into(store) catch {
     IoFailed(msg) => {
@@ -1045,7 +1045,7 @@ test "wal/append_truncated_tail" {
   let wal = WalRuntime::new(storage, "truncated.wal")
   let record1 : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
   }
@@ -1063,7 +1063,7 @@ test "wal/append_truncated_tail" {
   // Append should recover valid records
   let record2 : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(2),
+    id: @types.VectorId::from_int(2),
     attrs: None,
     vector: Some([3.0, 4.0]),
   }
@@ -1081,12 +1081,12 @@ test "wal/json_control_chars" {
   let storage = @storage.MemoryStorage::new()
   let wal = WalRuntime::new(storage, "control.wal")
   // Create attrs with control characters in value
-  let attrs = @core.empty_attrs()
+  let attrs = @types.empty_attrs()
   // String with backspace, form feed, and other control chars
-  attrs.set("data", @core.String("a\u0008b\u000Cc\u0001d"))
+  attrs.set("data", @types.String("a\u0008b\u000Cc\u0001d"))
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
-    id: @core.VectorId::from_int(1),
+    id: @types.VectorId::from_int(1),
     attrs: Some(attrs),
     vector: Some([1.0, 2.0]),
   }
@@ -1102,7 +1102,7 @@ test "wal/json_control_chars" {
     None => inspect(false, content="true")
     Some(decoded_attrs) =>
       match decoded_attrs.get("data") {
-        Some(@core.String(s)) => inspect(s, content="a\u0008b\u000Cc\u0001d")
+        Some(@types.String(s)) => inspect(s, content="a\u0008b\u000Cc\u0001d")
         _ => inspect(false, content="true")
       }
   }

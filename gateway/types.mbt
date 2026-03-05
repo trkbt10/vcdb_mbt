@@ -17,8 +17,8 @@ pub(all) suberror GatewayError {
 pub struct CollectionConfig {
   name : String
   dim : Int
-  metric : @core.Metric
-  strategy : @core.Strategy
+  metric : @types.Metric
+  strategy : @types.Strategy
 } derive(Show)
 
 ///|
@@ -27,8 +27,8 @@ pub fn CollectionConfig::default(name : String, dim : Int) -> CollectionConfig {
   {
     name,
     dim,
-    metric: @core.Cosine,
-    strategy: @core.HNSW(@core.HNSWParams::default()),
+    metric: @types.Cosine,
+    strategy: @types.HNSW(@types.HNSWParams::default()),
   }
 }
 
@@ -52,14 +52,14 @@ pub fn CollectionConfig::from_json(json : JsonValue) -> CollectionConfig? {
         None => get_string(json, "metric")
       }
       let metric = match metric_str {
-        Some("l2") | Some("L2") => @core.L2
-        Some("dot") | Some("Dot") => @core.Dot
-        _ => @core.Cosine
+        Some("l2") | Some("L2") => @types.L2
+        Some("dot") | Some("Dot") => @types.Dot
+        _ => @types.Cosine
       }
       let strategy = match get_string(json, "strategy") {
-        Some("bruteforce") | Some("Bruteforce") => @core.Bruteforce
-        Some("ivf") | Some("IVF") => @core.IVF(@core.IVFParams::default())
-        _ => @core.HNSW(@core.HNSWParams::default())
+        Some("bruteforce") | Some("Bruteforce") => @types.Bruteforce
+        Some("ivf") | Some("IVF") => @types.IVF(@types.IVFParams::default())
+        _ => @types.HNSW(@types.HNSWParams::default())
       }
       Some({ name, dim, metric, strategy })
     }
@@ -71,14 +71,14 @@ pub fn CollectionConfig::from_json(json : JsonValue) -> CollectionConfig? {
 /// Convert collection config to JSON
 pub fn CollectionConfig::to_json(self : CollectionConfig) -> JsonValue {
   let metric_str = match self.metric {
-    @core.Cosine => "Cosine"
-    @core.L2 => "L2"
-    @core.Dot => "Dot"
+    @types.Cosine => "Cosine"
+    @types.L2 => "L2"
+    @types.Dot => "Dot"
   }
   let strategy_str = match self.strategy {
-    @core.Bruteforce => "Bruteforce"
-    @core.HNSW(_) => "HNSW"
-    @core.IVF(_) => "IVF"
+    @types.Bruteforce => "Bruteforce"
+    @types.HNSW(_) => "HNSW"
+    @types.IVF(_) => "IVF"
   }
   json_object([
     ("name", JString(self.name)),
@@ -93,7 +93,7 @@ pub fn CollectionConfig::to_json(self : CollectionConfig) -> JsonValue {
 pub struct PointData {
   id : Int64
   vector : Array[Double]
-  payload : @core.Attrs
+  payload : @types.Attrs
 } derive(Show)
 
 ///|
@@ -114,8 +114,8 @@ pub fn PointData::from_json(json : JsonValue) -> PointData? {
         None => return None
       }
       let payload = match get_object(json, "payload") {
-        Some(obj) => json_to_attrs(JObject(obj)).unwrap_or(@core.empty_attrs())
-        None => @core.empty_attrs()
+        Some(obj) => json_to_attrs(JObject(obj)).unwrap_or(@types.empty_attrs())
+        None => @types.empty_attrs()
       }
       Some({ id, vector, payload })
     }
@@ -202,7 +202,7 @@ pub fn SearchRequest::from_json(json : JsonValue) -> SearchRequest? {
 pub struct SearchHitResponse {
   id : Int64
   score : Double
-  payload : @core.Attrs?
+  payload : @types.Attrs?
   vector : Array[Double]?
 } derive(Show)
 
@@ -242,7 +242,7 @@ pub fn SearchResponse::to_json(self : SearchResponse) -> JsonValue {
 /// Point response (for get operations)
 pub struct PointResponse {
   id : Int64
-  payload : @core.Attrs
+  payload : @types.Attrs
   vector : Array[Double]
 } derive(Show)
 

@@ -23,7 +23,7 @@ pub(all) struct IndexHeader {
 
 ///|
 /// Encode metric to code
-pub fn encode_metric(metric : @core.Metric) -> Int {
+pub fn encode_metric(metric : @types.Metric) -> Int {
   match metric {
     Cosine => 0
     L2 => 1
@@ -33,7 +33,7 @@ pub fn encode_metric(metric : @core.Metric) -> Int {
 
 ///|
 /// Decode code to metric
-pub fn decode_metric(code : Int) -> @core.Metric {
+pub fn decode_metric(code : Int) -> @types.Metric {
   match code {
     1 => L2
     2 => Dot
@@ -43,7 +43,7 @@ pub fn decode_metric(code : Int) -> @core.Metric {
 
 ///|
 /// Encode strategy to code
-pub fn encode_strategy(strategy : @core.Strategy) -> Int {
+pub fn encode_strategy(strategy : @types.Strategy) -> Int {
   match strategy {
     Bruteforce => 0
     HNSW(_) => 1
@@ -156,7 +156,7 @@ pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
   let entries : Array[IndexEntry] = []
   while r.remaining() >= 20 {
     // Minimum entry: id(8) + nameLen(4) + name(0) + offset(4) + length(4)
-    let id = @core.VectorId(r.read_u64().reinterpret_as_int64())
+    let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
     let name_len = r.read_u32().reinterpret_as_int()
 
     if r.remaining() < name_len + 8 {
@@ -178,8 +178,8 @@ pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
 ///|
 /// Create header from store
 pub fn IndexHeader::from_store(
-  store : @core.CoreStore,
-  strategy : @core.Strategy,
+  store : @store.CoreStore,
+  strategy : @types.Strategy,
   has_ann : Bool,
 ) -> IndexHeader {
   {

@@ -1,6 +1,7 @@
 import {
   "moonbitlang/core/bench",
-  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/types",
+  "trkbt10/vcdb/core/store",
   "trkbt10/vcdb/core/binary",
   "trkbt10/vcdb/core/persistence/codec",
 }

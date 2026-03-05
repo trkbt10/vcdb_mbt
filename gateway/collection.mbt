@@ -8,7 +8,7 @@
 /// Collection entry
 pub struct Collection {
   config : CollectionConfig
-  db : @vcdb.VectorDB
+  db : @facade.VectorDB
 }
 
 ///|
@@ -110,7 +110,7 @@ fn[S : @storage.Storage] CollectionManager::load_collection_from_storage(
   // Load data
   let data_path = make_path(self.base_path, @storage.collection_data_path(name))
   let data = storage.read(data_path, @storage.Data) catch { _ => return None }
-  let db = @vcdb.VectorDB::deserialize(data)
+  let db = @facade.VectorDB::deserialize(data)
   Some({ config, db })
 }
 
@@ -159,13 +159,13 @@ pub fn[S : @storage.Storage] CollectionManager::create(
   if self.collections.contains(config.name) {
     return Err(CollectionExists(config.name))
   }
-  let options : @core.DatabaseOptions = {
+  let options : @types.DatabaseOptions = {
     dim: config.dim,
     metric: config.metric,
     capacity: 1024,
     strategy: config.strategy,
   }
-  let db = @vcdb.VectorDB::new(options)
+  let db = @facade.VectorDB::new(options)
   let collection : Collection = { config, db }
   self.collections[config.name] = collection
   self.persist_collection(config.name)
@@ -176,7 +176,7 @@ pub fn[S : @storage.Storage] CollectionManager::create(
 pub fn[S : @storage.Storage] CollectionManager::get(
   self : CollectionManager[S],
   name : String,
-) -> @vcdb.VectorDB? {
+) -> @facade.VectorDB? {
   match self.collections.get(name) {
     Some(c) => Some(c.db)
     None =>
@@ -198,14 +198,14 @@ pub fn[S : @storage.Storage] CollectionManager::get_info(
   match self.collections.get(name) {
     Some(c) => {
       let metric_str = match c.config.metric {
-        @core.Cosine => "Cosine"
-        @core.L2 => "L2"
-        @core.Dot => "Dot"
+        @types.Cosine => "Cosine"
+        @types.L2 => "L2"
+        @types.Dot => "Dot"
       }
       let strategy_str = match c.config.strategy {
-        @core.Bruteforce => "Bruteforce"
-        @core.HNSW(_) => "HNSW"
-        @core.IVF(_) => "IVF"
+        @types.Bruteforce => "Bruteforce"
+        @types.HNSW(_) => "HNSW"
+        @types.IVF(_) => "IVF"
       }
       Some({
         name: c.config.name,
@@ -296,7 +296,7 @@ pub fn[S : @storage.Storage] CollectionManager::load_collection(
   if self.collections.contains(config.name) {
     return Err(CollectionExists(config.name))
   }
-  let db = @vcdb.VectorDB::deserialize(data)
+  let db = @facade.VectorDB::deserialize(data)
   let collection : Collection = { config, db }
   self.collections[config.name] = collection
   Ok(())

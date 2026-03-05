@@ -5,8 +5,8 @@
 ///|
 /// Leaf expression types
 pub(all) enum LeafExpr {
-  Match(String, @core.AttrValue) // key == value
-  Range(String, @core.NumericRange) // key in range
+  Match(String, @types.AttrValue) // key == value
+  Range(String, @types.NumericRange) // key in range
   Exists(String) // key exists (not null)
   IsNull(String) // key is null or doesn't exist
 } derive(Show)
@@ -30,7 +30,7 @@ pub(all) enum FilterStrategy {
 
 ///|
 /// Create a Match filter
-pub fn FilterExpr::match_(key : String, value : @core.AttrValue) -> FilterExpr {
+pub fn FilterExpr::match_(key : String, value : @types.AttrValue) -> FilterExpr {
   Leaf(Match(key, value))
 }
 
@@ -38,7 +38,7 @@ pub fn FilterExpr::match_(key : String, value : @core.AttrValue) -> FilterExpr {
 /// Create a Range filter
 pub fn FilterExpr::range(
   key : String,
-  range : @core.NumericRange,
+  range : @types.NumericRange,
 ) -> FilterExpr {
   Leaf(Range(key, range))
 }
@@ -78,7 +78,7 @@ pub fn FilterExpr::should(
 
 ///|
 /// Evaluate a leaf expression against attrs
-fn eval_leaf(expr : LeafExpr, attrs : @core.Attrs) -> Bool {
+fn eval_leaf(expr : LeafExpr, attrs : @types.Attrs) -> Bool {
   match expr {
     Match(key, expected) =>
       match attrs.get(key) {
@@ -89,7 +89,7 @@ fn eval_leaf(expr : LeafExpr, attrs : @core.Attrs) -> Bool {
       match attrs.get(key) {
         None => false
         Some(value) =>
-          match @core.attr_value_to_number(value) {
+          match @types.attr_value_to_number(value) {
             None => false
             Some(num) => range.matches(num)
           }
@@ -111,7 +111,7 @@ fn eval_leaf(expr : LeafExpr, attrs : @core.Attrs) -> Bool {
 
 ///|
 /// Check if two AttrValues are equal
-fn attr_value_eq(a : @core.AttrValue, b : @core.AttrValue) -> Bool {
+fn attr_value_eq(a : @types.AttrValue, b : @types.AttrValue) -> Bool {
   match (a, b) {
     (Null, Null) => true
     (Bool(x), Bool(y)) => x == y
@@ -124,7 +124,7 @@ fn attr_value_eq(a : @core.AttrValue, b : @core.AttrValue) -> Bool {
 
 ///|
 /// Evaluate a filter expression against attrs
-pub fn eval_filter(expr : FilterExpr, attrs : @core.Attrs) -> Bool {
+pub fn eval_filter(expr : FilterExpr, attrs : @types.Attrs) -> Bool {
   match expr {
     Leaf(leaf) => eval_leaf(leaf, attrs)
     Must(exprs) => {
@@ -162,8 +162,8 @@ pub fn eval_filter(expr : FilterExpr, attrs : @core.Attrs) -> Bool {
 /// Compile a filter expression to a predicate function
 pub fn compile_filter(
   expr : FilterExpr,
-) -> (@core.VectorId, @core.Attrs) -> Bool {
-  fn(id : @core.VectorId, attrs : @core.Attrs) -> Bool {
+) -> (@types.VectorId, @types.Attrs) -> Bool {
+  fn(id : @types.VectorId, attrs : @types.Attrs) -> Bool {
     let _ = id
     eval_filter(expr, attrs)
   }
@@ -175,7 +175,7 @@ pub fn compile_filter(
 pub fn get_candidates_basic(
   expr : FilterExpr,
   index : @attr.BasicAttrIndex,
-) -> Array[@core.VectorId]? {
+) -> Array[@types.VectorId]? {
   match expr {
     Leaf(Match(key, value)) => Some(index.eq(key, value))
     Leaf(Exists(key)) => Some(index.exists(key))
@@ -183,7 +183,7 @@ pub fn get_candidates_basic(
     Leaf(IsNull(_)) => None // Cannot efficiently find nulls
     Must(exprs) => {
       // Intersect all candidate sets
-      let mut result : Array[@core.VectorId]? = None
+      let mut result : Array[@types.VectorId]? = None
       for e in exprs {
         match get_candidates_basic(e, index) {
           None => return None
@@ -209,7 +209,7 @@ pub fn get_candidates_basic(
         return None
       }
       // For min == 1 (OR), union all candidate sets
-      let all : Array[@core.VectorId] = []
+      let all : Array[@types.VectorId] = []
       let seen : Map[Int64, Bool] = {}
       for e in exprs {
         match get_candidates_basic(e, index) {
@@ -231,14 +231,14 @@ pub fn get_candidates_basic(
 ///|
 /// Intersect two ID arrays
 fn intersect_ids(
-  a : Array[@core.VectorId],
-  b : Array[@core.VectorId],
-) -> Array[@core.VectorId] {
+  a : Array[@types.VectorId],
+  b : Array[@types.VectorId],
+) -> Array[@types.VectorId] {
   let b_set : Map[Int64, Bool] = {}
   for id in b {
     b_set.set(id.to_int64(), true)
   }
-  let result : Array[@core.VectorId] = []
+  let result : Array[@types.VectorId] = []
   for id in a {
     if b_set.contains(id.to_int64()) {
       result.push(id)

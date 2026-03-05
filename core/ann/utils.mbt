@@ -1,8 +1,8 @@
 ///|
 /// Push a search hit into top-k buffer using score ordering.
 fn push_search_hit_top_k(
-  out : Array[@core.SearchHit],
-  hit : @core.SearchHit,
+  out : Array[@types.SearchHit],
+  hit : @types.SearchHit,
   k : Int,
 ) -> Unit {
   @collection.push_top_k(out, hit, k, fn(hit) { hit.score })
@@ -10,7 +10,7 @@ fn push_search_hit_top_k(
 
 ///|
 /// Return best hit from result list.
-fn first_search_hit(results : Array[@core.SearchHit]) -> @core.SearchHit? {
+fn first_search_hit(results : Array[@types.SearchHit]) -> @types.SearchHit? {
   if results.is_empty() {
     None
   } else {
@@ -21,8 +21,8 @@ fn first_search_hit(results : Array[@core.SearchHit]) -> @core.SearchHit? {
 ///|
 /// Run a callback with `(index, vector)` if id exists in store.
 fn with_store_vector(
-  store : @core.CoreStore,
-  id : @core.VectorId,
+  store : @store.CoreStore,
+  id : @types.VectorId,
   f : (Int, Array[Double]) -> Unit,
 ) -> Unit {
   match store.get_index(id) {

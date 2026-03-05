@@ -19,7 +19,7 @@ pub(all) struct DataPointer {
 ///|
 /// Index entry - mapping from vector ID to data location
 pub(all) struct IndexEntry {
-  id : @core.VectorId
+  id : @types.VectorId
   ptr : DataPointer
 } derive(Show)
 
@@ -45,9 +45,9 @@ pub fn SegmentWriter::new(name : String) -> SegmentWriter {
 /// Returns DataPointer to the appended record
 pub fn SegmentWriter::append(
   self : SegmentWriter,
-  id : @core.VectorId,
+  id : @types.VectorId,
   vector : Array[Double],
-  attrs : @core.Attrs,
+  attrs : @types.Attrs,
 ) -> DataPointer {
   let offset = self.size
   let w = @binary.BinaryWriter::new()
@@ -123,7 +123,7 @@ pub fn SegmentReader::read_at(
   self : SegmentReader,
   offset : Int,
   length : Int,
-) -> (@core.VectorId, Array[Double], @core.Attrs)? {
+) -> (@types.VectorId, Array[Double], @types.Attrs)? {
   if offset + length > self.data.length() {
     return None
   }
@@ -131,7 +131,7 @@ pub fn SegmentReader::read_at(
   let r = @binary.BinaryReader::new(self.data)
   r.skip(offset)
   // Read ID
-  let id = @core.VectorId(r.read_u64().reinterpret_as_int64())
+  let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
   // Read lengths
   let attrs_len = r.read_u32().reinterpret_as_int()
   let vector_len = r.read_u32().reinterpret_as_int()
@@ -140,10 +140,10 @@ pub fn SegmentReader::read_at(
     let attrs_bytes = r.read_bytes(attrs_len)
     match @codec.decode_attrs_json(attrs_bytes) {
       Some(a) => a
-      None => @core.empty_attrs()
+      None => @types.empty_attrs()
     }
   } else {
-    @core.empty_attrs()
+    @types.empty_attrs()
   }
   // Read vector
   let count = vector_len / 4
@@ -158,13 +158,13 @@ pub fn SegmentReader::read_at(
 /// Collect all records in the segment into an array
 pub fn SegmentReader::collect(
   self : SegmentReader,
-) -> Array[(@core.VectorId, Array[Double], @core.Attrs)] {
-  let results : Array[(@core.VectorId, Array[Double], @core.Attrs)] = []
+) -> Array[(@types.VectorId, Array[Double], @types.Attrs)] {
+  let results : Array[(@types.VectorId, Array[Double], @types.Attrs)] = []
   let r = @binary.BinaryReader::new(self.data)
   r.skip(@codec.header_size) // Skip header
   while r.remaining() >= 16 {
     // Read ID
-    let id = @core.VectorId(r.read_u64().reinterpret_as_int64())
+    let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
     // Read lengths
     let attrs_len = r.read_u32().reinterpret_as_int()
     let vector_len = r.read_u32().reinterpret_as_int()
@@ -177,10 +177,10 @@ pub fn SegmentReader::collect(
       let attrs_bytes = r.read_bytes(attrs_len)
       match @codec.decode_attrs_json(attrs_bytes) {
         Some(a) => a
-        None => @core.empty_attrs()
+        None => @types.empty_attrs()
       }
     } else {
-      @core.empty_attrs()
+      @types.empty_attrs()
     }
     // Read vector
     let count = vector_len / 4
@@ -197,6 +197,6 @@ pub fn SegmentReader::collect(
 /// Iterate over all records in the segment
 pub fn SegmentReader::iter(
   self : SegmentReader,
-) -> Iter[(@core.VectorId, Array[Double], @core.Attrs)] {
+) -> Iter[(@types.VectorId, Array[Double], @types.Attrs)] {
   self.collect().iter()
 }

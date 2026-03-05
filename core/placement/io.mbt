@@ -42,7 +42,7 @@ priv struct SegState {
 /// Write vectors to segments using CRUSH placement
 /// Returns index entries and manifest for index building
 pub fn[S : @storage.Storage] write_segments_from_store(
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   opts : SegmentOptions,
   storages : Map[String, S],
 ) -> SegmentResult raise @storage.IOError {
@@ -152,16 +152,16 @@ pub fn[S : @storage.Storage] write_segments_from_store(
 
 ///|
 /// Estimate attrs JSON size
-fn estimate_attrs_size(attrs : @core.Attrs) -> Int {
+fn estimate_attrs_size(attrs : @types.Attrs) -> Int {
   let mut size = 2 // {}
   for key in attrs.keys() {
     size = size + key.length() + 4 // "key":
     match attrs.get(key) {
-      Some(@core.String(s)) => size = size + s.length() + 2
-      Some(@core.Int(_)) => size = size + 20
-      Some(@core.Float(_)) => size = size + 20
-      Some(@core.Bool(_)) => size = size + 5
-      Some(@core.Null) | None => size = size + 4
+      Some(@types.String(s)) => size = size + s.length() + 2
+      Some(@types.Int(_)) => size = size + 20
+      Some(@types.Float(_)) => size = size + 20
+      Some(@types.Bool(_)) => size = size + 5
+      Some(@types.Null) | None => size = size + 4
     }
   }
   size
@@ -172,8 +172,8 @@ fn estimate_attrs_size(attrs : @core.Attrs) -> Int {
 pub fn[S : @storage.Storage] read_segments_from_manifest(
   manifest : PlacementManifest,
   storages : Map[String, S],
-) -> Array[(@core.VectorId, Array[Double], @core.Attrs)] raise @storage.IOError {
-  let results : Array[(@core.VectorId, Array[Double], @core.Attrs)] = []
+) -> Array[(@types.VectorId, Array[Double], @types.Attrs)] raise @storage.IOError {
+  let results : Array[(@types.VectorId, Array[Double], @types.Attrs)] = []
 
   // Read each segment from its target storage
   for segment in manifest.segments {
@@ -197,7 +197,7 @@ pub fn[S : @storage.Storage] read_segments_from_manifest(
 /// Save options for distributed storage
 pub struct SaveDistributedOptions {
   segment_opts : SegmentOptions
-  strategy : @core.Strategy
+  strategy : @types.Strategy
   include_ann : Bool
   ann_bytes : Bytes? // Pre-serialized ANN state (optional)
 }
@@ -210,7 +210,7 @@ pub fn SaveDistributedOptions::default(
 ) -> SaveDistributedOptions {
   {
     segment_opts: SegmentOptions::default(base_name, crush),
-    strategy: @core.Bruteforce,
+    strategy: @types.Bruteforce,
     include_ann: false,
     ann_bytes: None,
   }
@@ -220,7 +220,7 @@ pub fn SaveDistributedOptions::default(
 /// Save CoreStore to distributed storage using CRUSH
 /// Writes: data segments (.vseg), index file (.vidx), manifest (.vcdb.manifest)
 pub fn[S : @storage.Storage] save_store_distributed(
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   opts : SegmentOptions,
   storages : Map[String, S],
   index_storage : S,
@@ -230,7 +230,7 @@ pub fn[S : @storage.Storage] save_store_distributed(
     opts,
     storages,
     index_storage,
-    @core.Bruteforce,
+    @types.Bruteforce,
     None,
   )
 }
@@ -238,11 +238,11 @@ pub fn[S : @storage.Storage] save_store_distributed(
 ///|
 /// Save CoreStore with ANN state to distributed storage
 pub fn[S : @storage.Storage] save_store_distributed_with_ann(
-  store : @core.CoreStore,
+  store : @store.CoreStore,
   opts : SegmentOptions,
   storages : Map[String, S],
   index_storage : S,
-  strategy : @core.Strategy,
+  strategy : @types.Strategy,
   ann_bytes : Bytes?,
 ) -> PlacementManifest raise @storage.IOError {
   // 1. Write data segments to distributed storages
@@ -276,7 +276,7 @@ pub fn[S : @storage.Storage] save_store_distributed_with_ann(
 ///|
 /// Result of loading from distributed storage
 pub struct LoadDistributedResult {
-  store : @core.CoreStore
+  store : @store.CoreStore
   header : @segment.IndexHeader
   ann_bytes : Bytes?
 }
@@ -289,7 +289,7 @@ pub fn[S : @storage.Storage] load_store_distributed(
   base_name : String,
   storages : Map[String, S],
   index_storage : S,
-) -> @core.CoreStore raise @storage.IOError {
+) -> @store.CoreStore raise @storage.IOError {
   let result = load_store_distributed_full(base_name, storages, index_storage)
   result.store
 }
@@ -303,7 +303,10 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
 ) -> LoadDistributedResult raise @storage.IOError {
   // Try to load from index file (fast path with pointers)
   if index_storage.exists(base_name + @codec.ext_index, @storage.Index) {
-    let index_bytes = index_storage.read(base_name + @codec.ext_index, @storage.Index)
+    let index_bytes = index_storage.read(
+      base_name + @codec.ext_index,
+      @storage.Index,
+    )
     let decoded = match @segment.decode_index_file(index_bytes) {
       None => raise @storage.IoFailed("Invalid index file")
       Some(d) => d
@@ -327,7 +330,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
 
     // Create store with correct metric
     let metric = @segment.decode_metric(decoded.header.metric_code)
-    let store = @core.CoreStore::new(
+    let store = @store.CoreStore::new(
       decoded.header.dim,
       metric,
       capacity=decoded.header.count + 100,
@@ -350,7 +353,10 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
         Some(r) => r
         None => {
           let storage = require_storage(storages, target_key)
-          let data = storage.read(entry.ptr.segment + @codec.ext_segment, @storage.Data)
+          let data = storage.read(
+            entry.ptr.segment + @codec.ext_segment,
+            @storage.Data,
+          )
           let r = match
             @segment.SegmentReader::from_bytes(entry.ptr.segment, data) {
             None =>
@@ -391,7 +397,10 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
   // Determine dimension from first segment
   let first_segment = manifest.segments[0]
   let storage = require_storage(storages, first_segment.target_key)
-  let data = storage.read(first_segment.name + @codec.ext_segment, @storage.Data)
+  let data = storage.read(
+    first_segment.name + @codec.ext_segment,
+    @storage.Data,
+  )
   let reader = match
     @segment.SegmentReader::from_bytes(first_segment.name, data) {
     None => raise @storage.IoFailed("Invalid segment")
@@ -409,7 +418,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
   }
 
   // Create store and load all records
-  let store = @core.CoreStore::new(dim, @core.Cosine, capacity=1024)
+  let store = @store.CoreStore::new(dim, @types.Cosine, capacity=1024)
   let records = read_segments_from_manifest(manifest, storages)
   for record in records {
     let (id, vec, attrs) = record
@@ -419,7 +428,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
   {
     store,
     header: {
-      metric_code: @segment.encode_metric(@core.Cosine),
+      metric_code: @segment.encode_metric(@types.Cosine),
       dim,
       count: store.size(),
       strategy_code: 0,
