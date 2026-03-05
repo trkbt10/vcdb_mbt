@@ -480,11 +480,11 @@ test "distributed/load_slow_path" {
   }
 
   // Delete index file to force slow path
-  index_storage.del("slowpath.index") catch {
+  index_storage.del("slowpath" + @codec.ext_index) catch {
     _ => ()
   }
-  inspect(index_storage.exists("slowpath.index"), content="false")
-  inspect(index_storage.exists("slowpath.manifest.json"), content="true")
+  inspect(index_storage.exists("slowpath" + @codec.ext_index), content="false")
+  inspect(index_storage.exists("slowpath" + @codec.ext_manifest), content="true")
 
   // Load should work via segment scan
   let restored = load_store_distributed("slowpath", storages, index_storage) catch {
@@ -550,7 +550,7 @@ test "distributed/empty_manifest_error" {
     commit_ts: 0L,
   }
   let bytes = serialize_manifest(manifest)
-  index_storage.atomic_write("empty.manifest.json", bytes)
+  index_storage.atomic_write("empty" + @codec.ext_manifest, bytes)
 
   // Load should fail with "Empty manifest"
   let mut caught = false

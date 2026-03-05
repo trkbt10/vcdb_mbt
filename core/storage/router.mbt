@@ -18,17 +18,17 @@ pub fn collection_data_path(collection_name : String) -> String {
 ///|
 /// Path for collection index file (distributed)
 pub fn collection_index_path(collection_name : String) -> String {
-  collection_name + ".index"
+  collection_name + @codec.ext_index
 }
 
 ///|
 /// Path for collection manifest file (distributed)
 pub fn collection_manifest_path(collection_name : String) -> String {
-  collection_name + ".manifest.json"
+  collection_name + @codec.ext_manifest
 }
 
 ///|
 /// Path for data segment file
 pub fn segment_data_path(base : String, pg : Int, part : Int) -> String {
-  base + ".pg" + pg.to_string() + ".part" + part.to_string() + ".data"
+  base + ".pg" + pg.to_string() + ".part" + part.to_string() + @codec.ext_segment
 }

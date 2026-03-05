@@ -83,3 +83,16 @@ test "header/file_type_roundtrip" {
   inspect(FileType::from_byte(b'\x00'), content="None")
   inspect(FileType::from_byte(b'\xFF'), content="None")
 }
+
+///|
+test "ext/file_extensions" {
+  // Verify extension constants
+  inspect(ext_wal, content=".vwal")
+  inspect(ext_segment, content=".vseg")
+  inspect(ext_index, content=".vidx")
+  inspect(ext_manifest, content=".vcdb.manifest")
+  // Verify FileType::extension
+  inspect(Wal.extension(), content=".vwal")
+  inspect(Segment.extension(), content=".vseg")
+  inspect(Index.extension(), content=".vidx")
+}

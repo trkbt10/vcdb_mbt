@@ -100,7 +100,7 @@ pub fn[S : @storage.Storage] write_segments_from_store(
       let seg_data = seg.writer.to_bytes()
       let storage = require_storage(storages, seg.target_key)
       storage.atomic_write(
-        seg.writer.get_name() + ".data",
+        seg.writer.get_name() + @codec.ext_segment,
         seg_data,
         @storage.Data,
       )
@@ -127,7 +127,7 @@ pub fn[S : @storage.Storage] write_segments_from_store(
         let seg_data = seg.writer.to_bytes()
         let storage = require_storage(storages, seg.target_key)
         storage.atomic_write(
-          seg.writer.get_name() + ".data",
+          seg.writer.get_name() + @codec.ext_segment,
           seg_data,
           @storage.Data,
         )
@@ -179,7 +179,7 @@ pub fn[S : @storage.Storage] read_segments_from_manifest(
   for segment in manifest.segments {
     let storage = require_storage(storages, segment.target_key)
 
-    let data = storage.read(segment.name + ".data", @storage.Data)
+    let data = storage.read(segment.name + @codec.ext_segment, @storage.Data)
     let reader = match @segment.SegmentReader::from_bytes(segment.name, data) {
       None => raise @storage.IoFailed("Invalid segment: " + segment.name)
       Some(r) => r
@@ -218,7 +218,7 @@ pub fn SaveDistributedOptions::default(
 
 ///|
 /// Save CoreStore to distributed storage using CRUSH
-/// Writes: data segments (to data storages), .index file, .manifest.json (to index storage)
+/// Writes: data segments (.vseg), index file (.vidx), manifest (.vcdb.manifest)
 pub fn[S : @storage.Storage] save_store_distributed(
   store : @core.CoreStore,
   opts : SegmentOptions,
@@ -257,7 +257,7 @@ pub fn[S : @storage.Storage] save_store_distributed_with_ann(
     ann_bytes,
   )
   index_storage.atomic_write(
-    opts.base_name + ".index",
+    opts.base_name + @codec.ext_index,
     index_bytes,
     @storage.Index,
   )
@@ -265,7 +265,7 @@ pub fn[S : @storage.Storage] save_store_distributed_with_ann(
   // 3. Write manifest (segment locations)
   let manifest_bytes = serialize_manifest(result.manifest)
   index_storage.atomic_write(
-    opts.base_name + ".manifest.json",
+    opts.base_name + @codec.ext_manifest,
     manifest_bytes,
     @storage.Index,
   )
@@ -302,8 +302,8 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
   index_storage : S,
 ) -> LoadDistributedResult raise @storage.IOError {
   // Try to load from index file (fast path with pointers)
-  if index_storage.exists(base_name + ".index", @storage.Index) {
-    let index_bytes = index_storage.read(base_name + ".index", @storage.Index)
+  if index_storage.exists(base_name + @codec.ext_index, @storage.Index) {
+    let index_bytes = index_storage.read(base_name + @codec.ext_index, @storage.Index)
     let decoded = match @segment.decode_index_file(index_bytes) {
       None => raise @storage.IoFailed("Invalid index file")
       Some(d) => d
@@ -311,7 +311,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
 
     // Load manifest for segment locations
     let manifest_bytes = index_storage.read(
-      base_name + ".manifest.json",
+      base_name + @codec.ext_manifest,
       @storage.Index,
     )
     let manifest = match deserialize_manifest(manifest_bytes) {
@@ -350,7 +350,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
         Some(r) => r
         None => {
           let storage = require_storage(storages, target_key)
-          let data = storage.read(entry.ptr.segment + ".data", @storage.Data)
+          let data = storage.read(entry.ptr.segment + @codec.ext_segment, @storage.Data)
           let r = match
             @segment.SegmentReader::from_bytes(entry.ptr.segment, data) {
             None =>
@@ -376,7 +376,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
 
   // Fall back to reading from segments (slow path - no index file)
   let manifest_bytes = index_storage.read(
-    base_name + ".manifest.json",
+    base_name + @codec.ext_manifest,
     @storage.Index,
   )
   let manifest = match deserialize_manifest(manifest_bytes) {
@@ -391,7 +391,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
   // Determine dimension from first segment
   let first_segment = manifest.segments[0]
   let storage = require_storage(storages, first_segment.target_key)
-  let data = storage.read(first_segment.name + ".data", @storage.Data)
+  let data = storage.read(first_segment.name + @codec.ext_segment, @storage.Data)
   let reader = match
     @segment.SegmentReader::from_bytes(first_segment.name, data) {
     None => raise @storage.IoFailed("Invalid segment")

@@ -117,3 +117,33 @@ pub fn get_file_type(data : Bytes) -> FileType? {
   }
   FileType::from_byte(r.read_byte())
 }
+
+// ============================================================================
+// File Extensions (Single Source of Truth)
+// ============================================================================
+
+///|
+/// WAL file extension
+pub let ext_wal : String = ".vwal"
+
+///|
+/// Data segment file extension
+pub let ext_segment : String = ".vseg"
+
+///|
+/// Index file extension
+pub let ext_index : String = ".vidx"
+
+///|
+/// Manifest file extension
+pub let ext_manifest : String = ".vcdb.manifest"
+
+///|
+/// Get file extension for a file type
+pub fn FileType::extension(self : FileType) -> String {
+  match self {
+    Wal => ext_wal
+    Segment => ext_segment
+    Index => ext_index
+  }
+}
