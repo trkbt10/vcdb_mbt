@@ -9,7 +9,7 @@
 ///|
 /// Test: Dot product calculation - exact values
 test "spec/metric/dot_exact" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.Dot,
     capacity: 10,
@@ -39,7 +39,7 @@ test "spec/metric/dot_exact" {
 ///|
 /// Test: L2 distance calculation - exact values
 test "spec/metric/l2_exact" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.L2,
     capacity: 10,
@@ -69,7 +69,7 @@ test "spec/metric/l2_exact" {
 ///|
 /// Test: Cosine similarity - auto-normalization verification
 test "spec/metric/cosine_normalization" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Cosine,
     capacity: 10,
@@ -91,7 +91,7 @@ test "spec/metric/cosine_normalization" {
 ///|
 /// Test: Cosine similarity - orthogonal vectors
 test "spec/metric/cosine_orthogonal" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Cosine,
     capacity: 10,
@@ -111,7 +111,7 @@ test "spec/metric/cosine_orthogonal" {
 ///|
 /// Test: Cosine similarity - opposite vectors
 test "spec/metric/cosine_opposite" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Cosine,
     capacity: 10,
@@ -135,7 +135,7 @@ test "spec/metric/cosine_opposite" {
 ///|
 /// Test: k=1 returns the single best match
 test "spec/search/k1_best_match" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
   db.add(@types.VectorId::from_int(1), [0.9, 0.1, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [1.0, 0.0, 0.0], @types.empty_attrs()) // Best match
   db.add(@types.VectorId::from_int(3), [0.8, 0.2, 0.0], @types.empty_attrs())
@@ -147,7 +147,7 @@ test "spec/search/k1_best_match" {
 ///|
 /// Test: k > size returns all vectors
 test "spec/search/k_exceeds_size" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   let results = db.search([1.0, 0.0], 100, None)
@@ -157,7 +157,7 @@ test "spec/search/k_exceeds_size" {
 ///|
 /// Test: Search with filter reduces results
 test "spec/search/filter_reduces" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
     attrs.set("even", @types.Bool(i % 2 == 0))
@@ -180,7 +180,7 @@ test "spec/search/filter_reduces" {
 ///|
 /// Test: Results are sorted by score (descending)
 test "spec/search/sorted_descending" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 1,
     metric: @types.Dot,
     capacity: 10,
@@ -210,8 +210,8 @@ test "spec/search/sorted_descending" {
 /// Test: HNSW top-1 is in Bruteforce top-3 (high recall)
 /// Note: HNSW is approximate NN, so 100% top-1 match is not guaranteed
 test "spec/recall/hnsw_top1_in_top3" {
-  let bf_db = @facade.VectorDB::with_dim(4)
-  let hnsw_db = @facade.VectorDB::with_hnsw(4, metric=@types.Cosine)
+  let bf_db = @vcdb.VectorDB::with_dim(4)
+  let hnsw_db = @vcdb.VectorDB::with_hnsw(4, metric=@types.Cosine)
   // Add 50 vectors to both
   for i in 0..<50 {
     let v = [
@@ -250,8 +250,8 @@ test "spec/recall/hnsw_top1_in_top3" {
 ///|
 /// Test: IVF returns correct results after training
 test "spec/recall/ivf_trained_recall" {
-  let bf_db = @facade.VectorDB::with_dim(4)
-  let ivf_db = @facade.VectorDB::with_ivf(4, metric=@types.Cosine)
+  let bf_db = @vcdb.VectorDB::with_dim(4)
+  let ivf_db = @vcdb.VectorDB::with_ivf(4, metric=@types.Cosine)
   // Create 3 clear clusters
   for i in 0..<30 {
     let cluster = i / 10
@@ -284,9 +284,9 @@ test "spec/recall/ivf_trained_recall" {
 ///|
 /// Test: All strategies find the same best match
 test "spec/recall/exact_match_all_strategies" {
-  let bf_db = @facade.VectorDB::with_dim(3)
-  let hnsw_db = @facade.VectorDB::with_hnsw(3, metric=@types.Dot)
-  let ivf_db = @facade.VectorDB::with_ivf(3, metric=@types.Dot)
+  let bf_db = @vcdb.VectorDB::with_dim(3)
+  let hnsw_db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Dot)
+  let ivf_db = @vcdb.VectorDB::with_ivf(3, metric=@types.Dot)
   // Add vectors - id=7 is unique exact match for query [10, 0, 0]
   let query = [10.0, 0.0, 0.0]
   for i in 0..<20 {
@@ -321,7 +321,7 @@ test "spec/recall/exact_match_all_strategies" {
 ///|
 /// Test: Add then remove then add same ID maintains consistency
 test "spec/crud/add_remove_add" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   let id = @types.VectorId::from_int(42)
   // Add
   db.add(id, [1.0, 0.0], @types.empty_attrs())
@@ -343,7 +343,7 @@ test "spec/crud/add_remove_add" {
 ///|
 /// Test: Upsert preserves search correctness
 test "spec/crud/upsert_search_correctness" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   // Add vectors
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
@@ -369,7 +369,7 @@ test "spec/crud/upsert_search_correctness" {
 /// Test: Removed vectors don't appear in search
 test "spec/crud/remove_excludes_from_search" {
   // Use Dot metric to distinguish vectors by magnitude
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Dot,
     capacity: 10,
@@ -400,7 +400,7 @@ test "spec/crud/remove_excludes_from_search" {
 ///|
 /// Test: Zero vector handling (L2 metric)
 test "spec/edge/zero_vector_l2" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.L2,
     capacity: 10,
@@ -417,7 +417,7 @@ test "spec/edge/zero_vector_l2" {
 ///|
 /// Test: Very small differences are distinguishable
 test "spec/edge/small_differences" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 1,
     metric: @types.Dot,
     capacity: 10,
@@ -437,7 +437,7 @@ test "spec/edge/small_differences" {
 /// Test: High-dimensional sparse vectors
 test "spec/edge/sparse_high_dim" {
   let dim = 256
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim,
     metric: @types.Cosine,
     capacity: 20,
@@ -461,7 +461,7 @@ test "spec/edge/sparse_high_dim" {
 ///|
 /// Test: Duplicate vectors (same embedding, different IDs)
 test "spec/edge/duplicate_vectors" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   // Add same vector with different IDs
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs())
@@ -484,7 +484,7 @@ test "spec/edge/duplicate_vectors" {
 ///|
 /// Test: Empty query handling
 test "spec/edge/empty_db_search" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
   // Search on empty DB
   let results = db.search([1.0, 0.0, 0.0], 10, None)
   inspect(results.length(), content="0")
@@ -496,7 +496,7 @@ test "spec/edge/empty_db_search" {
 ///|
 /// Test: k=0 returns empty results
 test "spec/edge/k_zero" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
   let results = db.search([1.0, 0.0], 0, None)
   inspect(results.length(), content="0")
@@ -510,7 +510,7 @@ test "spec/edge/k_zero" {
 ///|
 /// Test: Serialization preserves search results exactly
 test "spec/serialization/search_preserved" {
-  let db = @facade.VectorDB::with_dim(4)
+  let db = @vcdb.VectorDB::with_dim(4)
   // Add vectors
   for i in 0..<20 {
     let v = [
@@ -526,7 +526,7 @@ test "spec/serialization/search_preserved" {
   let before = db.search(query, 5, None)
   // Serialize and deserialize
   let bytes = db.serialize()
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
   // Search after deserialization
   let after = db2.search(query, 5, None)
   // Results should be identical
@@ -543,7 +543,7 @@ test "spec/serialization/search_preserved" {
 ///|
 /// Test: Serialization preserves attributes
 test "spec/serialization/attrs_preserved" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   let attrs = @types.empty_attrs()
   attrs.set("name", @types.String("test-vector"))
   attrs.set("count", @types.Int(42L))
@@ -551,7 +551,7 @@ test "spec/serialization/attrs_preserved" {
   attrs.set("active", @types.Bool(true))
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
   // Serialize and deserialize
-  let db2 = @facade.VectorDB::deserialize(db.serialize())
+  let db2 = @vcdb.VectorDB::deserialize(db.serialize())
   // Verify attributes
   let record = db2.get(@types.VectorId::from_int(1)).unwrap()
   match record.attrs.get("name") {
@@ -576,7 +576,7 @@ test "spec/serialization/attrs_preserved" {
 ///|
 /// Test: HNSW serialization preserves graph structure
 test "spec/serialization/hnsw_graph_preserved" {
-  let db = @facade.VectorDB::with_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Dot)
   for i in 0..<30 {
     db.add(
       @types.VectorId::from_int(i),
@@ -592,7 +592,7 @@ test "spec/serialization/hnsw_graph_preserved" {
   let query = [1.0, 2.0, 0.0]
   let before = db.search(query, 10, None)
   // Serialize and deserialize
-  let db2 = @facade.VectorDB::deserialize(db.serialize())
+  let db2 = @vcdb.VectorDB::deserialize(db.serialize())
   let after = db2.search(query, 10, None)
   // Top-5 results should be the same (HNSW recall might vary slightly)
   let mut top5_match = 0
@@ -615,7 +615,7 @@ test "spec/serialization/hnsw_graph_preserved" {
 ///|
 /// Test: Complex boolean filter with AND logic
 test "spec/filter/and_logic" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
     attrs.set("value", @types.Int(i.to_int64()))
@@ -647,7 +647,7 @@ test "spec/filter/and_logic" {
 ///|
 /// Test: OR logic filter
 test "spec/filter/or_logic" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
     attrs.set(
@@ -671,7 +671,7 @@ test "spec/filter/or_logic" {
 ///|
 /// Test: Filter that matches nothing returns empty
 test "spec/filter/no_match" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   for i in 1..<=5 {
     let attrs = @types.empty_attrs()
     attrs.set("type", @types.String("normal"))
@@ -695,7 +695,7 @@ test "spec/filter/no_match" {
 ///|
 /// Test: Interleaved add/remove/search maintains consistency
 test "spec/stress/interleaved_operations" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   // Add initial vectors
   for i in 1..<=20 {
     db.add(
@@ -730,7 +730,7 @@ test "spec/stress/interleaved_operations" {
 /// Test: Many updates via upsert maintains correctness
 test "spec/stress/many_upserts" {
   // Use Dot metric to avoid normalization
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Dot,
     capacity: 10,
@@ -753,8 +753,8 @@ test "spec/stress/many_upserts" {
 ///|
 /// Test: Large dataset maintains recall
 test "spec/stress/large_dataset_recall" {
-  let bf_db = @facade.VectorDB::with_dim(8)
-  let hnsw_db = @facade.VectorDB::with_hnsw(8, metric=@types.Cosine)
+  let bf_db = @vcdb.VectorDB::with_dim(8)
+  let hnsw_db = @vcdb.VectorDB::with_hnsw(8, metric=@types.Cosine)
   // Add 500 vectors
   for i in 0..<500 {
     let v : Array[Double] = []
@@ -789,7 +789,7 @@ test "spec/stress/large_dataset_recall" {
 ///|
 /// Test: HNSW tombstone exclusion in search
 test "spec/hnsw/tombstone_exclusion" {
-  let db = @facade.VectorDB::with_hnsw(2, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(2, metric=@types.Dot)
   for i in 1..<=10 {
     db.add(
       @types.VectorId::from_int(i),
@@ -807,7 +807,7 @@ test "spec/hnsw/tombstone_exclusion" {
 ///|
 /// Test: HNSW re-add after tombstone
 test "spec/hnsw/readd_after_tombstone" {
-  let db = @facade.VectorDB::with_hnsw(2, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(2, metric=@types.Dot)
   let id = @types.VectorId::from_int(1)
   // Add, remove, re-add with different vector
   db.add(id, [1.0, 0.0], @types.empty_attrs())
@@ -829,7 +829,7 @@ test "spec/hnsw/readd_after_tombstone" {
 ///|
 /// Test: IVF untrained still works (bruteforce fallback)
 test "spec/ivf/untrained_search" {
-  let db = @facade.VectorDB::with_ivf(3, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_ivf(3, metric=@types.Dot)
   for i in 1..<=10 {
     db.add(
       @types.VectorId::from_int(i),
@@ -847,7 +847,7 @@ test "spec/ivf/untrained_search" {
 ///|
 /// Test: IVF training improves cluster assignment
 test "spec/ivf/training_clusters" {
-  let db = @facade.VectorDB::with_ivf(4, metric=@types.Cosine)
+  let db = @vcdb.VectorDB::with_ivf(4, metric=@types.Cosine)
   // Create 4 distinct clusters
   for i in 0..<40 {
     let cluster = i / 10

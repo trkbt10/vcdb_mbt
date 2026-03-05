@@ -5,7 +5,7 @@
 ///|
 /// Test: Basic VectorDB operations with Bruteforce
 test "api/bruteforce_basic" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
   // Add vectors
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
@@ -25,7 +25,7 @@ test "api/bruteforce_basic" {
 ///|
 /// Test: HNSW search correctness
 test "api/hnsw_search" {
-  let db = @facade.VectorDB::with_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Dot)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [0.9, 0.1, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(3), [0.0, 1.0, 0.0], @types.empty_attrs())
@@ -40,7 +40,7 @@ test "api/hnsw_search" {
 ///|
 /// Test: IVF with training
 test "api/ivf_training" {
-  let db = @facade.VectorDB::with_ivf(3, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_ivf(3, metric=@types.Dot)
   // Add vectors in different clusters
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [0.9, 0.1, 0.0], @types.empty_attrs())
@@ -56,7 +56,7 @@ test "api/ivf_training" {
 ///|
 /// Test: Cosine metric auto-normalization
 test "api/cosine_normalization" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Cosine,
     capacity: 10,
@@ -74,7 +74,7 @@ test "api/cosine_normalization" {
 ///|
 /// Test: L2 metric (negative squared distance)
 test "api/l2_metric" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.L2,
     capacity: 10,
@@ -94,7 +94,7 @@ test "api/l2_metric" {
 ///|
 /// Test: Attributes storage and retrieval
 test "api/attributes" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   let attrs = @types.empty_attrs()
   attrs.set("name", @types.String("test"))
   attrs.set("count", @types.Int(42L))
@@ -117,7 +117,7 @@ test "api/attributes" {
 ///|
 /// Test: Search with filter
 test "api/search_filter" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   let attrs1 = @types.empty_attrs()
   attrs1.set("category", @types.String("A"))
   let attrs2 = @types.empty_attrs()
@@ -140,7 +140,7 @@ test "api/search_filter" {
 ///|
 /// Test: Upsert (update existing vector)
 test "api/upsert" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   // Initial add
   let created1 = db.upsert(
     @types.VectorId::from_int(1),
@@ -165,7 +165,7 @@ test "api/upsert" {
 ///|
 /// Test: Remove vector
 test "api/remove" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(3), [0.5, 0.5], @types.empty_attrs())
@@ -183,7 +183,7 @@ test "api/remove" {
 ///|
 /// Test: Full serialization roundtrip
 test "api/serialization_roundtrip" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
   let attrs = @types.empty_attrs()
   attrs.set("tag", @types.String("important"))
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs)
@@ -193,7 +193,7 @@ test "api/serialization_roundtrip" {
   let bytes = db.serialize()
   inspect(bytes.length() > 0, content="true")
   // Deserialize
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
   inspect(db2.size(), content="3")
   // Verify data
   let record = db2.get(@types.VectorId::from_int(1))
@@ -212,12 +212,12 @@ test "api/serialization_roundtrip" {
 ///|
 /// Test: HNSW serialization roundtrip
 test "api/hnsw_serialization" {
-  let db = @facade.VectorDB::with_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Dot)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
   // Serialize & deserialize
   let bytes = db.serialize()
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
   // Search should work
   let results = db2.search([1.0, 0.0, 0.0], 1, None)
   inspect(results[0].id.to_int64(), content="1")
@@ -233,9 +233,9 @@ test "api/recall_validation" {
     capacity: 1024,
     strategy: Bruteforce,
   }
-  let bf_db = @facade.VectorDB::new(bf_options)
+  let bf_db = @vcdb.VectorDB::new(bf_options)
   // Create HNSW DB with same metric
-  let hnsw_db = @facade.VectorDB::with_hnsw(4, metric=@types.Dot)
+  let hnsw_db = @vcdb.VectorDB::with_hnsw(4, metric=@types.Dot)
   // Add same vectors to both
   for i in 0..<20 {
     let v = [
@@ -269,7 +269,7 @@ test "api/recall_validation" {
 ///|
 /// Test: Empty database edge case
 test "api/empty_db" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
   inspect(db.size(), content="0")
   // Search on empty should return empty
   let results = db.search([1.0, 0.0, 0.0], 10, None)
@@ -282,7 +282,7 @@ test "api/empty_db" {
 ///|
 /// Test: Find (single best match)
 test "api/find" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
   db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   // Find best match
@@ -290,7 +290,7 @@ test "api/find" {
   inspect(result is None, content="false")
   inspect(result.unwrap().id.to_int64(), content="1")
   // Find on empty should return None
-  let empty_db = @facade.VectorDB::with_dim(2)
+  let empty_db = @vcdb.VectorDB::with_dim(2)
   let empty_result = empty_db.find([1.0, 0.0], None)
   inspect(empty_result is None, content="true")
 }
@@ -298,7 +298,7 @@ test "api/find" {
 ///|
 /// Test: Large dataset with 200 vectors
 test "api/large_dataset" {
-  let db = @facade.VectorDB::with_dim(4)
+  let db = @vcdb.VectorDB::with_dim(4)
   // Add 200 vectors in 4 clusters
   for i in 0..<200 {
     let cluster = i / 50
@@ -334,7 +334,7 @@ test "api/large_dataset" {
 ///|
 /// Test: HNSW with larger dataset
 test "api/hnsw_large" {
-  let db = @facade.VectorDB::with_hnsw(4, metric=@types.Cosine)
+  let db = @vcdb.VectorDB::with_hnsw(4, metric=@types.Cosine)
   // Add 100 vectors
   for i in 0..<100 {
     let v = [
@@ -351,7 +351,7 @@ test "api/hnsw_large" {
   inspect(results.length(), content="10")
   // Serialize and restore
   let bytes = db.serialize()
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
   inspect(db2.size(), content="100")
   let results2 = db2.search([1.0, 2.0, 3.0, 0.0], 10, None)
   inspect(results2.length(), content="10")
@@ -360,7 +360,7 @@ test "api/hnsw_large" {
 ///|
 /// Test: IVF training with clustered data
 test "api/ivf_clustered" {
-  let db = @facade.VectorDB::with_ivf(4, metric=@types.Cosine)
+  let db = @vcdb.VectorDB::with_ivf(4, metric=@types.Cosine)
   // Create 3 clusters
   // Cluster A: around [1, 0, 0, 0]
   for i in 0..<30 {
@@ -402,7 +402,7 @@ test "api/ivf_clustered" {
 ///|
 /// Test: Mixed operations (add, update, remove, search)
 test "api/mixed_operations" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
   // Add initial vectors
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
@@ -448,7 +448,7 @@ test "api/mixed_operations" {
 ///|
 /// Test: Search with complex filter
 test "api/complex_filter" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   // Add vectors with multiple attributes
   for i in 1..<=20 {
     let attrs = @types.empty_attrs()
@@ -486,19 +486,19 @@ test "api/complex_filter" {
 /// Test: Similarity metrics comparison
 test "api/metrics_comparison" {
   // Same data, different metrics
-  let db_cosine = @facade.VectorDB::new({
+  let db_cosine = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.Cosine,
     capacity: 10,
     strategy: @types.Bruteforce,
   })
-  let db_dot = @facade.VectorDB::new({
+  let db_dot = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.Dot,
     capacity: 10,
     strategy: @types.Bruteforce,
   })
-  let db_l2 = @facade.VectorDB::new({
+  let db_l2 = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.L2,
     capacity: 10,
@@ -555,7 +555,7 @@ test "api/metrics_comparison" {
 ///|
 /// Test: Bulk add operations
 test "api/bulk_add" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
   // Add multiple vectors at once
   for i in 1..<=50 {
     let attrs = @types.empty_attrs()
@@ -594,7 +594,7 @@ test "api/bulk_add" {
 ///|
 /// Test: Bulk upsert operations
 test "api/bulk_upsert" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   // Initial adds
   for i in 1..<=20 {
     db.add(
@@ -626,7 +626,7 @@ test "api/bulk_upsert" {
 ///|
 /// Test: Bulk remove operations
 test "api/bulk_remove" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   // Add 50 vectors
   for i in 1..<=50 {
     db.add(
@@ -653,7 +653,7 @@ test "api/bulk_remove" {
 ///|
 /// Test: Search with range filter using attr index
 test "api/search_range_prefilter" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   let attr_index = @attr.BasicAttrIndex::new()
   // Add vectors with numeric values
   for i in 1..<=100 {
@@ -682,7 +682,7 @@ test "api/search_range_prefilter" {
 /// Note: HNSW uses tombstone-based removal - physical size remains unchanged
 /// until compact() is called. Heavy tombstoning degrades recall.
 test "api/hnsw_remove_search" {
-  let db = @facade.VectorDB::with_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Dot)
   // Add vectors
   for i in 1..<=20 {
     db.add(
@@ -719,7 +719,7 @@ test "api/hnsw_remove_search" {
 /// Test: High-dimensional vectors
 test "api/high_dimensional" {
   let dim = 128
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim,
     metric: @types.Cosine,
     capacity: 100,
@@ -748,7 +748,7 @@ test "api/high_dimensional" {
 ///|
 /// Test: Complex must/must_not/should expressions
 test "api/complex_expr_search" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   let attr_index = @attr.BasicAttrIndex::new()
   // Setup data
   for i in 1..<=20 {
@@ -779,7 +779,7 @@ test "api/complex_expr_search" {
 ///|
 /// Test: Unified CRUD operations
 test "api/unified_crud" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
   // set single
   db.add(
     @types.VectorId::from_int(1),

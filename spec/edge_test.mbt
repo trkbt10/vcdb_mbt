@@ -8,7 +8,7 @@
 ///|
 /// Test: Int64 max/min values in attributes
 test "edge/numeric/int64_bounds" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   let attrs = @types.empty_attrs()
   attrs.set("max", @types.Int(9223372036854775807L)) // Int64.max
@@ -31,7 +31,7 @@ test "edge/numeric/int64_bounds" {
 ///|
 /// Test: Float64 special values
 test "edge/numeric/float_special" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
       dim: 2,
       metric: @types.Dot,
       capacity: 10,
@@ -60,7 +60,7 @@ test "edge/numeric/float_special" {
 ///|
 /// Test: VectorId boundary values
 test "edge/numeric/vectorid_bounds" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   let max_id = @types.VectorId::from_int64(9223372036854775807L)
   let zero_id = @types.VectorId::from_int(0)
@@ -83,7 +83,7 @@ test "edge/numeric/vectorid_bounds" {
 ///|
 /// Test: Single dimension vector (dim=1)
 test "edge/dim/single_dimension" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 1,
     metric: @types.Dot,
     capacity: 10,
@@ -106,7 +106,7 @@ test "edge/dim/single_dimension" {
 /// Test: High dimension vector (dim=512)
 test "edge/dim/high_dimension" {
   let dim = 512
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim,
     metric: @types.Cosine,
     capacity: 20,
@@ -137,7 +137,7 @@ test "edge/dim/high_dimension" {
 ///|
 /// Test: Multiple vectors with identical scores
 test "edge/score/identical_scores" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Dot,
     capacity: 10,
@@ -167,7 +167,7 @@ test "edge/score/identical_scores" {
 ///|
 /// Test: Very close but distinct scores
 test "edge/score/close_scores" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 1,
     metric: @types.Dot,
     capacity: 10,
@@ -193,7 +193,7 @@ test "edge/score/close_scores" {
 ///|
 /// Test: All-zero vector with L2 metric
 test "edge/vector/zero_vector_l2" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.L2,
     capacity: 10,
@@ -214,7 +214,7 @@ test "edge/vector/zero_vector_l2" {
 ///|
 /// Test: All-zero vector with Cosine (normalized to itself)
 test "edge/vector/zero_vector_cosine" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Cosine,
     capacity: 10,
@@ -233,7 +233,7 @@ test "edge/vector/zero_vector_cosine" {
 ///|
 /// Test: All same value vector
 test "edge/vector/uniform_values" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 4,
     metric: @types.Cosine,
     capacity: 10,
@@ -265,7 +265,7 @@ test "edge/vector/uniform_values" {
 ///|
 /// Test: HNSW with single node
 test "edge/hnsw/single_node" {
-  let db = @facade.VectorDB::with_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Dot)
 
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
 
@@ -277,7 +277,7 @@ test "edge/hnsw/single_node" {
 ///|
 /// Test: HNSW after removing most nodes (high tombstone ratio)
 test "edge/hnsw/high_tombstone_ratio" {
-  let db = @facade.VectorDB::with_hnsw(2, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(2, metric=@types.Dot)
 
   // Add 20 nodes
   for i in 1..<=20 {
@@ -316,7 +316,7 @@ test "edge/hnsw/minimal_params" {
     seed: 42UL,
     allow_replace_deleted: false,
   }
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Dot,
     capacity: 20,
@@ -344,7 +344,7 @@ test "edge/hnsw/minimal_params" {
 /// Test: IVF with nprobe > nlist
 test "edge/ivf/nprobe_exceeds_nlist" {
   let params : @types.IVFParams = { nlist: 4, nprobe: 100 } // nprobe >> nlist
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Dot,
     capacity: 20,
@@ -370,7 +370,7 @@ test "edge/ivf/nprobe_exceeds_nlist" {
 /// Test: IVF with minimal nlist
 test "edge/ivf/minimal_nlist" {
   let params : @types.IVFParams = { nlist: 1, nprobe: 1 }
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Dot,
     capacity: 20,
@@ -399,7 +399,7 @@ test "edge/ivf/minimal_nlist" {
 ///|
 /// Test: Filter that matches nothing
 test "edge/filter/none_match" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
@@ -421,7 +421,7 @@ test "edge/filter/none_match" {
 ///|
 /// Test: Filter that matches everything
 test "edge/filter/all_match" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
@@ -527,7 +527,7 @@ test "edge/filter/deeply_nested" {
 ///|
 /// Test: Empty string key and value
 test "edge/string/empty" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   let attrs = @types.empty_attrs()
   attrs.set("", @types.String("")) // Both empty
@@ -544,7 +544,7 @@ test "edge/string/empty" {
 ///|
 /// Test: Very long key name
 test "edge/string/long_key" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   // 1000 character key
   let mut long_key = ""
@@ -567,7 +567,7 @@ test "edge/string/long_key" {
 ///|
 /// Test: Special characters in strings
 test "edge/string/special_chars" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   let attrs = @types.empty_attrs()
   attrs.set("newline", @types.String("line1\nline2"))
@@ -597,12 +597,12 @@ test "edge/string/special_chars" {
 ///|
 /// Test: Serialize empty database
 test "edge/serialize/empty_db" {
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
 
   let bytes = db.serialize()
   inspect(bytes.length() > 0, content="true")
 
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
   inspect(db2.size(), content="0")
   inspect(db2.dim(), content="3")
 }
@@ -610,7 +610,7 @@ test "edge/serialize/empty_db" {
 ///|
 /// Test: Serialize single vector
 test "edge/serialize/single_vector" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   let attrs = @types.empty_attrs()
   attrs.set("only", @types.Bool(true))
@@ -618,7 +618,7 @@ test "edge/serialize/single_vector" {
   db.add(@types.VectorId::from_int(42), [1.0, 0.0], attrs)
 
   let bytes = db.serialize()
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
 
   inspect(db2.size(), content="1")
   inspect(db2.has(@types.VectorId::from_int(42)), content="true")
@@ -633,7 +633,7 @@ test "edge/serialize/single_vector" {
 ///|
 /// Test: Serialize with many attributes per vector
 test "edge/serialize/many_attrs" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   let attrs = @types.empty_attrs()
   for i in 0..<100 {
@@ -643,7 +643,7 @@ test "edge/serialize/many_attrs" {
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
 
   let bytes = db.serialize()
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
 
   let record = db2.get(@types.VectorId::from_int(1)).unwrap()
   inspect(record.attrs.size(), content="100")
@@ -657,7 +657,7 @@ test "edge/serialize/many_attrs" {
 ///|
 /// Test: Serialize HNSW with tombstones
 test "edge/serialize/hnsw_tombstones" {
-  let db = @facade.VectorDB::with_hnsw(2, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(2, metric=@types.Dot)
 
   for i in 1..<=10 {
     db.add(
@@ -672,7 +672,7 @@ test "edge/serialize/hnsw_tombstones" {
   let _ = db.remove(@types.VectorId::from_int(7))
 
   let bytes = db.serialize()
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
 
   // Tombstoned IDs should still be tombstoned
   inspect(db2.has(@types.VectorId::from_int(3)), content="false")
@@ -687,7 +687,7 @@ test "edge/serialize/hnsw_tombstones" {
 ///|
 /// Test: Exceed initial capacity
 test "edge/capacity/exceed_initial" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
       dim: 2,
       metric: @types.Dot,
       capacity: 5,
@@ -714,7 +714,7 @@ test "edge/capacity/exceed_initial" {
 ///|
 /// Test: Capacity=1
 test "edge/capacity/minimal" {
-  let db = @facade.VectorDB::new({
+  let db = @vcdb.VectorDB::new({
     dim: 2,
     metric: @types.Dot,
     capacity: 1,
@@ -734,7 +734,7 @@ test "edge/capacity/minimal" {
 ///|
 /// Test: k=0 returns empty
 test "edge/k/zero" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
 
   let results = db.search([1.0, 0.0], 0, None)
@@ -744,7 +744,7 @@ test "edge/k/zero" {
 ///|
 /// Test: k=1 returns exactly one
 test "edge/k/one" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   for i in 1..<=100 {
     db.add(
@@ -761,7 +761,7 @@ test "edge/k/one" {
 ///|
 /// Test: k much larger than database size
 test "edge/k/exceeds_size" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   for i in 1..<=5 {
     db.add(
@@ -821,7 +821,7 @@ test "edge/range/negative_range" {
 ///|
 /// Test: Rapid add/remove/search cycle
 test "edge/ops/rapid_cycle" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   for cycle in 0..<10 {
     // Add 10
@@ -851,7 +851,7 @@ test "edge/ops/rapid_cycle" {
 ///|
 /// Test: Interleaved upsert and search
 test "edge/ops/upsert_search_interleave" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   for i in 1..<=20 {
     // Upsert
@@ -877,7 +877,7 @@ test "edge/ops/upsert_search_interleave" {
 ///|
 /// Test: PreFilter with empty candidate set
 test "edge/prefilter/empty_candidates" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   let index = @attr.BasicAttrIndex::new()
 
   for i in 1..<=10 {
@@ -905,7 +905,7 @@ test "edge/prefilter/empty_candidates" {
 ///|
 /// Test: Index and DB out of sync
 test "edge/index/desync" {
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
   let index = @attr.BasicAttrIndex::new()
 
   // Add to both

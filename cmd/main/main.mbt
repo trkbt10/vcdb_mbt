@@ -26,7 +26,7 @@ fn main {
 fn demo_bruteforce() -> Unit {
   println("--- Demo 1: Bruteforce Search ---")
 
-  let db = @facade.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::with_dim(3)
 
   // Add sample vectors representing documents/items
   // Simulating embeddings for: "apple", "banana", "orange", "grape", "melon"
@@ -67,7 +67,7 @@ fn demo_bruteforce() -> Unit {
 fn demo_hnsw() -> Unit {
   println("--- Demo 2: HNSW Approximate Search ---")
 
-  let db = @facade.VectorDB::with_hnsw(4, metric=@types.Dot)
+  let db = @vcdb.VectorDB::with_hnsw(4, metric=@types.Dot)
 
   // Add 100 vectors
   for i in 0..<100 {
@@ -106,7 +106,7 @@ fn demo_hnsw() -> Unit {
 fn demo_filtered_search() -> Unit {
   println("--- Demo 3: Search with Attribute Filter ---")
 
-  let db = @facade.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::with_dim(2)
 
   // Add products with categories
   let products = [
@@ -155,7 +155,7 @@ fn demo_filtered_search() -> Unit {
 fn demo_serialization() -> Unit {
   println("--- Demo 4: Serialization & Persistence ---")
 
-  let db = @facade.VectorDB::with_hnsw(3, metric=@types.Cosine)
+  let db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Cosine)
 
   // Add data
   for i in 1..<=10 {
@@ -175,7 +175,7 @@ fn demo_serialization() -> Unit {
   )
 
   // Deserialize
-  let db2 = @facade.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.VectorDB::deserialize(bytes)
   println("Restored DB: \{db2.size()} vectors")
 
   // Verify search works on restored DB
@@ -207,7 +207,7 @@ fn demo_metrics() -> Unit {
   let query = [1.0, 0.0, 0.0]
 
   // Cosine: direction matters, not magnitude
-  let db_cosine = @facade.VectorDB::new({
+  let db_cosine = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.Cosine,
     capacity: 10,
@@ -215,7 +215,7 @@ fn demo_metrics() -> Unit {
   })
 
   // Dot: both direction and magnitude matter
-  let db_dot = @facade.VectorDB::new({
+  let db_dot = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.Dot,
     capacity: 10,
@@ -223,7 +223,7 @@ fn demo_metrics() -> Unit {
   })
 
   // L2: distance matters
-  let db_l2 = @facade.VectorDB::new({
+  let db_l2 = @vcdb.VectorDB::new({
     dim: 3,
     metric: @types.L2,
     capacity: 10,

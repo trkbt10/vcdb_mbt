@@ -6,7 +6,7 @@
 /// Handle upsert points into a collection
 /// Returns (count, needs_persist) - caller should persist if needed
 pub fn handle_upsert(
-  db : @facade.VectorDB,
+  db : @vcdb.VectorDB,
   req : UpsertRequest,
 ) -> Result[Int, GatewayError] {
   let dim = db.dim()
@@ -26,7 +26,7 @@ pub fn handle_upsert(
 ///|
 /// Handle search in a collection
 pub fn handle_search(
-  db : @facade.VectorDB,
+  db : @vcdb.VectorDB,
   req : SearchRequest,
 ) -> Result[SearchResponse, GatewayError] {
   let dim = db.dim()
@@ -54,7 +54,7 @@ pub fn handle_search(
 ///|
 /// Handle get point by ID
 pub fn handle_get_point(
-  db : @facade.VectorDB,
+  db : @vcdb.VectorDB,
   id : Int64,
 ) -> Result[PointResponse, GatewayError] {
   let vec_id = @types.VectorId::from_int64(id)
@@ -67,7 +67,7 @@ pub fn handle_get_point(
 ///|
 /// Handle delete point by ID
 pub fn handle_delete_point(
-  db : @facade.VectorDB,
+  db : @vcdb.VectorDB,
   id : Int64,
 ) -> Result[Unit, GatewayError] {
   let vec_id = @types.VectorId::from_int64(id)
@@ -121,7 +121,7 @@ pub fn[S : @storage.Storage] handle_get_collection(
 pub fn[S : @storage.Storage, T] with_collection(
   manager : CollectionManager[S],
   name : String,
-  handler : (@facade.VectorDB) -> Result[T, GatewayError],
+  handler : (@vcdb.VectorDB) -> Result[T, GatewayError],
 ) -> Result[T, GatewayError] {
   match manager.get(name) {
     Some(db) => handler(db)

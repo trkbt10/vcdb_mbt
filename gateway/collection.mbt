@@ -8,7 +8,7 @@
 /// Collection entry
 pub struct Collection {
   config : CollectionConfig
-  db : @facade.VectorDB
+  db : @vcdb.VectorDB
 }
 
 ///|
@@ -110,7 +110,7 @@ fn[S : @storage.Storage] CollectionManager::load_collection_from_storage(
   // Load data
   let data_path = make_path(self.base_path, @storage.collection_data_path(name))
   let data = storage.read(data_path, @storage.Data) catch { _ => return None }
-  let db = @facade.VectorDB::deserialize(data)
+  let db = @vcdb.VectorDB::deserialize(data)
   Some({ config, db })
 }
 
@@ -165,7 +165,7 @@ pub fn[S : @storage.Storage] CollectionManager::create(
     capacity: 1024,
     strategy: config.strategy,
   }
-  let db = @facade.VectorDB::new(options)
+  let db = @vcdb.VectorDB::new(options)
   let collection : Collection = { config, db }
   self.collections[config.name] = collection
   self.persist_collection(config.name)
@@ -176,7 +176,7 @@ pub fn[S : @storage.Storage] CollectionManager::create(
 pub fn[S : @storage.Storage] CollectionManager::get(
   self : CollectionManager[S],
   name : String,
-) -> @facade.VectorDB? {
+) -> @vcdb.VectorDB? {
   match self.collections.get(name) {
     Some(c) => Some(c.db)
     None =>
@@ -296,7 +296,7 @@ pub fn[S : @storage.Storage] CollectionManager::load_collection(
   if self.collections.contains(config.name) {
     return Err(CollectionExists(config.name))
   }
-  let db = @facade.VectorDB::deserialize(data)
+  let db = @vcdb.VectorDB::deserialize(data)
   let collection : Collection = { config, db }
   self.collections[config.name] = collection
   Ok(())

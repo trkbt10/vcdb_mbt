@@ -4,7 +4,7 @@
 
 ///|
 /// Global instance storage
-let instances : @hashmap.HashMap[Int, @facade.VectorDB] = @hashmap.new()
+let instances : @hashmap.HashMap[Int, @vcdb.VectorDB] = @hashmap.new()
 
 ///|
 priv struct Counter {
@@ -16,7 +16,7 @@ let counter : Counter = { value: 1 }
 
 ///|
 pub fn vcdb_create(dim : Int) -> Int {
-  let db = @facade.VectorDB::with_dim(dim)
+  let db = @vcdb.VectorDB::with_dim(dim)
   let id = counter.value
   counter.value = counter.value + 1
   instances[id] = db
@@ -25,7 +25,7 @@ pub fn vcdb_create(dim : Int) -> Int {
 
 ///|
 pub fn vcdb_create_hnsw(dim : Int) -> Int {
-  let db = @facade.VectorDB::with_hnsw(dim)
+  let db = @vcdb.VectorDB::with_hnsw(dim)
   let id = counter.value
   counter.value = counter.value + 1
   instances[id] = db
@@ -34,7 +34,7 @@ pub fn vcdb_create_hnsw(dim : Int) -> Int {
 
 ///|
 pub fn vcdb_create_ivf(dim : Int) -> Int {
-  let db = @facade.VectorDB::with_ivf(dim)
+  let db = @vcdb.VectorDB::with_ivf(dim)
   let id = counter.value
   counter.value = counter.value + 1
   instances[id] = db
@@ -165,7 +165,7 @@ pub fn vcdb_serialize(instance_id : Int) -> Bytes {
 
 ///|
 pub fn vcdb_deserialize(data : Bytes) -> Int {
-  let db = @facade.VectorDB::deserialize(data)
+  let db = @vcdb.VectorDB::deserialize(data)
   let id = counter.value
   counter.value = counter.value + 1
   instances[id] = db
