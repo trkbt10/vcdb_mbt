@@ -356,12 +356,12 @@ test "wal/truncate" {
     _ => ()
   }
   let before = storage.read("truncate.wal") catch { _ => Bytes::new(0) }
-  inspect(before.length() > 8, content="true") // Header + records
+  inspect(before.length() > @codec.header_size, content="true") // Header + records
   // Truncate
   wal.truncate()
-  // WAL should be reset to just header (8 bytes)
+  // WAL should be reset to just header (12 bytes)
   let data = storage.read("truncate.wal") catch { _ => Bytes::new(0) }
-  inspect(data.length(), content="8") // Just header
+  inspect(data.length(), content="12") // Just header
 }
 
 ///|
@@ -829,9 +829,8 @@ test "wal/corrupted_checksum_rejected" {
 test "wal/invalid_attrs_len" {
   // Manually create a record with impossibly large attrs_len
   let w = @binary.BinaryWriter::new()
-  // Header
-  w.push_u32(wal_magic)
-  w.push_u32(wal_version)
+  // Header (12 bytes)
+  w.push_bytes(encode_wal_header())
   // Record type (Upsert = 1)
   w.push_byte(b'\x01')
   // Reserved
@@ -897,9 +896,8 @@ test "wal/json_exponent_notation" {
 ///|
 test "wal/reject_non_aligned_vector" {
   let w = @binary.BinaryWriter::new()
-  // Header
-  w.push_u32(wal_magic)
-  w.push_u32(wal_version)
+  // Header (12 bytes)
+  w.push_bytes(encode_wal_header())
   // Record type (Upsert = 1)
   w.push_byte(b'\x01')
   // Reserved

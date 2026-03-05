@@ -1,16 +1,12 @@
 ///|
 /// Data Segment - Binary format for storing vectors in distributed segments
-/// Format: Header (8 bytes) + Records
-/// Header: Magic (4 bytes "VSEG") + Version (4 bytes)
+/// Format: Header (12 bytes) + Records
+/// Header: Magic (8 bytes "VCDBMBT\0") + Type (1) + Version (1) + Reserved (2)
 /// Record: ID (8 bytes) + AttrsLen (4 bytes) + VectorLen (4 bytes) + Attrs + Vector
 
 ///|
-/// Segment magic number: "VSEG" in little-endian
-pub let segment_magic : UInt = 0x47455356U
-
-///|
 /// Segment format version
-pub let segment_version : UInt = 1U
+pub let segment_version : Byte = b'\x01'
 
 ///|
 /// Data pointer - reference to a record within a segment
@@ -39,10 +35,9 @@ pub struct SegmentWriter {
 /// Create a new segment writer
 pub fn SegmentWriter::new(name : String) -> SegmentWriter {
   let buffer = @binary.BinaryWriter::new()
-  // Write header
-  buffer.push_u32(segment_magic)
-  buffer.push_u32(segment_version)
-  { name, buffer, size: 8 }
+  // Write header (12 bytes)
+  @codec.encode_header(buffer, Segment, segment_version)
+  { name, buffer, size: @codec.header_size }
 }
 
 ///|
@@ -107,16 +102,19 @@ pub struct SegmentReader {
 ///|
 /// Create a segment reader from bytes
 pub fn SegmentReader::from_bytes(name : String, data : Bytes) -> SegmentReader? {
-  if data.length() < 8 {
+  if data.length() < @codec.header_size {
     return None
   }
   let r = @binary.BinaryReader::new(data)
-  let magic = r.read_u32()
-  let version = r.read_u32()
-  if magic != segment_magic || version != segment_version {
-    return None
+  match @codec.read_header(r) {
+    None => None
+    Some((file_type, version)) =>
+      if file_type == Segment && version == segment_version {
+        Some({ name, data })
+      } else {
+        None
+      }
   }
-  Some({ name, data })
 }
 
 ///|
@@ -163,7 +161,7 @@ pub fn SegmentReader::collect(
 ) -> Array[(@core.VectorId, Array[Double], @core.Attrs)] {
   let results : Array[(@core.VectorId, Array[Double], @core.Attrs)] = []
   let r = @binary.BinaryReader::new(self.data)
-  r.skip(8) // Skip header
+  r.skip(@codec.header_size) // Skip header
   while r.remaining() >= 16 {
     // Read ID
     let id = @core.VectorId(r.read_u64().reinterpret_as_int64())

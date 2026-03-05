@@ -1,15 +1,11 @@
 ///|
 /// Write-Ahead Log (WAL) implementation
 /// Format:
-/// - Header (8 bytes): Magic (4 bytes) + Version (4 bytes)
+/// - Header (12 bytes): Magic (8 bytes "VCDBMBT\0") + Type (1) + Version (1) + Reserved (2)
 /// - Records: Type (1 byte) + Reserved (1 byte) + ID (8 bytes) + AttrsLen (4 bytes) + VectorLen (4 bytes) + Data
 /// - Footer (8 bytes, optional): Magic (4 bytes) + CRC32 (4 bytes)
 /// - Attrs: JSON encoded UTF-8 string
 /// - Vectors: Float32 array (4 bytes per element)
-
-///|
-/// WAL Magic number: "VLWA" in little-endian
-pub let wal_magic : UInt = 0x41574C56U
 
 ///|
 /// WAL Footer magic: "WCRC" in little-endian
@@ -17,7 +13,7 @@ pub let wal_footer_magic : UInt = 0x43524357U
 
 ///|
 /// WAL format version
-pub let wal_version : UInt = 1U
+pub let wal_version : Byte = b'\x01'
 
 ///|
 /// WAL record types
@@ -185,11 +181,10 @@ pub fn decode_wal_record(r : @binary.BinaryReader) -> WalRecord? {
 }
 
 ///|
-/// Encode WAL header
+/// Encode WAL header (12 bytes)
 pub fn encode_wal_header() -> Bytes {
   let w = @binary.BinaryWriter::new()
-  w.push_u32(wal_magic)
-  w.push_u32(wal_version)
+  @codec.encode_header(w, Wal, wal_version)
   w.concat()
 }
 
@@ -206,9 +201,8 @@ pub fn encode_wal_footer(body : Bytes) -> Bytes {
 /// Encode multiple records to a complete WAL segment
 pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
   let w = @binary.BinaryWriter::new()
-  // Write header inline
-  w.push_u32(wal_magic)
-  w.push_u32(wal_version)
+  // Write header inline (12 bytes)
+  @codec.encode_header(w, Wal, wal_version)
   // Write records directly (no intermediate allocations)
   for record in records {
     encode_wal_record_to(w, record)
@@ -224,15 +218,16 @@ pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
 ///|
 /// Verify WAL header
 pub fn verify_wal_header(r : @binary.BinaryReader) -> Bool {
-  let magic = r.read_u32()
-  let version = r.read_u32()
-  magic == wal_magic && version == wal_version
+  match @codec.read_header(r) {
+    None => false
+    Some((file_type, version)) => file_type == Wal && version == wal_version
+  }
 }
 
 ///|
 /// Return footer start offset when WAL checksum footer is present.
 fn wal_footer_start(data : Bytes) -> Int? {
-  if data.length() < 16 {
+  if data.length() < @codec.header_size + 8 {
     return None
   }
   let footer_start = data.length() - 8
@@ -257,14 +252,14 @@ fn wal_body_length(data : Bytes) -> Int {
 
 ///|
 /// Check if WAL has valid footer and verify CRC32
-/// A header-only WAL (8 bytes) is valid - no footer to verify
+/// A header-only WAL (12 bytes) is valid - no footer to verify
 pub fn verify_wal_checksum(data : Bytes) -> Bool {
   // Too short to even have a header
-  if data.length() < 8 {
+  if data.length() < @codec.header_size {
     return false
   }
   // Header-only WAL (no footer) is valid
-  if data.length() < 16 {
+  if data.length() < @codec.header_size + 8 {
     return true
   }
   let footer_start = match wal_footer_start(data) {
@@ -284,7 +279,7 @@ pub fn verify_wal_checksum(data : Bytes) -> Bool {
 /// Decode all records from WAL data
 pub fn decode_wal_records(data : Bytes) -> Array[WalRecord] {
   let records : Array[WalRecord] = []
-  if data.length() < 8 {
+  if data.length() < @codec.header_size {
     return records
   }
   let r = @binary.BinaryReader::new(data)

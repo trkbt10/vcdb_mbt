@@ -16,9 +16,9 @@ pub fn WalRuntime::new(
 
 ///|
 /// Get safe copy length - up to the last decodable record boundary
-/// Returns header length (8) if no records are decodable
+/// Returns header length (12) if no records are decodable
 fn get_safe_copy_length(data : Bytes) -> Int {
-  if data.length() < 8 {
+  if data.length() < @codec.header_size {
     return 0
   }
   let r = @binary.BinaryReader::new(data)
@@ -29,7 +29,7 @@ fn get_safe_copy_length(data : Bytes) -> Int {
   // Calculate body length (without footer)
   let body_len = wal_body_length(data)
   // Track position after last successful decode
-  let mut last_valid_pos = 8 // After header
+  let mut last_valid_pos = @codec.header_size // After header
   while r.position() < body_len {
     match decode_wal_record(r) {
       None => break // Stop at first malformed record
@@ -57,7 +57,7 @@ pub fn WalRuntime::append(
     if verify_wal_checksum(existing) {
       // Checksum valid: get safe copy length (up to last decodable record boundary)
       let safe_len = get_safe_copy_length(existing)
-      if safe_len >= 8 {
+      if safe_len >= @codec.header_size {
         // Copy header + valid records only (excludes corrupt tail)
         for i in 0..<safe_len {
           w.push_byte(existing[i])
@@ -97,7 +97,7 @@ pub fn WalRuntime::replay_into(
   }
   let data = self.storage.read(self.path)
   // Verify header first - reject non-WAL files
-  if data.length() < 8 {
+  if data.length() < @codec.header_size {
     raise @storage.IoFailed("WAL file too short")
   }
   let header_reader = @binary.BinaryReader::new(data)

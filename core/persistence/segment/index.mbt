@@ -1,20 +1,15 @@
 ///|
 /// Index File Format - Binary format for index entries and ANN state
-/// Compatible with TypeScript vcdb index file format (with 64-bit ID extension)
 ///
 /// Format:
-/// - Header (16 bytes): Magic (4) + Version (4) + Reserved (8)
+/// - Header (12 bytes): Magic (8 "VCDBMBT\0") + Type (1) + Version (1) + Reserved (2)
 /// - Info (20 bytes): metricCode (4) + dim (4) + count (4) + strategyCode (4) + flags (4)
 /// - If hasAnn: annLen (4) + annBytes
 /// - Entries: repeated [id (8) + nameLen (4) + name + offset (4) + length (4)]
 
 ///|
-/// Index file magic: 'VLIX' in little-endian
-pub let index_magic : UInt = 0x58494C56U
-
-///|
 /// Index file version
-pub let index_version : UInt = 1U
+pub let index_version : Byte = b'\x01'
 
 ///|
 /// Index file header
@@ -72,11 +67,8 @@ pub fn encode_index_file(
 ) -> Bytes {
   let w = @binary.BinaryWriter::new()
 
-  // Header (16 bytes)
-  w.push_u32(index_magic)
-  w.push_u32(index_version)
-  w.push_u32(0U) // Reserved
-  w.push_u32(0U) // Reserved
+  // Header (12 bytes)
+  @codec.encode_header(w, Index, index_version)
 
   // Info (20 bytes)
   w.push_u32(header.metric_code.reinterpret_as_uint())
@@ -124,21 +116,20 @@ pub struct DecodedIndexFile {
 ///|
 /// Decode index file from bytes
 pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
-  if data.length() < 36 {
-    // Minimum: header(16) + info(20)
+  if data.length() < @codec.header_size + 20 {
+    // Minimum: header(12) + info(20)
     return None
   }
 
   let r = @binary.BinaryReader::new(data)
 
-  // Header
-  let magic = r.read_u32()
-  let version = r.read_u32()
-  let _ = r.read_u32() // Reserved
-  let _ = r.read_u32() // Reserved
-
-  if magic != index_magic || version != index_version {
-    return None
+  // Header (12 bytes)
+  match @codec.read_header(r) {
+    None => return None
+    Some((file_type, version)) =>
+      if file_type != Index || version != index_version {
+        return None
+      }
   }
 
   // Info
