@@ -99,7 +99,10 @@ test "bench/bitmap_set_attrs" (b : @bench.T) {
     let index = BitmapAttrIndex::new()
     for i in 0..<100 {
       let attrs = @core.empty_attrs()
-      attrs.set("status", @core.String(if i % 2 == 0 { "active" } else { "inactive" }))
+      attrs.set(
+        "status",
+        @core.String(if i % 2 == 0 { "active" } else { "inactive" }),
+      )
       attrs.set("region", @core.String("region_" + (i % 5).to_string()))
       index.set_attrs(@core.VectorId::from_int(i), attrs)
     }
@@ -113,7 +116,10 @@ test "bench/bitmap_eq_lookup" (b : @bench.T) {
   let index = BitmapAttrIndex::new()
   for i in 0..<1000 {
     let attrs = @core.empty_attrs()
-    attrs.set("status", @core.String(if i % 2 == 0 { "active" } else { "inactive" }))
+    attrs.set(
+      "status",
+      @core.String(if i % 2 == 0 { "active" } else { "inactive" }),
+    )
     index.set_attrs(@core.VectorId::from_int(i), attrs)
   }
   b.bench(fn() { b.keep(index.eq("status", @core.String("active")).length()) })

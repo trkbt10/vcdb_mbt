@@ -64,11 +64,7 @@ pub fn[S : @storage.Storage] write_segments_from_store(
     let id = store.ids[i]
     let result = crush_locate(id, opts.crush)
     let pg = result.pg
-    let target_key = if result.primaries.is_empty() {
-      "local"
-    } else {
-      result.primaries[0]
-    }
+    let target_key = first_string_or(result.primaries, "local")
 
     // Get or create segment writer for this PG
     let seg = match writers.get(pg) {
@@ -102,10 +98,7 @@ pub fn[S : @storage.Storage] write_segments_from_store(
     if opts.segmented && seg.size + rec_size > seg_limit {
       // Flush current segment
       let seg_data = seg.writer.to_bytes()
-      let storage = match storages.get(seg.target_key) {
-        None => raise @storage.IoFailed("Storage not found: " + seg.target_key)
-        Some(s) => s
-      }
+      let storage = require_storage(storages, seg.target_key)
       storage.atomic_write(
         seg.writer.get_name() + ".data",
         seg_data,
@@ -132,11 +125,7 @@ pub fn[S : @storage.Storage] write_segments_from_store(
       None => continue
       Some(seg) => {
         let seg_data = seg.writer.to_bytes()
-        let storage = match storages.get(seg.target_key) {
-          None =>
-            raise @storage.IoFailed("Storage not found: " + seg.target_key)
-          Some(s) => s
-        }
+        let storage = require_storage(storages, seg.target_key)
         storage.atomic_write(
           seg.writer.get_name() + ".data",
           seg_data,
@@ -188,11 +177,7 @@ pub fn[S : @storage.Storage] read_segments_from_manifest(
 
   // Read each segment from its target storage
   for segment in manifest.segments {
-    let storage = match storages.get(segment.target_key) {
-      None =>
-        raise @storage.IoFailed("Storage not found: " + segment.target_key)
-      Some(s) => s
-    }
+    let storage = require_storage(storages, segment.target_key)
 
     let data = storage.read(segment.name + ".data", @storage.Data)
     let reader = match @segment.SegmentReader::from_bytes(segment.name, data) {
@@ -356,11 +341,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
         None => {
           // Fall back to CRUSH placement
           let result = crush_locate(entry.id, manifest.crush)
-          if result.primaries.is_empty() {
-            "local"
-          } else {
-            result.primaries[0]
-          }
+          first_string_or(result.primaries, "local")
         }
       }
 
@@ -368,10 +349,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
       let reader = match seg_readers.get(entry.ptr.segment) {
         Some(r) => r
         None => {
-          let storage = match storages.get(target_key) {
-            None => raise @storage.IoFailed("Storage not found: " + target_key)
-            Some(s) => s
-          }
+          let storage = require_storage(storages, target_key)
           let data = storage.read(entry.ptr.segment + ".data", @storage.Data)
           let r = match
             @segment.SegmentReader::from_bytes(entry.ptr.segment, data) {
@@ -412,10 +390,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
 
   // Determine dimension from first segment
   let first_segment = manifest.segments[0]
-  let storage = match storages.get(first_segment.target_key) {
-    None => raise @storage.IoFailed("Storage not found")
-    Some(s) => s
-  }
+  let storage = require_storage(storages, first_segment.target_key)
   let data = storage.read(first_segment.name + ".data", @storage.Data)
   let reader = match
     @segment.SegmentReader::from_bytes(first_segment.name, data) {
@@ -502,7 +477,7 @@ fn serialize_manifest(manifest : PlacementManifest) -> Bytes {
   let json = "{" +
     parts.iter().intersperse(",").fold(init="", fn(a, s) { a + s }) +
     "}"
-  @segment.string_to_utf8_segment(json)
+  @codec.encode_utf8(json)
 }
 
 ///|
@@ -534,7 +509,7 @@ fn find_substr(s : String, pattern : String) -> Int? {
 ///|
 /// Deserialize manifest from JSON bytes (simplified parser)
 fn deserialize_manifest(bytes : Bytes) -> PlacementManifest? {
-  let json = @segment.utf8_to_string_segment(bytes)
+  let json = @codec.decode_utf8(bytes)
 
   // Extract fields
   let base = extract_string_field(json, "base")

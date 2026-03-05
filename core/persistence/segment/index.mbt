@@ -101,7 +101,7 @@ pub fn encode_index_file(
     w.push_u64(entry.id.to_int64().reinterpret_as_uint64())
 
     // Segment name
-    let name_bytes = string_to_utf8_index(entry.ptr.segment)
+    let name_bytes = @codec.encode_utf8(entry.ptr.segment)
     w.push_u32(name_bytes.length().reinterpret_as_uint())
     w.push_bytes(name_bytes)
 
@@ -173,7 +173,7 @@ pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
     }
 
     let name_bytes = r.read_bytes(name_len)
-    let segment = utf8_to_string_index(name_bytes)
+    let segment = @codec.decode_utf8(name_bytes)
     let offset = r.read_u32().reinterpret_as_int()
     let length = r.read_u32().reinterpret_as_int()
 
@@ -198,67 +198,4 @@ pub fn IndexHeader::from_store(
     strategy_code: encode_strategy(strategy),
     has_ann,
   }
-}
-
-// UTF-8 helpers (same as segment.mbt)
-
-///|
-fn string_to_utf8_index(s : String) -> Bytes {
-  let w = @binary.BinaryWriter::new()
-  for c in s {
-    let code = c.to_uint()
-    if code < 0x80U {
-      w.push_byte(code.to_byte())
-    } else if code < 0x800U {
-      w.push_byte((0xC0U | (code >> 6)).to_byte())
-      w.push_byte((0x80U | (code & 0x3FU)).to_byte())
-    } else if code < 0x10000U {
-      w.push_byte((0xE0U | (code >> 12)).to_byte())
-      w.push_byte((0x80U | ((code >> 6) & 0x3FU)).to_byte())
-      w.push_byte((0x80U | (code & 0x3FU)).to_byte())
-    } else {
-      w.push_byte((0xF0U | (code >> 18)).to_byte())
-      w.push_byte((0x80U | ((code >> 12) & 0x3FU)).to_byte())
-      w.push_byte((0x80U | ((code >> 6) & 0x3FU)).to_byte())
-      w.push_byte((0x80U | (code & 0x3FU)).to_byte())
-    }
-  }
-  w.concat()
-}
-
-///|
-fn utf8_to_string_index(bytes : Bytes) -> String {
-  let chars : Array[Char] = []
-  let mut i = 0
-  while i < bytes.length() {
-    let b0 = bytes[i].to_uint()
-    if b0 < 0x80U {
-      chars.push(b0.reinterpret_as_int().unsafe_to_char())
-      i = i + 1
-    } else if b0 < 0xE0U && i + 1 < bytes.length() {
-      let b1 = bytes[i + 1].to_uint()
-      let code = ((b0 & 0x1FU) << 6) | (b1 & 0x3FU)
-      chars.push(code.reinterpret_as_int().unsafe_to_char())
-      i = i + 2
-    } else if b0 < 0xF0U && i + 2 < bytes.length() {
-      let b1 = bytes[i + 1].to_uint()
-      let b2 = bytes[i + 2].to_uint()
-      let code = ((b0 & 0x0FU) << 12) | ((b1 & 0x3FU) << 6) | (b2 & 0x3FU)
-      chars.push(code.reinterpret_as_int().unsafe_to_char())
-      i = i + 3
-    } else if i + 3 < bytes.length() {
-      let b1 = bytes[i + 1].to_uint()
-      let b2 = bytes[i + 2].to_uint()
-      let b3 = bytes[i + 3].to_uint()
-      let code = ((b0 & 0x07U) << 18) |
-        ((b1 & 0x3FU) << 12) |
-        ((b2 & 0x3FU) << 6) |
-        (b3 & 0x3FU)
-      chars.push(code.reinterpret_as_int().unsafe_to_char())
-      i = i + 4
-    } else {
-      i = i + 1
-    }
-  }
-  String::from_array(chars)
 }

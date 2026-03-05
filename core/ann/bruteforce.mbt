@@ -44,11 +44,7 @@ pub fn bf_search(
     }
     let base = i * store.dim
     let s = score_fn(store.data, base, query, store.dim)
-    @collection.push_top_k(out, @core.SearchHit::{ id, score: s, attrs }, k, fn(
-      hit,
-    ) {
-      hit.score
-    })
+    push_search_hit_top_k(out, @core.SearchHit::{ id, score: s, attrs }, k)
   }
   out
 }
@@ -62,11 +58,7 @@ pub fn bf_find(
   filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
 ) -> @core.SearchHit? {
   let results = bf_search(state, store, q, 1, filter)
-  if results.is_empty() {
-    None
-  } else {
-    Some(results[0])
-  }
+  first_search_hit(results)
 }
 
 ///|

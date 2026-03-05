@@ -33,10 +33,7 @@ fn BinaryWriter::ensure(self : BinaryWriter, extra : Int) -> Unit {
 /// Push a u32 value (little-endian)
 pub fn BinaryWriter::push_u32(self : BinaryWriter, value : UInt) -> Unit {
   self.ensure(4)
-  self.buf[self.len] = (value & 0xFF).to_byte()
-  self.buf[self.len + 1] = ((value >> 8) & 0xFF).to_byte()
-  self.buf[self.len + 2] = ((value >> 16) & 0xFF).to_byte()
-  self.buf[self.len + 3] = ((value >> 24) & 0xFF).to_byte()
+  write_u32_le(self.buf, self.len, value)
   self.len = self.len + 4
 }
 
@@ -50,14 +47,7 @@ pub fn BinaryWriter::push_i32(self : BinaryWriter, value : Int) -> Unit {
 /// Push a u64 value (little-endian)
 pub fn BinaryWriter::push_u64(self : BinaryWriter, value : UInt64) -> Unit {
   self.ensure(8)
-  self.buf[self.len] = (value & 0xFF).to_byte()
-  self.buf[self.len + 1] = ((value >> 8) & 0xFF).to_byte()
-  self.buf[self.len + 2] = ((value >> 16) & 0xFF).to_byte()
-  self.buf[self.len + 3] = ((value >> 24) & 0xFF).to_byte()
-  self.buf[self.len + 4] = ((value >> 32) & 0xFF).to_byte()
-  self.buf[self.len + 5] = ((value >> 40) & 0xFF).to_byte()
-  self.buf[self.len + 6] = ((value >> 48) & 0xFF).to_byte()
-  self.buf[self.len + 7] = ((value >> 56) & 0xFF).to_byte()
+  write_u64_le(self.buf, self.len, value)
   self.len = self.len + 8
 }
 

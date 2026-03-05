@@ -235,20 +235,57 @@ fn encode_index(entries : Array[SparseIndexEntry]) -> Bytes {
 }
 
 ///|
-/// Decode sparse index from bytes
-fn decode_index(buf : Bytes) -> Array[SparseIndexEntry] {
+/// Decode sparse index from a byte range [start, end)
+fn decode_index_in_range(
+  buf : Bytes,
+  start : Int,
+  end : Int,
+) -> Array[SparseIndexEntry] {
   let entries : Array[SparseIndexEntry] = []
+  if start < 0 || end < start || end > buf.length() {
+    return entries
+  }
   let r = @binary.BinaryReader::new(buf)
-  while r.remaining() >= 8 {
+  r.skip(start)
+  while r.position() + 8 <= end {
     let key_len = r.read_u32().reinterpret_as_int()
     let offset = r.read_u32().reinterpret_as_int()
-    if r.remaining() < key_len {
+    if key_len < 0 || r.position() + key_len > end {
       break
     }
     let key = r.read_bytes(key_len)
     entries.push({ key, offset })
   }
   entries
+}
+
+///|
+/// Decode data records from a byte range [start, end)
+fn decode_records_in_range(
+  buf : Bytes,
+  start : Int,
+  end : Int,
+) -> Array[SSTableRecord]? {
+  if start < 0 || end < start || end > buf.length() {
+    return None
+  }
+  let records : Array[SSTableRecord] = []
+  let r = @binary.BinaryReader::new(buf)
+  r.skip(start)
+  while r.position() < end {
+    if r.position() + 8 > end {
+      return None
+    }
+    let key_len = r.read_u32().reinterpret_as_int()
+    let val_len = r.read_u32().reinterpret_as_int()
+    if key_len < 0 || val_len < 0 || r.position() + key_len + val_len > end {
+      return None
+    }
+    let key = r.read_bytes(key_len)
+    let value = r.read_bytes(val_len)
+    records.push({ key, value })
+  }
+  Some(records)
 }
 
 ///|
@@ -259,26 +296,26 @@ pub fn SSTable::build(
 ) -> Bytes {
   // Guard against zero/negative interval to prevent division by zero
   let interval = if index_interval <= 0 { 1 } else { index_interval }
-  let data_parts : Array[Bytes] = []
+  let data_w = @binary.BinaryWriter::new()
   let index_entries : Array[SparseIndexEntry] = []
+  let keys : Array[Bytes] = []
   let mut data_offset = 0
   for i, record in records {
     // Add to sparse index every N records
     if i % interval == 0 {
       index_entries.push({ key: record.key, offset: data_offset })
     }
-    let encoded = record.encode()
-    data_parts.push(encoded)
-    data_offset = data_offset + encoded.length()
-  }
-  // Concatenate data section
-  let data_w = @binary.BinaryWriter::new()
-  for part in data_parts {
-    data_w.push_bytes(part)
+    keys.push(record.key)
+    let key_len = record.key.length()
+    let value_len = record.value.length()
+    data_w.push_u32(key_len.reinterpret_as_uint())
+    data_w.push_u32(value_len.reinterpret_as_uint())
+    data_w.push_bytes(record.key)
+    data_w.push_bytes(record.value)
+    data_offset = data_offset + 8 + key_len + value_len
   }
   let data_section = data_w.concat()
   // Build bloom filter
-  let keys = records.map(fn(r) { r.key })
   let bloom = BloomFilter::create(keys, 0.01)
   let bloom_section = bloom.encode()
   // Encode index
@@ -325,39 +362,29 @@ pub fn SSTable::read(buf : Bytes) -> SSTable? {
     return None
   }
   // Decode data section
-  let records : Array[SSTableRecord] = []
-  let mut offset = footer.data_offset
-  while offset < data_end {
-    match SSTableRecord::decode(buf, offset) {
-      None => return None
-      Some((record, bytes_read)) => {
-        records.push(record)
-        offset = offset + bytes_read
-      }
-    }
+  let records = match
+    decode_records_in_range(buf, footer.data_offset, data_end) {
+    None => return None
+    Some(rs) => rs
   }
   // Decode index section
-  let index_buf = slice_bytes(buf, footer.index_offset, index_end)
-  let index = decode_index(index_buf)
+  let index = decode_index_in_range(buf, footer.index_offset, index_end)
   // Decode bloom filter
-  let bloom = if footer.bloom_size > 0 {
-    let bloom_buf = slice_bytes(buf, footer.bloom_offset, bloom_end)
-    BloomFilter::decode(bloom_buf)
+  let bloom = if footer.bloom_size >= 8 {
+    let r = @binary.BinaryReader::new(buf)
+    r.skip(footer.bloom_offset)
+    let hash_count = r.read_u32().reinterpret_as_int()
+    let bit_count = r.read_u32().reinterpret_as_int()
+    let bits_len = bloom_end - r.position()
+    if bits_len < 0 || r.position() + bits_len > bloom_end {
+      None
+    } else {
+      Some({ bits: r.read_bytes(bits_len), hash_count, bit_count })
+    }
   } else {
     None
   }
   Some({ records, index, bloom, footer })
-}
-
-///|
-/// Slice bytes helper
-fn slice_bytes(buf : Bytes, start : Int, end : Int) -> Bytes {
-  let len = end - start
-  let result : FixedArray[Byte] = FixedArray::make(len, b'\x00')
-  for i in 0..<len {
-    result[i] = buf[start + i]
-  }
-  Bytes::from_array(result)
 }
 
 ///|
@@ -389,51 +416,81 @@ pub fn SSTable::find(self : SSTable, key : Bytes) -> SSTableRecord? {
     Some(bloom) => if not(bloom.might_contain(key)) { return None }
     None => ()
   }
-  // If no sparse index, linear scan
-  if self.index.is_empty() {
-    return linear_search_records(self.records, key, 0)
+  let record_len = self.records.length()
+  if record_len == 0 {
+    return None
   }
-  // Binary search in sparse index
+  // If no sparse index, binary search across all records
+  if self.index.is_empty() {
+    let pos = lower_bound_records(self.records, key, 0, record_len)
+    return if pos < record_len && compare_bytes(self.records[pos].key, key) == 0 {
+      Some(self.records[pos])
+    } else {
+      None
+    }
+  }
+  // Find sparse-index range and search only inside its covered records.
+  let sparse_floor = floor_sparse_index(self.index, key)
+  let range_start = lower_bound_records(
+    self.records,
+    self.index[sparse_floor].key,
+    0,
+    record_len,
+  )
+  let range_end = if sparse_floor + 1 < self.index.length() {
+    lower_bound_records(
+      self.records,
+      self.index[sparse_floor + 1].key,
+      range_start,
+      record_len,
+    )
+  } else {
+    record_len
+  }
+  let pos = lower_bound_records(self.records, key, range_start, range_end)
+  if pos < range_end && compare_bytes(self.records[pos].key, key) == 0 {
+    Some(self.records[pos])
+  } else {
+    None
+  }
+}
+
+///|
+/// Returns last sparse-index position whose key is <= target.
+fn floor_sparse_index(index : Array[SparseIndexEntry], target : Bytes) -> Int {
   let mut lo = 0
-  let mut hi = self.index.length() - 1
-  let mut start_idx = 0
+  let mut hi = index.length() - 1
+  let mut best = 0
   while lo <= hi {
     let mid = (lo + hi) / 2
-    let cmp = compare_bytes(self.index[mid].key, key)
+    let cmp = compare_bytes(index[mid].key, target)
     if cmp <= 0 {
-      start_idx = mid
+      best = mid
       lo = mid + 1
     } else {
       hi = mid - 1
     }
   }
-  // Find the record index that corresponds to this sparse index entry
-  let index_key = self.index[start_idx].key
-  let mut record_start_idx = 0
-  for i in 0..<self.records.length() {
-    if compare_bytes(self.records[i].key, index_key) == 0 {
-      record_start_idx = i
-      break
-    }
-  }
-  linear_search_records(self.records, key, record_start_idx)
+  best
 }
 
 ///|
-/// Linear search for a key in records starting from start_idx
-fn linear_search_records(
+/// Lower-bound search on `records[start..<end]`.
+fn lower_bound_records(
   records : Array[SSTableRecord],
   key : Bytes,
-  start_idx : Int,
-) -> SSTableRecord? {
-  for i = start_idx; i < records.length(); i = i + 1 {
-    let cmp = compare_bytes(records[i].key, key)
-    if cmp == 0 {
-      return Some(records[i])
-    }
-    if cmp > 0 {
-      break
+  start : Int,
+  end : Int,
+) -> Int {
+  let mut lo = start
+  let mut hi = end
+  while lo < hi {
+    let mid = lo + (hi - lo) / 2
+    if compare_bytes(records[mid].key, key) < 0 {
+      lo = mid + 1
+    } else {
+      hi = mid
     }
   }
-  None
+  lo
 }

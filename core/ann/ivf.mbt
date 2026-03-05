@@ -80,32 +80,23 @@ pub fn ivf_add(
   store : @core.CoreStore,
   id : @core.VectorId,
 ) -> Unit {
-  let idx = store.get_index(id)
-  match idx {
-    None => ()
-    Some(i) => {
-      let base = i * store.dim
-      let vec = Array::make(store.dim, 0.0)
+  with_store_vector(store, id, fn(_, vec) {
+    // Initialize centroids with first nlist vectors
+    if state.centroid_count < state.nlist {
+      let c = state.centroid_count
       for j in 0..<store.dim {
-        vec[j] = store.data[base + j]
+        state.centroids[c * store.dim + j] = vec[j]
       }
-      // Initialize centroids with first nlist vectors
-      if state.centroid_count < state.nlist {
-        let c = state.centroid_count
-        for j in 0..<store.dim {
-          state.centroids[c * store.dim + j] = vec[j]
-        }
-        state.centroid_count = state.centroid_count + 1
-        state.lists[c].push(id)
-        state.id_to_list.set(id.to_int64(), c)
-        return
-      }
+      state.centroid_count = state.centroid_count + 1
+      state.lists[c].push(id)
+      state.id_to_list.set(id.to_int64(), c)
+    } else {
       // Find nearest centroid
       let c = nearest_centroid(state, store, vec)
       state.lists[c].push(id)
       state.id_to_list.set(id.to_int64(), c)
     }
-  }
+  })
 }
 
 ///|
@@ -116,21 +107,12 @@ pub fn ivf_assign(
   store : @core.CoreStore,
   id : @core.VectorId,
 ) -> Unit {
-  let idx = store.get_index(id)
-  match idx {
-    None => ()
-    Some(i) => {
-      let base = i * store.dim
-      let vec = Array::make(store.dim, 0.0)
-      for j in 0..<store.dim {
-        vec[j] = store.data[base + j]
-      }
-      // Always assign to nearest existing centroid (no bootstrap)
-      let c = nearest_centroid(state, store, vec)
-      state.lists[c].push(id)
-      state.id_to_list.set(id.to_int64(), c)
-    }
-  }
+  with_store_vector(store, id, fn(_, vec) {
+    // Always assign to nearest existing centroid (no bootstrap)
+    let c = nearest_centroid(state, store, vec)
+    state.lists[c].push(id)
+    state.id_to_list.set(id.to_int64(), c)
+  })
 }
 
 ///|
@@ -213,11 +195,10 @@ pub fn ivf_search(
           }
           let base = at * dim
           let s = score_fn(store.data, base, query, dim)
-          @collection.push_top_k(
+          push_search_hit_top_k(
             out,
             @core.SearchHit::{ id, score: s, attrs },
             k,
-            fn(hit) { hit.score },
           )
         }
       }
@@ -235,11 +216,7 @@ pub fn ivf_find(
   filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
 ) -> @core.SearchHit? {
   let results = ivf_search(state, store, q, 1, filter)
-  if results.is_empty() {
-    None
-  } else {
-    Some(results[0])
-  }
+  first_search_hit(results)
 }
 
 ///|

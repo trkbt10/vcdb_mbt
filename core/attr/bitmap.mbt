@@ -25,109 +25,18 @@ pub fn BitmapAttrIndex::set_attrs(
   match self.data.get(id_val) {
     None => ()
     Some(old_attrs) =>
-      for key in old_attrs.keys() {
-        match old_attrs.get(key) {
-          None => ()
-          Some(value) => {
-            bitmap_remove_from_eq(self.eq_map, key, value, id_val)
-            bitmap_remove_from_exists(self.exists_map, key, id_val)
-          }
-        }
-      }
+      for_each_attr(old_attrs, fn(key, value) {
+        remove_from_eq_index(self.eq_map, key, value, id_val)
+        remove_from_exists_index(self.exists_map, key, id_val)
+      })
   }
   // Add new attrs to indexes
-  for key in attrs.keys() {
-    match attrs.get(key) {
-      None => ()
-      Some(value) => {
-        bitmap_add_to_eq(self.eq_map, key, value, id_val)
-        bitmap_add_to_exists(self.exists_map, key, id_val)
-      }
-    }
-  }
+  for_each_attr(attrs, fn(key, value) {
+    add_to_eq_index(self.eq_map, key, value, id_val)
+    add_to_exists_index(self.exists_map, key, id_val)
+  })
   // Store attrs (defensive copy to prevent external mutation)
   self.data.set(id_val, attrs.copy())
-}
-
-///|
-fn bitmap_add_to_eq(
-  eq_map : Map[String, Map[String, Array[Int64]]],
-  key : String,
-  value : @core.AttrValue,
-  id : Int64,
-) -> Unit {
-  let value_key = attr_value_to_key(value)
-  match eq_map.get(key) {
-    None => {
-      let value_map : Map[String, Array[Int64]] = {}
-      value_map.set(value_key, [id])
-      eq_map.set(key, value_map)
-    }
-    Some(value_map) =>
-      match value_map.get(value_key) {
-        None => value_map.set(value_key, [id])
-        Some(ids) => ids.push(id)
-      }
-  }
-}
-
-///|
-fn bitmap_remove_from_eq(
-  eq_map : Map[String, Map[String, Array[Int64]]],
-  key : String,
-  value : @core.AttrValue,
-  id : Int64,
-) -> Unit {
-  let value_key = attr_value_to_key(value)
-  match eq_map.get(key) {
-    None => ()
-    Some(value_map) =>
-      match value_map.get(value_key) {
-        None => ()
-        Some(ids) => {
-          let _ = remove_int64_swap(ids, id)
-        }
-      }
-  }
-}
-
-///|
-fn bitmap_add_to_exists(
-  exists_map : Map[String, Array[Int64]],
-  key : String,
-  id : Int64,
-) -> Unit {
-  match exists_map.get(key) {
-    None => exists_map.set(key, [id])
-    Some(ids) => ids.push(id)
-  }
-}
-
-///|
-fn bitmap_remove_from_exists(
-  exists_map : Map[String, Array[Int64]],
-  key : String,
-  id : Int64,
-) -> Unit {
-  match exists_map.get(key) {
-    None => ()
-    Some(ids) => {
-      let mut found_idx = -1
-      for i in 0..<ids.length() {
-        if ids[i] == id {
-          found_idx = i
-          break
-        }
-      }
-      if found_idx >= 0 {
-        let last = ids.length() - 1
-        if found_idx != last {
-          ids[found_idx] = ids[last]
-        }
-        let _ = ids.pop()
-      }
-    }
-  }
 }
 
 ///|
@@ -149,15 +58,10 @@ pub fn BitmapAttrIndex::remove_id(
   match self.data.get(id_val) {
     None => ()
     Some(old_attrs) => {
-      for key in old_attrs.keys() {
-        match old_attrs.get(key) {
-          None => ()
-          Some(value) => {
-            bitmap_remove_from_eq(self.eq_map, key, value, id_val)
-            bitmap_remove_from_exists(self.exists_map, key, id_val)
-          }
-        }
-      }
+      for_each_attr(old_attrs, fn(key, value) {
+        remove_from_eq_index(self.eq_map, key, value, id_val)
+        remove_from_exists_index(self.exists_map, key, id_val)
+      })
       self.data.remove(id_val)
     }
   }
@@ -176,13 +80,7 @@ pub fn BitmapAttrIndex::eq(
     Some(value_map) =>
       match value_map.get(value_key) {
         None => []
-        Some(ids) => {
-          let result : Array[@core.VectorId] = []
-          for id in ids {
-            result.push(@core.VectorId(id))
-          }
-          result
-        }
+        Some(ids) => ids_to_vector_ids(ids)
       }
   }
 }
@@ -195,13 +93,7 @@ pub fn BitmapAttrIndex::exists(
 ) -> Array[@core.VectorId] {
   match self.exists_map.get(key) {
     None => []
-    Some(ids) => {
-      let result : Array[@core.VectorId] = []
-      for id in ids {
-        result.push(@core.VectorId(id))
-      }
-      result
-    }
+    Some(ids) => ids_to_vector_ids(ids)
   }
 }
 

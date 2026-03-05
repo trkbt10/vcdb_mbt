@@ -20,12 +20,9 @@ pub fn BinaryReader::position(self : BinaryReader) -> Int {
 ///|
 /// Read a u32 value (little-endian)
 pub fn BinaryReader::read_u32(self : BinaryReader) -> UInt {
-  let b0 = self.data[self.offset].to_int() & 0xFF
-  let b1 = self.data[self.offset + 1].to_int() & 0xFF
-  let b2 = self.data[self.offset + 2].to_int() & 0xFF
-  let b3 = self.data[self.offset + 3].to_int() & 0xFF
+  let value = read_u32_le(self.data, self.offset)
   self.offset = self.offset + 4
-  (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)).reinterpret_as_uint()
+  value
 }
 
 ///|
@@ -37,23 +34,9 @@ pub fn BinaryReader::read_i32(self : BinaryReader) -> Int {
 ///|
 /// Read a u64 value (little-endian)
 pub fn BinaryReader::read_u64(self : BinaryReader) -> UInt64 {
-  let b0 = self.data[self.offset].to_int().land(0xFF).to_int64()
-  let b1 = self.data[self.offset + 1].to_int().land(0xFF).to_int64()
-  let b2 = self.data[self.offset + 2].to_int().land(0xFF).to_int64()
-  let b3 = self.data[self.offset + 3].to_int().land(0xFF).to_int64()
-  let b4 = self.data[self.offset + 4].to_int().land(0xFF).to_int64()
-  let b5 = self.data[self.offset + 5].to_int().land(0xFF).to_int64()
-  let b6 = self.data[self.offset + 6].to_int().land(0xFF).to_int64()
-  let b7 = self.data[self.offset + 7].to_int().land(0xFF).to_int64()
+  let value = read_u64_le(self.data, self.offset)
   self.offset = self.offset + 8
-  (b0 |
-  (b1 << 8) |
-  (b2 << 16) |
-  (b3 << 24) |
-  (b4 << 32) |
-  (b5 << 40) |
-  (b6 << 48) |
-  (b7 << 56)).reinterpret_as_uint64()
+  value
 }
 
 ///|

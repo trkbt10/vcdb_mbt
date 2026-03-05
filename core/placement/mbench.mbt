@@ -103,7 +103,10 @@ test "bench/crush_plan_rebalance_no_change" (b : @bench.T) {
       Some(p) => p
       None => "node1"
     }
-    segments.push({ name: "db.pg" + i.to_string() + ".part0", target_key: primary })
+    segments.push({
+      name: "db.pg" + i.to_string() + ".part0",
+      target_key: primary,
+    })
   }
   let manifest : PlacementManifest = {
     base: "db",
@@ -137,7 +140,10 @@ test "bench/crush_plan_rebalance_with_change" (b : @bench.T) {
       Some(p) => p
       None => "node1"
     }
-    segments.push({ name: "db.pg" + i.to_string() + ".part0", target_key: primary })
+    segments.push({
+      name: "db.pg" + i.to_string() + ".part0",
+      target_key: primary,
+    })
   }
   let manifest : PlacementManifest = {
     base: "db",
@@ -153,10 +159,7 @@ test "bench/crush_plan_rebalance_with_change" (b : @bench.T) {
 /// Benchmark: parse_pg_from_name
 test "bench/crush_parse_pg_from_name" (b : @bench.T) {
   let names = [
-    "db.pg0.part0",
-    "db.pg15.part2",
-    "mydb.pg123.part5",
-    "complex.name.pg42.part0",
+    "db.pg0.part0", "db.pg15.part2", "mydb.pg123.part5", "complex.name.pg42.part0",
   ]
   b.bench(fn() {
     let mut sum = 0
@@ -174,7 +177,10 @@ test "bench/crush_update_manifest" (b : @bench.T) {
   let crush = CrushMap::new(4, 1, targets)
   let segments : Array[SegmentEntry] = []
   for i in 0..<4 {
-    segments.push({ name: "db.pg" + i.to_string() + ".part0", target_key: "node1" })
+    segments.push({
+      name: "db.pg" + i.to_string() + ".part0",
+      target_key: "node1",
+    })
   }
   let manifest : PlacementManifest = {
     base: "db",
@@ -188,7 +194,9 @@ test "bench/crush_update_manifest" (b : @bench.T) {
     { name: "db.pg3.part0", from: "node1", to: "node2" },
   ]
   b.bench(fn() {
-    let updated = update_manifest_after_rebalance(manifest, plan, crush, 2, 2000L)
+    let updated = update_manifest_after_rebalance(
+      manifest, plan, crush, 2, 2000L,
+    )
     b.keep(updated.segments.length())
   })
 }

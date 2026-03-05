@@ -170,30 +170,20 @@ pub fn LSMAttrIndex::set_attrs(
   match self.data.get(id_val) {
     None => ()
     Some(old_attrs) =>
-      for key in old_attrs.keys() {
-        match old_attrs.get(key) {
-          None => ()
-          Some(value) => {
-            let mem_key = lsm_encode_memtable_key(key, value)
-            memtable_remove_id(self.memtable, mem_key, id_val)
-            let exists_key = lsm_encode_exists_key(key)
-            memtable_remove_id(self.exists_memtable, exists_key, id_val)
-          }
-        }
-      }
+      for_each_attr(old_attrs, fn(key, value) {
+        let mem_key = lsm_encode_memtable_key(key, value)
+        memtable_remove_id(self.memtable, mem_key, id_val)
+        let exists_key = lsm_encode_exists_key(key)
+        memtable_remove_id(self.exists_memtable, exists_key, id_val)
+      })
   }
   // Add new attrs
-  for key in attrs.keys() {
-    match attrs.get(key) {
-      None => ()
-      Some(value) => {
-        let mem_key = lsm_encode_memtable_key(key, value)
-        memtable_add_id(self.memtable, mem_key, id_val)
-        let exists_key = lsm_encode_exists_key(key)
-        memtable_add_id(self.exists_memtable, exists_key, id_val)
-      }
-    }
-  }
+  for_each_attr(attrs, fn(key, value) {
+    let mem_key = lsm_encode_memtable_key(key, value)
+    memtable_add_id(self.memtable, mem_key, id_val)
+    let exists_key = lsm_encode_exists_key(key)
+    memtable_add_id(self.exists_memtable, exists_key, id_val)
+  })
   // Store attrs (defensive copy to prevent external mutation)
   self.data.set(id_val, attrs.copy())
 }
@@ -217,17 +207,12 @@ pub fn LSMAttrIndex::remove_id(
   match self.data.get(id_val) {
     None => ()
     Some(old_attrs) => {
-      for key in old_attrs.keys() {
-        match old_attrs.get(key) {
-          None => ()
-          Some(value) => {
-            let mem_key = lsm_encode_memtable_key(key, value)
-            memtable_remove_id(self.memtable, mem_key, id_val)
-            let exists_key = lsm_encode_exists_key(key)
-            memtable_remove_id(self.exists_memtable, exists_key, id_val)
-          }
-        }
-      }
+      for_each_attr(old_attrs, fn(key, value) {
+        let mem_key = lsm_encode_memtable_key(key, value)
+        memtable_remove_id(self.memtable, mem_key, id_val)
+        let exists_key = lsm_encode_exists_key(key)
+        memtable_remove_id(self.exists_memtable, exists_key, id_val)
+      })
       self.data.remove(id_val)
     }
   }
@@ -246,13 +231,7 @@ pub fn LSMAttrIndex::eq(
     Some(value_opt) =>
       match value_opt {
         None => [] // Tombstone
-        Some(list) => {
-          let result : Array[@core.VectorId] = []
-          for id in list {
-            result.push(@core.VectorId(id))
-          }
-          result
-        }
+        Some(list) => ids_to_vector_ids(list)
       }
   }
 }
@@ -269,13 +248,7 @@ pub fn LSMAttrIndex::exists(
     Some(value_opt) =>
       match value_opt {
         None => []
-        Some(list) => {
-          let result : Array[@core.VectorId] = []
-          for id in list {
-            result.push(@core.VectorId(id))
-          }
-          result
-        }
+        Some(list) => ids_to_vector_ids(list)
       }
   }
 }

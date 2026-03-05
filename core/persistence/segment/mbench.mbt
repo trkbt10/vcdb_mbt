@@ -59,18 +59,18 @@ test "bench/segment_collect_100" (b : @bench.T) {
 }
 
 ///|
-/// Benchmark: string_to_utf8_segment short string
+/// Benchmark: codec UTF-8 encode short string
 test "bench/utf8_encode_short" (b : @bench.T) {
   let s = "hello world"
-  b.bench(fn() { b.keep(string_to_utf8_segment(s).length()) })
+  b.bench(fn() { b.keep(@codec.encode_utf8(s).length()) })
 }
 
 ///|
-/// Benchmark: utf8_to_string_segment short string
+/// Benchmark: codec UTF-8 decode short string
 test "bench/utf8_decode_short" (b : @bench.T) {
   let s = "hello world"
-  let bytes = string_to_utf8_segment(s)
-  b.bench(fn() { b.keep(utf8_to_string_segment(bytes).length()) })
+  let bytes = @codec.encode_utf8(s)
+  b.bench(fn() { b.keep(@codec.decode_utf8(bytes).length()) })
 }
 
 ///|
@@ -83,7 +83,7 @@ test "bench/json_attrs_encode" (b : @bench.T) {
   attrs.set("active", @core.Bool(true))
   attrs.set("tag", @core.String("benchmark"))
   b.bench(fn() {
-    let bytes = encode_attrs_for_segment(attrs)
+    let bytes = @codec.encode_attrs_json(Some(attrs))
     b.keep(bytes.length())
   })
 }
@@ -97,9 +97,12 @@ test "bench/json_attrs_decode" (b : @bench.T) {
   attrs.set("count", @core.Int(42L))
   attrs.set("active", @core.Bool(true))
   attrs.set("tag", @core.String("benchmark"))
-  let bytes = encode_attrs_for_segment(attrs)
+  let bytes = @codec.encode_attrs_json(Some(attrs))
   b.bench(fn() {
-    let decoded = decode_attrs_from_segment(bytes)
+    let decoded = match @codec.decode_attrs_json(bytes) {
+      Some(a) => a
+      None => @core.empty_attrs()
+    }
     b.keep(decoded.keys().length())
   })
 }

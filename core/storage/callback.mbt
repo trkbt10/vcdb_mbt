@@ -74,22 +74,34 @@ fn get_callbacks() -> StorageCallbacks? {
 }
 
 ///|
+fn[T] with_callbacks_or(default : T, f : (StorageCallbacks) -> T) -> T {
+  match get_callbacks() {
+    None => default
+    Some(cb) => f(cb)
+  }
+}
+
+///|
+fn get_callbacks_raise() -> StorageCallbacks raise IOError {
+  match get_callbacks() {
+    None => raise IoFailed("Storage callbacks not registered")
+    Some(cb) => cb
+  }
+}
+
+///|
 pub fn CallbackStorage::read(
   self : CallbackStorage,
   path : String,
   kind : StorageKind,
 ) -> Bytes raise IOError {
   ignore(self)
-  match get_callbacks() {
-    None => raise IoFailed("Storage callbacks not registered")
-    Some(cb) => {
-      let data = (cb.read)(path, kind)
-      if data.length() == 0 && not((cb.exists)(path, kind)) {
-        raise NotFound(path)
-      }
-      data
-    }
+  let cb = get_callbacks_raise()
+  let data = (cb.read)(path, kind)
+  if data.length() == 0 && not((cb.exists)(path, kind)) {
+    raise NotFound(path)
   }
+  data
 }
 
 ///|
@@ -100,10 +112,7 @@ pub fn CallbackStorage::write(
   kind : StorageKind,
 ) -> Unit {
   ignore(self)
-  match get_callbacks() {
-    None => ()
-    Some(cb) => (cb.write)(path, data, kind)
-  }
+  with_callbacks_or((), fn(cb) { (cb.write)(path, data, kind) })
 }
 
 ///|
@@ -114,20 +123,14 @@ pub fn CallbackStorage::append(
   kind : StorageKind,
 ) -> Unit {
   ignore(self)
-  match get_callbacks() {
-    None => ()
-    Some(cb) => {
-      let existing = if (cb.exists)(path, kind) {
-        (cb.read)(path, kind)
-      } else {
-        Bytes::new(0)
-      }
-      let w = @binary.BinaryWriter::new()
-      w.push_bytes(existing)
-      w.push_bytes(data)
-      (cb.write)(path, w.concat(), kind)
+  with_callbacks_or((), fn(cb) {
+    let existing = if (cb.exists)(path, kind) {
+      (cb.read)(path, kind)
+    } else {
+      Bytes::new(0)
     }
-  }
+    (cb.write)(path, concat_bytes(existing, data), kind)
+  })
 }
 
 ///|
@@ -147,15 +150,11 @@ pub fn CallbackStorage::del(
   kind : StorageKind,
 ) -> Unit raise IOError {
   ignore(self)
-  match get_callbacks() {
-    None => raise IoFailed("Storage callbacks not registered")
-    Some(cb) => {
-      if not((cb.exists)(path, kind)) {
-        raise NotFound(path)
-      }
-      (cb.del)(path, kind)
-    }
+  let cb = get_callbacks_raise()
+  if not((cb.exists)(path, kind)) {
+    raise NotFound(path)
   }
+  (cb.del)(path, kind)
 }
 
 ///|
@@ -165,10 +164,7 @@ pub fn CallbackStorage::exists(
   kind : StorageKind,
 ) -> Bool {
   ignore(self)
-  match get_callbacks() {
-    None => false
-    Some(cb) => (cb.exists)(path, kind)
-  }
+  with_callbacks_or(false, fn(cb) { (cb.exists)(path, kind) })
 }
 
 ///|
@@ -177,10 +173,7 @@ pub fn CallbackStorage::list(
   kind : StorageKind,
 ) -> Array[String] {
   ignore(self)
-  match get_callbacks() {
-    None => []
-    Some(cb) => (cb.list)(kind)
-  }
+  with_callbacks_or([], fn(cb) { (cb.list)(kind) })
 }
 
 ///|

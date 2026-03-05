@@ -350,28 +350,18 @@ pub fn hnsw_add(
   store : @core.CoreStore,
   id : @core.VectorId,
 ) -> Unit {
-  let idx = store.get_index(id)
-  match idx {
-    None => ()
-    Some(at) => {
-      state.ensure_capacity(at + 1)
-      // Get vector for query
-      let base = at * store.dim
-      let vec = Array::make(store.dim, 0.0)
-      for i in 0..<store.dim {
-        vec[i] = store.data[base + i]
-      }
-      // Sample level for this node
-      let node_level = state.sample_level()
-      state.level_arr[at] = node_level
-      state.tombstone[at] = false
-      // First node becomes entry point
-      if state.enter_point < 0 {
-        state.enter_point = at
-        state.max_level = node_level
-        state.ensure_levels(node_level)
-        return
-      }
+  with_store_vector(store, id, fn(at, vec) {
+    state.ensure_capacity(at + 1)
+    // Sample level for this node
+    let node_level = state.sample_level()
+    state.level_arr[at] = node_level
+    state.tombstone[at] = false
+    // First node becomes entry point
+    if state.enter_point < 0 {
+      state.enter_point = at
+      state.max_level = node_level
+      state.ensure_levels(node_level)
+    } else {
       // Descend from entry point through upper levels, stopping at node_level
       let mut cur = state.enter_point
       if state.max_level > node_level {
@@ -423,7 +413,7 @@ pub fn hnsw_add(
         state.enter_point = at
       }
     }
-  }
+  })
 }
 
 ///|
@@ -507,11 +497,7 @@ pub fn hnsw_search(
       Some(f) => if not(f(id, attrs)) { continue }
       None => ()
     }
-    @collection.push_top_k(out, @core.SearchHit::{ id, score: c.s, attrs }, k, fn(
-      hit,
-    ) {
-      hit.score
-    })
+    push_search_hit_top_k(out, @core.SearchHit::{ id, score: c.s, attrs }, k)
   }
   out
 }
@@ -525,11 +511,7 @@ pub fn hnsw_find(
   filter : ((@core.VectorId, @core.Attrs) -> Bool)?,
 ) -> @core.SearchHit? {
   let results = hnsw_search(state, store, q, 1, filter)
-  if results.is_empty() {
-    None
-  } else {
-    Some(results[0])
-  }
+  first_search_hit(results)
 }
 
 ///|

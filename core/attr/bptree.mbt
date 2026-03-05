@@ -181,20 +181,7 @@ fn insert_into_posting(list : Array[Int64], id : Int64) -> Unit {
 ///|
 /// Remove ID from posting list
 fn remove_from_posting(list : Array[Int64], id : Int64) -> Unit {
-  let mut found_idx = -1
-  for i in 0..<list.length() {
-    if list[i] == id {
-      found_idx = i
-      break
-    }
-  }
-  if found_idx >= 0 {
-    let last = list.length() - 1
-    if found_idx != last {
-      list[found_idx] = list[last]
-    }
-    let _ = list.pop()
-  }
+  let _ = remove_int64_swap(list, id)
 }
 
 ///|
@@ -393,43 +380,32 @@ pub fn BPTreeAttrIndex::set_attrs(
   match self.data.get(id_val) {
     None => ()
     Some(old_attrs) =>
-      for key in old_attrs.keys() {
-        match old_attrs.get(key) {
+      for_each_attr(old_attrs, fn(key, value) {
+        // Remove from field tree
+        match self.field_trees.get(key) {
           None => ()
-          Some(value) => {
-            // Remove from field tree
-            match self.field_trees.get(key) {
-              None => ()
-              Some(tree) =>
-                bptree_remove(tree, encode_attr_value(value), id_val)
-            }
-            // Remove from exists tree
-            match self.exists_trees.get(key) {
-              None => ()
-              Some(tree) => {
-                let exists_key = make_exists_key()
-                bptree_remove(tree, exists_key, id_val)
-              }
-            }
+          Some(tree) => bptree_remove(tree, encode_attr_value(value), id_val)
+        }
+        // Remove from exists tree
+        match self.exists_trees.get(key) {
+          None => ()
+          Some(tree) => {
+            let exists_key = make_exists_key()
+            bptree_remove(tree, exists_key, id_val)
           }
         }
-      }
+      })
   }
   // Add new attrs to trees
-  for key in attrs.keys() {
-    match attrs.get(key) {
-      None => ()
-      Some(value) => {
-        // Add to field tree
-        let field_tree = get_or_create_field_tree(self, key)
-        bptree_insert(field_tree, encode_attr_value(value), id_val)
-        // Add to exists tree
-        let exists_tree = get_or_create_exists_tree(self, key)
-        let exists_key = make_exists_key()
-        bptree_insert(exists_tree, exists_key, id_val)
-      }
-    }
-  }
+  for_each_attr(attrs, fn(key, value) {
+    // Add to field tree
+    let field_tree = get_or_create_field_tree(self, key)
+    bptree_insert(field_tree, encode_attr_value(value), id_val)
+    // Add to exists tree
+    let exists_tree = get_or_create_exists_tree(self, key)
+    let exists_key = make_exists_key()
+    bptree_insert(exists_tree, exists_key, id_val)
+  })
   // Store attrs (defensive copy to prevent external mutation)
   self.data.set(id_val, attrs.copy())
 }
@@ -453,25 +429,19 @@ pub fn BPTreeAttrIndex::remove_id(
   match self.data.get(id_val) {
     None => ()
     Some(old_attrs) => {
-      for key in old_attrs.keys() {
-        match old_attrs.get(key) {
+      for_each_attr(old_attrs, fn(key, value) {
+        match self.field_trees.get(key) {
           None => ()
-          Some(value) => {
-            match self.field_trees.get(key) {
-              None => ()
-              Some(tree) =>
-                bptree_remove(tree, encode_attr_value(value), id_val)
-            }
-            match self.exists_trees.get(key) {
-              None => ()
-              Some(tree) => {
-                let exists_key = make_exists_key()
-                bptree_remove(tree, exists_key, id_val)
-              }
-            }
+          Some(tree) => bptree_remove(tree, encode_attr_value(value), id_val)
+        }
+        match self.exists_trees.get(key) {
+          None => ()
+          Some(tree) => {
+            let exists_key = make_exists_key()
+            bptree_remove(tree, exists_key, id_val)
           }
         }
-      }
+      })
       self.data.remove(id_val)
     }
   }
@@ -490,13 +460,7 @@ pub fn BPTreeAttrIndex::eq(
       let encoded = encode_attr_value(value)
       match bptree_lookup(tree, encoded) {
         None => []
-        Some(list) => {
-          let result : Array[@core.VectorId] = []
-          for id in list {
-            result.push(@core.VectorId(id))
-          }
-          result
-        }
+        Some(list) => ids_to_vector_ids(list)
       }
     }
   }
@@ -514,13 +478,7 @@ pub fn BPTreeAttrIndex::exists(
       let exists_key = make_exists_key()
       match bptree_lookup(tree, exists_key) {
         None => []
-        Some(list) => {
-          let result : Array[@core.VectorId] = []
-          for id in list {
-            result.push(@core.VectorId(id))
-          }
-          result
-        }
+        Some(list) => ids_to_vector_ids(list)
       }
     }
   }
@@ -537,11 +495,7 @@ pub fn BPTreeAttrIndex::range(
     None => Some([])
     Some(tree) => {
       let list = bptree_range(tree, None, None, range)
-      let result : Array[@core.VectorId] = []
-      for id in list {
-        result.push(@core.VectorId(id))
-      }
-      Some(result)
+      Some(ids_to_vector_ids(list))
     }
   }
 }

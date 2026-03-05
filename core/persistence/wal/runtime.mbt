@@ -15,24 +15,6 @@ pub fn WalRuntime::new(
 }
 
 ///|
-/// Get WAL body length (excluding footer if present)
-fn get_wal_body_length(data : Bytes) -> Int {
-  if data.length() < 16 {
-    return data.length()
-  }
-  // Check for footer magic at end
-  let footer_start = data.length() - 8
-  let r = @binary.BinaryReader::new(data)
-  let _ = r.read_bytes(footer_start)
-  let footer_magic = r.read_u32()
-  if footer_magic == wal_footer_magic {
-    footer_start
-  } else {
-    data.length()
-  }
-}
-
-///|
 /// Get safe copy length - up to the last decodable record boundary
 /// Returns header length (8) if no records are decodable
 fn get_safe_copy_length(data : Bytes) -> Int {
@@ -45,7 +27,7 @@ fn get_safe_copy_length(data : Bytes) -> Int {
     return 0
   }
   // Calculate body length (without footer)
-  let body_len = get_wal_body_length(data)
+  let body_len = wal_body_length(data)
   // Track position after last successful decode
   let mut last_valid_pos = 8 // After header
   while r.position() < body_len {

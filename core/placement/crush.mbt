@@ -138,11 +138,7 @@ pub fn crush_locate(id : @core.VectorId, map : CrushMap) -> LocateResult {
 /// Convenience function that returns the primary target key
 pub fn crush_primary(id : @core.VectorId, map : CrushMap) -> String? {
   let result = crush_locate(id, map)
-  if result.primaries.is_empty() {
-    None
-  } else {
-    Some(result.primaries[0])
-  }
+  first_string_opt(result.primaries)
 }
 
 ///|
@@ -262,16 +258,16 @@ pub fn[S : @storage.Storage] apply_rebalance(
   storages : Map[String, S],
 ) -> Unit raise @storage.IOError {
   for mv in plan {
-    // Get source storage
-    let from_storage = match storages.get(mv.from) {
-      None => raise @storage.IoFailed("Source storage not found: " + mv.from)
-      Some(s) => s
-    }
-    // Get destination storage
-    let to_storage = match storages.get(mv.to) {
-      None => raise @storage.IoFailed("Destination storage not found: " + mv.to)
-      Some(s) => s
-    }
+    let from_storage = require_storage_with_prefix(
+      storages,
+      mv.from,
+      "Source storage not found: ",
+    )
+    let to_storage = require_storage_with_prefix(
+      storages,
+      mv.to,
+      "Destination storage not found: ",
+    )
     // Read from source
     let data = S::read(from_storage, mv.name + ".data", @storage.Data)
     // Write to destination
