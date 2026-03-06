@@ -2,9 +2,10 @@
 package "trkbt10/vcdb/core/placement"
 
 import {
-  "trkbt10/vcdb/core",
   "trkbt10/vcdb/core/persistence/segment",
   "trkbt10/vcdb/core/storage",
+  "trkbt10/vcdb/core/store",
+  "trkbt10/vcdb/core/types",
 }
 
 // Values
@@ -12,25 +13,25 @@ pub fn[S : @storage.Storage] apply_rebalance(Array[MovePlan], Map[String, S]) ->
 
 pub fn apply_rebalance_memory(Array[MovePlan], Map[String, @storage.MemoryStorage]) -> Unit raise @storage.IOError
 
-pub fn crush_locate(@core.VectorId, CrushMap) -> LocateResult
+pub fn crush_locate(@types.VectorId, CrushMap) -> LocateResult
 
-pub fn crush_primary(@core.VectorId, CrushMap) -> String?
+pub fn crush_primary(@types.VectorId, CrushMap) -> String?
 
-pub fn[S : @storage.Storage] load_store_distributed(String, Map[String, S], S) -> @core.CoreStore raise @storage.IOError
+pub fn[S : @storage.Storage] load_store_distributed(String, Map[String, S], S) -> @store.CoreStore raise @storage.IOError
 
 pub fn[S : @storage.Storage] load_store_distributed_full(String, Map[String, S], S) -> LoadDistributedResult raise @storage.IOError
 
 pub fn plan_rebalance(PlacementManifest, CrushMap) -> Array[MovePlan]
 
-pub fn[S : @storage.Storage] read_segments_from_manifest(PlacementManifest, Map[String, S]) -> Array[(@core.VectorId, Array[Double], @core.Attrs)] raise @storage.IOError
+pub fn[S : @storage.Storage] read_segments_from_manifest(PlacementManifest, Map[String, S]) -> Array[(@types.VectorId, Array[Double], @types.Attrs)] raise @storage.IOError
 
-pub fn[S : @storage.Storage] save_store_distributed(@core.CoreStore, SegmentOptions, Map[String, S], S) -> PlacementManifest raise @storage.IOError
+pub fn[S : @storage.Storage] save_store_distributed(@store.CoreStore, SegmentOptions, Map[String, S], S) -> PlacementManifest raise @storage.IOError
 
-pub fn[S : @storage.Storage] save_store_distributed_with_ann(@core.CoreStore, SegmentOptions, Map[String, S], S, @core.Strategy, Bytes?) -> PlacementManifest raise @storage.IOError
+pub fn[S : @storage.Storage] save_store_distributed_with_ann(@store.CoreStore, SegmentOptions, Map[String, S], S, @types.Strategy, Bytes?) -> PlacementManifest raise @storage.IOError
 
 pub fn update_manifest_after_rebalance(PlacementManifest, Array[MovePlan], CrushMap, Int, Int64) -> PlacementManifest
 
-pub fn[S : @storage.Storage] write_segments_from_store(@core.CoreStore, SegmentOptions, Map[String, S]) -> SegmentResult raise @storage.IOError
+pub fn[S : @storage.Storage] write_segments_from_store(@store.CoreStore, SegmentOptions, Map[String, S]) -> SegmentResult raise @storage.IOError
 
 // Errors
 
@@ -54,7 +55,7 @@ pub fn CrushTarget::with_zone(String, Double, String) -> Self
 pub impl Show for CrushTarget
 
 pub struct LoadDistributedResult {
-  store : @core.CoreStore
+  store : @store.CoreStore
   header : @segment.IndexHeader
   ann_bytes : Bytes?
 }
@@ -83,7 +84,7 @@ pub impl Show for PlacementManifest
 
 pub struct SaveDistributedOptions {
   segment_opts : SegmentOptions
-  strategy : @core.Strategy
+  strategy : @types.Strategy
   include_ann : Bool
   ann_bytes : Bytes?
 }

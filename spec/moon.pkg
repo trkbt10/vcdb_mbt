@@ -1,6 +1,6 @@
-import "test" {
+import {
   "trkbt10/vcdb",
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/attr",
   "trkbt10/vcdb/core/filter",
-}
+} for "test"

@@ -152,15 +152,13 @@ pub struct Router[S] {
 
 ///|
 /// Create a new router
-pub fn[S : @storage.Storage] Router::new(
-  base_path? : String = "./storage",
-) -> Router[S] {
+pub fn[S] Router::new(base_path? : String = "./storage") -> Router[S] {
   { manager: @gateway.CollectionManager::new(base_path~) }
 }
 
 ///|
 /// Get the collection manager
-pub fn[S : @storage.Storage] Router::get_manager(
+pub fn[S] Router::get_manager(
   self : Router[S],
 ) -> @gateway.CollectionManager[S] {
   self.manager

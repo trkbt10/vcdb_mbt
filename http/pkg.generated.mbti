@@ -47,8 +47,8 @@ pub impl Show for HttpResponse
 pub struct Router[S] {
   manager : @gateway.CollectionManager[S]
 }
-pub fn[S : @storage.Storage] Router::get_manager(Self[S]) -> @gateway.CollectionManager[S]
-pub fn[S : @storage.Storage] Router::new(base_path? : String) -> Self[S]
+pub fn[S] Router::get_manager(Self[S]) -> @gateway.CollectionManager[S]
+pub fn[S] Router::new(base_path? : String) -> Self[S]
 pub fn[S : @storage.Storage] Router::route(Self[S], HttpRequest) -> HttpResponse
 
 // Type aliases

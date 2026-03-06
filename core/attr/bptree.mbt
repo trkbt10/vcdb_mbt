@@ -35,7 +35,7 @@ priv enum BPNode {
 /// B+ Tree structure
 struct BPTree {
   nodes : Array[BPNode]
-  root_idx : Int
+  mut root_idx : Int
   order : Int // Max entries per node
 }
 
@@ -128,32 +128,226 @@ fn encode_attr_value(value : @types.AttrValue) -> Bytes {
 }
 
 ///|
-/// Find leaf node containing key
-fn find_leaf(tree : BPTree, key : Bytes) -> Int {
-  let mut current = tree.root_idx
-  while true {
-    match tree.nodes[current] {
-      Leaf(_, _) => return current
-      Branch(entries, rightmost) =>
-        if entries.is_empty() {
-          current = rightmost
-        } else {
-          // Binary search for child
-          let mut found = false
-          for i in 0..<entries.length() {
-            if bytes_compare(key, entries[i].key) < 0 {
-              current = entries[i].child_idx
-              found = true
-              break
-            }
-          }
-          if not(found) {
-            current = rightmost
-          }
-        }
+/// Write a String in a backend-stable format
+fn write_string(w : @binary.BinaryWriter, value : String) -> Unit {
+  let chars = value.to_array()
+  w.push_u32(chars.length().reinterpret_as_uint())
+  for c in chars {
+    w.push_u32(c.to_uint())
+  }
+}
+
+///|
+/// Read a String written by write_string
+fn read_string(r : @binary.BinaryReader) -> String {
+  let len = r.read_u32().reinterpret_as_int()
+  let chars : Array[Char] = []
+  for _ in 0..<len {
+    chars.push(r.read_u32().reinterpret_as_int().unsafe_to_char())
+  }
+  String::from_array(chars[:])
+}
+
+///|
+/// Write length-prefixed raw bytes
+fn write_prefixed_bytes(w : @binary.BinaryWriter, data : Bytes) -> Unit {
+  w.push_u32(data.length().reinterpret_as_uint())
+  w.push_bytes(data)
+}
+
+///|
+/// Read length-prefixed raw bytes
+fn read_prefixed_bytes(r : @binary.BinaryReader) -> Bytes {
+  let len = r.read_u32().reinterpret_as_int()
+  r.read_bytes(len)
+}
+
+///|
+/// Write a typed attribute value
+fn write_attr_value(w : @binary.BinaryWriter, value : @types.AttrValue) -> Unit {
+  match value {
+    Null => w.push_u32(0U)
+    Bool(b) => {
+      w.push_u32(1U)
+      w.push_u32(if b { 1U } else { 0U })
+    }
+    Int(n) => {
+      w.push_u32(2U)
+      w.push_i64(n)
+    }
+    Float(f) => {
+      w.push_u32(3U)
+      w.push_f64(f)
+    }
+    String(s) => {
+      w.push_u32(4U)
+      write_string(w, s)
     }
   }
-  current // Unreachable but needed for type checking
+}
+
+///|
+/// Read a typed attribute value
+fn read_attr_value(r : @binary.BinaryReader) -> @types.AttrValue {
+  match r.read_u32() {
+    0U => @types.Null
+    1U => @types.Bool(r.read_u32() != 0U)
+    2U => @types.Int(r.read_i64())
+    3U => @types.Float(r.read_f64())
+    _ => @types.String(read_string(r))
+  }
+}
+
+///|
+/// Write attrs payload
+fn write_attrs(w : @binary.BinaryWriter, attrs : @types.Attrs) -> Unit {
+  let keys = attrs.keys()
+  w.push_u32(keys.length().reinterpret_as_uint())
+  for key in keys {
+    write_string(w, key)
+    match attrs.get(key) {
+      Some(value) => write_attr_value(w, value)
+      None => write_attr_value(w, @types.Null)
+    }
+  }
+}
+
+///|
+/// Read attrs payload
+fn read_attrs(r : @binary.BinaryReader) -> @types.Attrs {
+  let attrs = @types.empty_attrs()
+  let count = r.read_u32().reinterpret_as_int()
+  for _ in 0..<count {
+    let key = read_string(r)
+    let value = read_attr_value(r)
+    attrs.set(key, value)
+  }
+  attrs
+}
+
+///|
+/// Serialize a B+ tree node graph directly
+fn serialize_bptree(tree : BPTree) -> Bytes {
+  let w = @binary.BinaryWriter::new()
+  w.push_u32(tree.order.reinterpret_as_uint())
+  w.push_i32(tree.root_idx)
+  w.push_u32(tree.nodes.length().reinterpret_as_uint())
+  for node in tree.nodes {
+    match node {
+      Leaf(entries, next) => {
+        w.push_u32(0U)
+        w.push_u32(entries.length().reinterpret_as_uint())
+        for entry in entries {
+          write_prefixed_bytes(w, entry.key)
+          w.push_u32(entry.value.length().reinterpret_as_uint())
+          for id in entry.value {
+            w.push_i64(id)
+          }
+        }
+        w.push_i32(next)
+      }
+      Branch(entries, rightmost) => {
+        w.push_u32(1U)
+        w.push_u32(entries.length().reinterpret_as_uint())
+        for entry in entries {
+          write_prefixed_bytes(w, entry.key)
+          w.push_i32(entry.child_idx)
+        }
+        w.push_i32(rightmost)
+      }
+    }
+  }
+  w.concat()
+}
+
+///|
+/// Deserialize a B+ tree node graph
+fn deserialize_bptree(data : Bytes) -> BPTree {
+  let r = @binary.BinaryReader::new(data)
+  let order = r.read_u32().reinterpret_as_int()
+  let root_idx = r.read_i32()
+  let node_count = r.read_u32().reinterpret_as_int()
+  let nodes : Array[BPNode] = []
+  for _ in 0..<node_count {
+    let tag = r.read_u32()
+    let entry_count = r.read_u32().reinterpret_as_int()
+    if tag == 0U {
+      let entries : Array[BPLeafEntry] = []
+      for _ in 0..<entry_count {
+        let key = read_prefixed_bytes(r)
+        let posting_count = r.read_u32().reinterpret_as_int()
+        let value : Array[Int64] = []
+        for _ in 0..<posting_count {
+          value.push(r.read_i64())
+        }
+        entries.push({ key, value })
+      }
+      let next = r.read_i32()
+      nodes.push(Leaf(entries, next))
+    } else {
+      let entries : Array[BPBranchEntry] = []
+      for _ in 0..<entry_count {
+        let key = read_prefixed_bytes(r)
+        let child_idx = r.read_i32()
+        entries.push({ key, child_idx })
+      }
+      let rightmost = r.read_i32()
+      nodes.push(Branch(entries, rightmost))
+    }
+  }
+  { nodes, root_idx, order }
+}
+
+///|
+/// Select child index from a branch node for a search key
+fn select_branch_child(
+  entries : Array[BPBranchEntry],
+  rightmost : Int,
+  key : Bytes,
+) -> Int {
+  if entries.is_empty() {
+    return rightmost
+  }
+  for i in 0..<entries.length() {
+    if bytes_compare(key, entries[i].key) < 0 {
+      return entries[i].child_idx
+    }
+  }
+  rightmost
+}
+
+///|
+/// Find insertion position in a branch node for a split key
+fn find_branch_insert_pos(entries : Array[BPBranchEntry], key : Bytes) -> Int {
+  for i in 0..<entries.length() {
+    if bytes_compare(key, entries[i].key) < 0 {
+      return i
+    }
+  }
+  entries.length()
+}
+
+///|
+/// Find the path from root to the leaf containing key
+fn find_leaf_path(tree : BPTree, key : Bytes) -> Array[Int] {
+  let path : Array[Int] = []
+  let mut current = tree.root_idx
+  while true {
+    path.push(current)
+    match tree.nodes[current] {
+      Leaf(_, _) => break
+      Branch(entries, rightmost) =>
+        current = select_branch_child(entries, rightmost, key)
+    }
+  }
+  path
+}
+
+///|
+/// Find leaf node containing key
+fn find_leaf(tree : BPTree, key : Bytes) -> Int {
+  let path = find_leaf_path(tree, key)
+  path[path.length() - 1]
 }
 
 ///|
@@ -185,9 +379,139 @@ fn remove_from_posting(list : Array[Int64], id : Int64) -> Unit {
 }
 
 ///|
+/// Check whether a node exceeds the configured order
+fn is_overflow(tree : BPTree, node_idx : Int) -> Bool {
+  match tree.nodes[node_idx] {
+    Leaf(entries, _) => entries.length() > tree.order
+    Branch(entries, _) => entries.length() > tree.order
+  }
+}
+
+///|
+/// Split an overflowing leaf node and return the new right leaf and separator key
+fn split_leaf(tree : BPTree, leaf_idx : Int) -> (Int, Bytes) {
+  match tree.nodes[leaf_idx] {
+    Leaf(entries, next) => {
+      let split_at = entries.length() / 2
+      let right_entries : Array[BPLeafEntry] = []
+      for i in split_at..<entries.length() {
+        right_entries.push(entries[i])
+      }
+      while entries.length() > split_at {
+        let _ = entries.pop()
+      }
+      let split_key = right_entries[0].key
+      let new_leaf_idx = tree.nodes.length()
+      tree.nodes.push(Leaf(right_entries, next))
+      tree.nodes[leaf_idx] = Leaf(entries, new_leaf_idx)
+      (new_leaf_idx, split_key)
+    }
+    _ => abort("split_leaf expects a leaf node")
+  }
+}
+
+///|
+/// Insert a promoted separator into a branch node
+fn insert_into_branch(
+  tree : BPTree,
+  branch_idx : Int,
+  key : Bytes,
+  child_idx : Int,
+) -> Unit {
+  match tree.nodes[branch_idx] {
+    Branch(entries, rightmost) => {
+      let insert_pos = find_branch_insert_pos(entries, key)
+      let new_entries : Array[BPBranchEntry] = []
+      let mut new_rightmost = rightmost
+      if insert_pos == entries.length() {
+        for entry in entries {
+          new_entries.push(entry)
+        }
+        new_entries.push({ key, child_idx: rightmost })
+        new_rightmost = child_idx
+      } else {
+        for i in 0..<entries.length() {
+          if i == insert_pos {
+            let left_child_idx = entries[i].child_idx
+            new_entries.push({ key, child_idx: left_child_idx })
+            new_entries.push({ key: entries[i].key, child_idx })
+          } else {
+            new_entries.push(entries[i])
+          }
+        }
+      }
+      tree.nodes[branch_idx] = Branch(new_entries, new_rightmost)
+    }
+    _ => abort("insert_into_branch expects a branch node")
+  }
+}
+
+///|
+/// Split an overflowing branch node and return the new right branch and promoted key
+fn split_branch(tree : BPTree, branch_idx : Int) -> (Int, Bytes) {
+  match tree.nodes[branch_idx] {
+    Branch(entries, rightmost) => {
+      let mid = entries.length() / 2
+      let promoted = entries[mid].key
+      let left_rightmost = entries[mid].child_idx
+      let right_entries : Array[BPBranchEntry] = []
+      for i in (mid + 1)..<entries.length() {
+        right_entries.push(entries[i])
+      }
+      while entries.length() > mid {
+        let _ = entries.pop()
+      }
+      let new_branch_idx = tree.nodes.length()
+      tree.nodes.push(Branch(right_entries, rightmost))
+      tree.nodes[branch_idx] = Branch(entries, left_rightmost)
+      (new_branch_idx, promoted)
+    }
+    _ => abort("split_branch expects a branch node")
+  }
+}
+
+///|
+/// Create a new root after splitting the previous root
+fn split_root(
+  tree : BPTree,
+  left_idx : Int,
+  right_idx : Int,
+  split_key : Bytes,
+) -> Unit {
+  let new_root_idx = tree.nodes.length()
+  tree.nodes.push(Branch([{ key: split_key, child_idx: left_idx }], right_idx))
+  tree.root_idx = new_root_idx
+}
+
+///|
+/// Propagate node splits up the insertion path
+fn handle_overflow(tree : BPTree, path : Array[Int]) -> Unit {
+  if path.is_empty() {
+    return
+  }
+  let mut level = path.length() - 1
+  let mut current_idx = path[level]
+  while is_overflow(tree, current_idx) {
+    let (new_idx, split_key) = match tree.nodes[current_idx] {
+      Leaf(_, _) => split_leaf(tree, current_idx)
+      Branch(_, _) => split_branch(tree, current_idx)
+    }
+    if level == 0 {
+      split_root(tree, current_idx, new_idx, split_key)
+      return
+    }
+    let parent_idx = path[level - 1]
+    insert_into_branch(tree, parent_idx, split_key, new_idx)
+    current_idx = parent_idx
+    level = level - 1
+  }
+}
+
+///|
 /// Insert posting into B+ tree
 fn bptree_insert(tree : BPTree, key : Bytes, id : Int64) -> Unit {
-  let leaf_idx = find_leaf(tree, key)
+  let path = find_leaf_path(tree, key)
+  let leaf_idx = path[path.length() - 1]
   match tree.nodes[leaf_idx] {
     Leaf(entries, next) => {
       // Find existing entry
@@ -201,13 +525,11 @@ fn bptree_insert(tree : BPTree, key : Bytes, id : Int64) -> Unit {
         entries.push({ key, value: new_list })
         // Sort entries by key
         entries.sort_by(fn(a, b) { bytes_compare(a.key, b.key) })
-        // Check for split (simplified - no actual split implementation)
-        if entries.length() > tree.order {
-          // In a full implementation, we would split the node here
-          // For simplicity, we just allow overflow
-          let _ = next
+        if is_overflow(tree, leaf_idx) {
+          handle_overflow(tree, path)
         }
       }
+      let _ = next
     }
     _ => ()
   }
@@ -265,18 +587,22 @@ fn bptree_range(
   range : @types.NumericRange,
 ) -> Array[Int64] {
   let result : Array[Int64] = []
-  // Start from leftmost leaf
-  let mut current = 0
-  // Find starting leaf
-  while true {
-    match tree.nodes[current] {
-      Leaf(_, _) => break
-      Branch(entries, rightmost) =>
-        if entries.is_empty() {
-          current = rightmost
-        } else {
-          current = entries[0].child_idx
+  let mut current = match lo {
+    Some(start_key) => find_leaf(tree, start_key)
+    None => {
+      let mut leftmost = tree.root_idx
+      while true {
+        match tree.nodes[leftmost] {
+          Leaf(_, _) => break
+          Branch(entries, rightmost) =>
+            leftmost = if entries.is_empty() {
+              rightmost
+            } else {
+              entries[0].child_idx
+            }
         }
+      }
+      leftmost
     }
   }
   // Scan through linked leaves
@@ -498,6 +824,60 @@ pub fn BPTreeAttrIndex::range(
       Some(ids_to_vector_ids(list))
     }
   }
+}
+
+///|
+/// Serialize a B+ tree attribute index, including node graphs and stored attrs
+pub fn BPTreeAttrIndex::serialize(self : BPTreeAttrIndex) -> Bytes {
+  let w = @binary.BinaryWriter::new()
+  w.push_u32(1U)
+  w.push_u32(self.order.reinterpret_as_uint())
+  let data_count = self.data.length()
+  w.push_u32(data_count.reinterpret_as_uint())
+  for id_val, attrs in self.data {
+    w.push_i64(id_val)
+    write_attrs(w, attrs)
+  }
+  let field_tree_count = self.field_trees.length()
+  w.push_u32(field_tree_count.reinterpret_as_uint())
+  for field, tree in self.field_trees {
+    write_string(w, field)
+    write_prefixed_bytes(w, serialize_bptree(tree))
+  }
+  let exists_tree_count = self.exists_trees.length()
+  w.push_u32(exists_tree_count.reinterpret_as_uint())
+  for field, tree in self.exists_trees {
+    write_string(w, field)
+    write_prefixed_bytes(w, serialize_bptree(tree))
+  }
+  w.concat()
+}
+
+///|
+/// Deserialize a B+ tree attribute index from serialized bytes
+pub fn BPTreeAttrIndex::deserialize(data : Bytes) -> BPTreeAttrIndex {
+  let r = @binary.BinaryReader::new(data)
+  let _version = r.read_u32()
+  let order = r.read_u32().reinterpret_as_int()
+  let data_map : Map[Int64, @types.Attrs] = {}
+  let data_count = r.read_u32().reinterpret_as_int()
+  for _ in 0..<data_count {
+    let id_val = r.read_i64()
+    data_map.set(id_val, read_attrs(r))
+  }
+  let field_trees : Map[String, BPTree] = {}
+  let field_tree_count = r.read_u32().reinterpret_as_int()
+  for _ in 0..<field_tree_count {
+    let field = read_string(r)
+    field_trees.set(field, deserialize_bptree(read_prefixed_bytes(r)))
+  }
+  let exists_trees : Map[String, BPTree] = {}
+  let exists_tree_count = r.read_u32().reinterpret_as_int()
+  for _ in 0..<exists_tree_count {
+    let field = read_string(r)
+    exists_trees.set(field, deserialize_bptree(read_prefixed_bytes(r)))
+  }
+  { field_trees, exists_trees, data: data_map, order }
 }
 
 ///|

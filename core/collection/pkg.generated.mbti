@@ -2,7 +2,7 @@
 package "trkbt10/vcdb/core/collection"
 
 import {
-  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/types",
 }
 
 // Values
@@ -41,5 +41,5 @@ pub impl Scored for ScoredItem
 pub trait Scored {
   score(Self) -> Double
 }
-pub impl Scored for @core.SearchHit
+pub impl Scored for @types.SearchHit
 

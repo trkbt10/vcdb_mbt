@@ -2,25 +2,60 @@
 package "trkbt10/vcdb/core/persistence/codec"
 
 import {
-  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/binary",
+  "trkbt10/vcdb/core/types",
 }
 
 // Values
-pub fn attrs_to_json(@core.Attrs?) -> String
+pub fn attrs_to_json(@types.Attrs?) -> String
 
-pub fn decode_attrs_json(Bytes) -> @core.Attrs?
+pub fn decode_attrs_json(Bytes) -> @types.Attrs?
 
 pub fn decode_utf8(Bytes) -> String
 
-pub fn encode_attrs_json(@core.Attrs?) -> Bytes
+pub fn encode_attrs_json(@types.Attrs?) -> Bytes
+
+pub fn encode_header(@binary.BinaryWriter, FileType, Byte) -> Unit
 
 pub fn encode_utf8(String) -> Bytes
 
-pub fn parse_attrs_json(String) -> @core.Attrs?
+pub let ext_index : String
+
+pub let ext_manifest : String
+
+pub let ext_segment : String
+
+pub let ext_wal : String
+
+pub fn get_file_type(Bytes) -> FileType?
+
+pub let header_size : Int
+
+pub fn is_vcdb_file(Bytes) -> Bool
+
+pub fn parse_attrs_json(String) -> @types.Attrs?
+
+pub fn read_header(@binary.BinaryReader) -> (FileType, Byte)?
+
+pub let vcdb_magic_hi : UInt
+
+pub let vcdb_magic_lo : UInt
+
+pub fn verify_magic(@binary.BinaryReader) -> Bool
 
 // Errors
 
 // Types and methods
+pub(all) enum FileType {
+  Wal
+  Segment
+  Index
+}
+pub fn FileType::extension(Self) -> String
+pub fn FileType::from_byte(Byte) -> Self?
+pub fn FileType::to_byte(Self) -> Byte
+pub impl Eq for FileType
+pub impl Show for FileType
 
 // Type aliases
 

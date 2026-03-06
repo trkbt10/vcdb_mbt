@@ -21,7 +21,7 @@ pub struct CollectionManager[S] {
 
 ///|
 /// Create without storage (in-memory only)
-pub fn[S : @storage.Storage] CollectionManager::new(
+pub fn[S] CollectionManager::new(
   base_path? : String = "",
 ) -> CollectionManager[S] {
   { collections: {}, storage: None, base_path }
@@ -29,7 +29,7 @@ pub fn[S : @storage.Storage] CollectionManager::new(
 
 ///|
 /// Create with storage
-pub fn[S : @storage.Storage] CollectionManager::with_storage(
+pub fn[S] CollectionManager::with_storage(
   storage : S,
   base_path? : String = "",
 ) -> CollectionManager[S] {
@@ -118,7 +118,7 @@ fn[S : @storage.Storage] CollectionManager::load_collection_from_storage(
 fn bytes_to_string(bytes : Bytes) -> String {
   let chars : Array[Char] = []
   for i in 0..<bytes.length() {
-    chars.push(Char::from_int(bytes[i].to_int()))
+    chars.push(bytes[i].to_int().unsafe_to_char())
   }
   String::from_array(chars)
 }
@@ -191,7 +191,7 @@ pub fn[S : @storage.Storage] CollectionManager::get(
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::get_info(
+pub fn[S] CollectionManager::get_info(
   self : CollectionManager[S],
   name : String,
 ) -> CollectionInfo? {
@@ -241,14 +241,12 @@ pub fn[S : @storage.Storage] CollectionManager::notify_modified(
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::list(
-  self : CollectionManager[S],
-) -> Array[String] {
+pub fn[S] CollectionManager::list(self : CollectionManager[S]) -> Array[String] {
   self.collections.keys().collect()
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::list_info(
+pub fn[S] CollectionManager::list_info(
   self : CollectionManager[S],
 ) -> Array[CollectionInfo] {
   let infos : Array[CollectionInfo] = []
@@ -262,7 +260,7 @@ pub fn[S : @storage.Storage] CollectionManager::list_info(
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::exists(
+pub fn[S] CollectionManager::exists(
   self : CollectionManager[S],
   name : String,
 ) -> Bool {
@@ -270,14 +268,12 @@ pub fn[S : @storage.Storage] CollectionManager::exists(
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::count(
-  self : CollectionManager[S],
-) -> Int {
+pub fn[S] CollectionManager::count(self : CollectionManager[S]) -> Int {
   self.collections.length()
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::serialize_collection(
+pub fn[S] CollectionManager::serialize_collection(
   self : CollectionManager[S],
   name : String,
 ) -> Bytes? {
@@ -288,7 +284,7 @@ pub fn[S : @storage.Storage] CollectionManager::serialize_collection(
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::load_collection(
+pub fn[S] CollectionManager::load_collection(
   self : CollectionManager[S],
   config : CollectionConfig,
   data : Bytes,
@@ -303,7 +299,7 @@ pub fn[S : @storage.Storage] CollectionManager::load_collection(
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::export_metadata(
+pub fn[S] CollectionManager::export_metadata(
   self : CollectionManager[S],
 ) -> JsonValue {
   let collections : Array[JsonValue] = []

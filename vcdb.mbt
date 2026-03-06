@@ -35,6 +35,7 @@ pub fn empty_attrs() -> @types.Attrs {
 /// - bruteforce/hnsw/ivf: Strategy-specific index state
 pub struct VectorDB {
   store : @store.CoreStore
+  attr_index : @attr.BPTreeAttrIndex
   strategy : @types.Strategy
   bruteforce : @ann.BruteforceState?
   hnsw : @ann.HNSWState?
@@ -54,9 +55,11 @@ pub fn VectorDB::new(options : @types.DatabaseOptions) -> VectorDB {
     options.metric,
     capacity=options.capacity,
   )
+  let attr_index = @attr.BPTreeAttrIndex::new()
   match options.strategy {
     Bruteforce =>
       {
+        attr_index,
         bruteforce: Some(@ann.BruteforceState::new(options.metric)),
         hnsw: None,
         ivf: None,
@@ -65,6 +68,7 @@ pub fn VectorDB::new(options : @types.DatabaseOptions) -> VectorDB {
       }
     HNSW(params) =>
       {
+        attr_index,
         bruteforce: None,
         hnsw: Some(
           @ann.HNSWState::new(params, options.metric, options.capacity),
@@ -75,6 +79,7 @@ pub fn VectorDB::new(options : @types.DatabaseOptions) -> VectorDB {
       }
     IVF(params) =>
       {
+        attr_index,
         bruteforce: None,
         hnsw: None,
         ivf: Some(@ann.IVFState::new(params, options.metric, options.dim)),
@@ -189,9 +194,14 @@ pub fn VectorDB::from_store(
   store : @store.CoreStore,
   options : @types.DatabaseOptions,
 ) -> VectorDB {
+  let attr_index = @attr.BPTreeAttrIndex::new()
+  for i in 0..<store.size() {
+    attr_index.set_attrs(store.ids[i], store.attrs[i])
+  }
   match options.strategy {
     Bruteforce =>
       {
+        attr_index,
         bruteforce: Some(@ann.BruteforceState::new(store.metric)),
         hnsw: None,
         ivf: None,
@@ -206,6 +216,7 @@ pub fn VectorDB::from_store(
         @ann.hnsw_add(hnsw, store, id)
       }
       {
+        attr_index,
         bruteforce: None,
         hnsw: Some(hnsw),
         ivf: None,
@@ -217,6 +228,7 @@ pub fn VectorDB::from_store(
       let ivf = @ann.IVFState::new(params, store.metric, store.dim)
       // IVF requires training
       {
+        attr_index,
         bruteforce: None,
         hnsw: None,
         ivf: Some(ivf),
@@ -225,6 +237,26 @@ pub fn VectorDB::from_store(
       }
     }
   }
+}
+
+///|
+/// Rebuild the metadata index from persisted store contents.
+///
+/// When `tombstone` is provided, tombstoned rows are excluded so the metadata
+/// index matches the set of visible vectors.
+fn rebuild_metadata_index(
+  store : @store.CoreStore,
+  tombstone : Array[Bool]?,
+) -> @attr.BPTreeAttrIndex {
+  let index = @attr.BPTreeAttrIndex::new()
+  for i in 0..<store.size() {
+    match tombstone {
+      Some(bits) => if i < bits.length() && bits[i] { continue }
+      None => ()
+    }
+    index.set_attrs(store.ids[i], store.attrs[i])
+  }
+  index
 }
 
 ///|
@@ -312,6 +344,7 @@ pub fn VectorDB::add(
     }
     // Update the existing vector with upsert
     let _ = self.store.add_or_update(id, vector, attrs, upsert=true)
+    self.attr_index.set_attrs(id, attrs)
     // Re-add to HNSW graph
     match self.hnsw {
       Some(state) => @ann.hnsw_add(state, self.store, id)
@@ -322,6 +355,7 @@ pub fn VectorDB::add(
   // Normal add path
   let (_, created) = self.store.add_or_update(id, vector, attrs, upsert=false)
   if created {
+    self.attr_index.set_attrs(id, attrs)
     match self.hnsw {
       Some(state) => @ann.hnsw_add(state, self.store, id)
       None => ()
@@ -353,6 +387,7 @@ pub fn VectorDB::upsert(
 ) -> Bool {
   let existed = self.store.has(id)
   let (_, created) = self.store.add_or_update(id, vector, attrs, upsert=true)
+  self.attr_index.set_attrs(id, attrs)
   if created {
     // New vector: add to index
     match self.hnsw {
@@ -405,6 +440,7 @@ pub fn VectorDB::remove(self : VectorDB, id : @types.VectorId) -> Bool {
         return false
       }
       @ann.hnsw_remove(state, id, self.store)
+      self.attr_index.remove_id(id)
       return true // Don't remove from store, HNSW relies on stable indices
     }
     None => ()
@@ -416,7 +452,10 @@ pub fn VectorDB::remove(self : VectorDB, id : @types.VectorId) -> Bool {
   }
   // Remove from store (only if not using HNSW)
   match self.store.remove_by_id(id) {
-    Some(_) => true
+    Some(_) => {
+      self.attr_index.remove_id(id)
+      true
+    }
     None => false
   }
 }
@@ -479,7 +518,7 @@ pub fn VectorDB::find(
 }
 
 ///|
-/// Search with filter expressions and optional attribute index.
+/// Search with filter expressions and metadata index support.
 ///
 /// Supports two filtering strategies:
 /// - PreFilter: Use attr index to get candidate IDs, then score only those
@@ -493,7 +532,7 @@ pub fn VectorDB::find(
 /// - query: The query vector
 /// - k: Number of results to return
 /// - expr: Optional filter expression (Must/MustNot/Should/Leaf)
-/// - attr_index: Optional attribute index for pre-filtering
+/// - attr_index: Optional B+ tree index override for pre-filtering
 /// - strategy: Filtering strategy (PreFilter/PostFilter/Auto)
 ///
 /// Returns: Array of SearchHit matching the filter criteria
@@ -502,42 +541,35 @@ pub fn VectorDB::search_with_expr(
   query : Array[Double],
   k : Int,
   expr : @filter.FilterExpr?,
-  attr_index : @attr.BasicAttrIndex?,
+  attr_index : @attr.BPTreeAttrIndex?,
   strategy : @filter.FilterStrategy,
 ) -> Array[@types.SearchHit] {
   match expr {
     None => self.search(query, k, None)
     Some(filter_expr) => {
+      let index = match attr_index {
+        Some(override_index) => override_index
+        None => self.attr_index
+      }
       // Determine actual strategy
       let use_prefilter = match strategy {
         PreFilter => true
         PostFilter => false
         Auto =>
-          match attr_index {
+          match @filter.get_candidates_bptree(filter_expr, index) {
             None => false
-            Some(index) =>
-              match @filter.get_candidates_basic(filter_expr, index) {
-                None => false
-                Some(candidates) =>
-                  // Use pre-filter if candidates < 50% of total
-                  candidates.length() < self.store.size() / 2
-              }
+            Some(candidates) =>
+              // Use pre-filter if candidates < 50% of total
+              candidates.length() < self.store.size() / 2
           }
       }
       if use_prefilter {
-        match attr_index {
+        match @filter.get_candidates_bptree(filter_expr, index) {
           None => {
             let pred = @filter.compile_filter(filter_expr)
             self.search(query, k, Some(pred))
           }
-          Some(index) =>
-            match @filter.get_candidates_basic(filter_expr, index) {
-              None => {
-                let pred = @filter.compile_filter(filter_expr)
-                self.search(query, k, Some(pred))
-              }
-              Some(candidates) => self.search_candidates(query, k, candidates)
-            }
+          Some(candidates) => self.search_candidates(query, k, candidates)
         }
       } else {
         let pred = @filter.compile_filter(filter_expr)
@@ -602,7 +634,12 @@ pub fn VectorDB::update_attrs(
   id : @types.VectorId,
   attrs : @types.Attrs,
 ) -> Bool {
-  self.store.update_attrs(id, attrs)
+  if self.store.update_attrs(id, attrs) {
+    self.attr_index.set_attrs(id, attrs)
+    true
+  } else {
+    false
+  }
 }
 
 ///|
@@ -623,7 +660,7 @@ pub fn VectorDB::train(self : VectorDB, iterations? : Int = 10) -> Unit {
 ///|
 /// Serialize the database to bytes for persistence.
 ///
-/// Includes all vectors, attributes, and index state.
+/// Includes all vectors, attributes, metadata index state, and ANN index state.
 /// Use deserialize() to restore.
 ///
 /// Returns: Binary representation of the database
@@ -678,13 +715,16 @@ pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
       w.push_bytes(ivf_bytes)
     }
   }
+  let attr_index_bytes = self.attr_index.serialize()
+  w.push_u32(attr_index_bytes.length().reinterpret_as_uint())
+  w.push_bytes(attr_index_bytes)
   w.concat()
 }
 
 ///|
 /// Deserialize a database from bytes.
 ///
-/// Restores all vectors, attributes, and index state from a previous serialize().
+/// Restores all vectors, attributes, metadata index state, and ANN index state.
 ///
 /// Parameters:
 /// - data: Binary data from serialize()
@@ -727,8 +767,15 @@ pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
   match strategy_type {
     0U => {
       let _ = r.read_u32()
+      let attr_index = if r.has_more() {
+        let len = r.read_u32().reinterpret_as_int()
+        @attr.BPTreeAttrIndex::deserialize(r.read_bytes(len))
+      } else {
+        rebuild_metadata_index(store, None)
+      }
       {
         store,
+        attr_index,
         strategy: @types.Bruteforce,
         bruteforce: Some(@ann.BruteforceState::new(store.metric)),
         hnsw: None,
@@ -741,8 +788,15 @@ pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
       let params = hnsw_params.unwrap()
       let state = @ann.HNSWState::new(params, store.metric, store.capacity())
       @ann.hnsw_deserialize(state, hnsw_bytes)
+      let attr_index = if r.has_more() {
+        let len = r.read_u32().reinterpret_as_int()
+        @attr.BPTreeAttrIndex::deserialize(r.read_bytes(len))
+      } else {
+        rebuild_metadata_index(store, Some(state.tombstone))
+      }
       {
         store,
+        attr_index,
         strategy: @types.HNSW(params),
         bruteforce: None,
         hnsw: Some(state),
@@ -755,8 +809,15 @@ pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
       let params = ivf_params.unwrap()
       let state = @ann.IVFState::new(params, store.metric, store.dim)
       @ann.ivf_deserialize(state, ivf_bytes, store.dim)
+      let attr_index = if r.has_more() {
+        let len = r.read_u32().reinterpret_as_int()
+        @attr.BPTreeAttrIndex::deserialize(r.read_bytes(len))
+      } else {
+        rebuild_metadata_index(store, None)
+      }
       {
         store,
+        attr_index,
         strategy: @types.IVF(params),
         bruteforce: None,
         hnsw: None,

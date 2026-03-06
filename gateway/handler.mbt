@@ -106,7 +106,7 @@ pub fn[S : @storage.Storage] handle_list_collections(
 
 ///|
 /// Handle get collection info
-pub fn[S : @storage.Storage] handle_get_collection(
+pub fn[S] handle_get_collection(
   manager : CollectionManager[S],
   name : String,
 ) -> Result[CollectionInfo, GatewayError] {

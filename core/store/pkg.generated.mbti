@@ -1,0 +1,49 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/store"
+
+import {
+  "trkbt10/vcdb/core/types",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct CoreStore {
+  dim : Int
+  metric : @types.Metric
+  mut ids : Array[@types.VectorId]
+  mut data : Array[Double]
+  mut attrs : Array[@types.Attrs]
+  pos : Map[Int64, Int]
+  mut capacity : Int
+  mut count : Int
+}
+pub fn CoreStore::add_or_update(Self, @types.VectorId, Array[Double], @types.Attrs, upsert? : Bool) -> (Int, Bool)
+pub fn CoreStore::capacity(Self) -> Int
+pub fn CoreStore::deserialize(Bytes) -> Self
+pub fn CoreStore::ensure_capacity(Self, Int) -> Bool
+pub fn CoreStore::get(Self, @types.VectorId) -> @types.VectorRecord?
+pub fn CoreStore::get_by_index(Self, Int) -> @types.VectorRecord
+pub fn CoreStore::get_index(Self, @types.VectorId) -> Int?
+pub fn CoreStore::has(Self, @types.VectorId) -> Bool
+pub fn CoreStore::new(Int, @types.Metric, capacity? : Int) -> Self
+pub fn CoreStore::normalize_query(Self, Array[Double]) -> Array[Double]
+pub fn CoreStore::remove_by_id(Self, @types.VectorId) -> MoveInfo?
+pub fn CoreStore::serialize(Self) -> Bytes
+pub fn CoreStore::shrink_to_fit(Self) -> Unit
+pub fn CoreStore::size(Self) -> Int
+pub fn CoreStore::update_attrs(Self, @types.VectorId, @types.Attrs) -> Bool
+
+pub struct MoveInfo {
+  moved_id : @types.VectorId?
+  moved_from : Int?
+  moved_to : Int?
+}
+pub impl Show for MoveInfo
+
+// Type aliases
+
+// Traits
+

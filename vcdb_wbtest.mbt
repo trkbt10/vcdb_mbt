@@ -63,6 +63,29 @@ test "vectordb/serialization" {
 }
 
 ///|
+test "vectordb/serialization_preserves_metadata_index" {
+  let db = VectorDB::with_dim(2)
+  let attrs_a = @types.empty_attrs()
+  attrs_a.set("category", @types.String("A"))
+  let attrs_b = @types.empty_attrs()
+  attrs_b.set("category", @types.String("B"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs_a)
+  db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs_b)
+  let bytes = db.serialize()
+  let db2 = VectorDB::deserialize(bytes)
+  let expr = @filter.FilterExpr::match_("category", @types.String("B"))
+  let results = db2.search_with_expr(
+    [1.0, 0.0],
+    10,
+    Some(expr),
+    None,
+    @filter.PreFilter,
+  )
+  inspect(results.length(), content="1")
+  inspect(results[0].id.to_int64(), content="2")
+}
+
+///|
 test "vectordb/upsert" {
   let db = VectorDB::with_dim(2)
   // Initial add
@@ -112,15 +135,12 @@ test "vectordb/search_with_expr_postfilter" {
 ///|
 test "vectordb/search_with_expr_prefilter" {
   let db = VectorDB::with_dim(2)
-  // Build attr index alongside DB
-  let attr_index = @attr.BasicAttrIndex::new()
   // Add vectors with scores
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
     attrs.set("score", @types.Int(i.to_int64() * 10L))
     let id = @types.VectorId::from_int(i)
     db.add(id, [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0], attrs)
-    attr_index.set_attrs(id, attrs)
   }
   // Search with PreFilter: score >= 50 (IDs 5-10)
   let range = @types.NumericRange::gte(50.0)
@@ -129,7 +149,7 @@ test "vectordb/search_with_expr_prefilter" {
     [1.0, 0.0],
     3,
     Some(expr),
-    Some(attr_index),
+    None,
     @filter.PreFilter,
   )
   inspect(results.length(), content="3")
@@ -145,7 +165,6 @@ test "vectordb/search_with_expr_prefilter" {
 ///|
 test "vectordb/search_with_expr_auto" {
   let db = VectorDB::with_dim(2)
-  let attr_index = @attr.BasicAttrIndex::new()
   // Add 10 vectors, only 2 have tag="rare"
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
@@ -156,7 +175,6 @@ test "vectordb/search_with_expr_auto" {
     }
     let id = @types.VectorId::from_int(i)
     db.add(id, [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0], attrs)
-    attr_index.set_attrs(id, attrs)
   }
   // Search with Auto strategy: should use pre-filter (2/10 < 50%)
   let expr = @filter.FilterExpr::match_("tag", @types.String("rare"))
@@ -164,7 +182,7 @@ test "vectordb/search_with_expr_auto" {
     [1.0, 0.0],
     5,
     Some(expr),
-    Some(attr_index),
+    None,
     @filter.Auto,
   )
   inspect(results.length(), content="2")
@@ -240,6 +258,40 @@ test "vectordb/update_attrs" {
 }
 
 ///|
+test "vectordb/update_attrs_updates_metadata_index" {
+  let db = VectorDB::with_dim(2)
+  let id = @types.VectorId::from_int(1)
+  let attrs = @types.empty_attrs()
+  attrs.set("status", @types.String("draft"))
+  db.add(id, [1.0, 0.0], attrs)
+  let new_attrs = @types.empty_attrs()
+  new_attrs.set("status", @types.String("published"))
+  inspect(db.update_attrs(id, new_attrs), content="true")
+  let draft_expr = @filter.FilterExpr::match_("status", @types.String("draft"))
+  let published_expr = @filter.FilterExpr::match_(
+    "status",
+    @types.String("published"),
+  )
+  let draft_results = db.search_with_expr(
+    [1.0, 0.0],
+    10,
+    Some(draft_expr),
+    None,
+    @filter.PreFilter,
+  )
+  let published_results = db.search_with_expr(
+    [1.0, 0.0],
+    10,
+    Some(published_expr),
+    None,
+    @filter.PreFilter,
+  )
+  inspect(draft_results.length(), content="0")
+  inspect(published_results.length(), content="1")
+  inspect(published_results[0].id.to_int64(), content="1")
+}
+
+///|
 test "vectordb/hnsw_remove" {
   let db = VectorDB::with_hnsw(2, metric=@types.Dot)
   let id1 = @types.VectorId::from_int(1)
@@ -312,6 +364,32 @@ test "vectordb/hnsw_serialization" {
   // Search should work
   let results = db2.search([1.0, 0.0, 0.0], 1, None)
   inspect(results.length(), content="1")
+}
+
+///|
+test "vectordb/hnsw_serialization_preserves_metadata_visibility" {
+  let db = VectorDB::with_hnsw(2, metric=@types.Dot)
+  let keep_attrs = @types.empty_attrs()
+  keep_attrs.set("group", @types.String("keep"))
+  let drop_attrs = @types.empty_attrs()
+  drop_attrs.set("group", @types.String("drop"))
+  let keep_id = @types.VectorId::from_int(1)
+  let drop_id = @types.VectorId::from_int(2)
+  db.add(keep_id, [1.0, 0.0], keep_attrs)
+  db.add(drop_id, [0.0, 1.0], drop_attrs)
+  let _ = db.remove(drop_id)
+  let bytes = db.serialize()
+  let db2 = VectorDB::deserialize(bytes)
+  let expr = @filter.FilterExpr::match_("group", @types.String("drop"))
+  let results = db2.search_with_expr(
+    [1.0, 0.0],
+    10,
+    Some(expr),
+    None,
+    @filter.PreFilter,
+  )
+  inspect(db2.size(), content="1")
+  inspect(results.length(), content="0")
 }
 
 ///|
@@ -476,23 +554,20 @@ test "vectordb/serialize_ivf_params" {
 /// When query dimension doesn't match, should return empty results
 test "vectordb/search_dimension_validation" {
   let db = VectorDB::with_dim(3)
-  let index = @attr.BasicAttrIndex::new()
   // Add vectors
   let attrs1 = @types.empty_attrs()
   attrs1.set("status", @types.String("active"))
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs1)
-  index.set_attrs(@types.VectorId::from_int(1), attrs1)
   let attrs2 = @types.empty_attrs()
   attrs2.set("status", @types.String("active"))
   db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], attrs2)
-  index.set_attrs(@types.VectorId::from_int(2), attrs2)
   // Search with wrong dimension (2 instead of 3) using pre-filter
   let expr = @filter.FilterExpr::match_("status", @types.String("active"))
   let results = db.search_with_expr(
     [1.0, 0.0], // Wrong dimension!
     2,
     Some(expr),
-    Some(index),
+    None,
     @filter.PreFilter,
   )
   // Should return empty results instead of crashing
@@ -503,19 +578,17 @@ test "vectordb/search_dimension_validation" {
 /// Test: search with correct dimension returns results
 test "vectordb/search_dimension_correct" {
   let db = VectorDB::with_dim(3)
-  let index = @attr.BasicAttrIndex::new()
   // Add vectors
   let attrs1 = @types.empty_attrs()
   attrs1.set("status", @types.String("active"))
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs1)
-  index.set_attrs(@types.VectorId::from_int(1), attrs1)
   // Search with correct dimension
   let expr = @filter.FilterExpr::match_("status", @types.String("active"))
   let results = db.search_with_expr(
     [1.0, 0.0, 0.0], // Correct dimension
     1,
     Some(expr),
-    Some(index),
+    None,
     @filter.PreFilter,
   )
   inspect(results.length(), content="1")
@@ -599,7 +672,6 @@ test "vectordb/hnsw_double_remove" {
 /// Test: Pre-filter search excludes tombstoned HNSW IDs
 test "vectordb/prefilter_excludes_tombstoned" {
   let db = VectorDB::with_hnsw(2, metric=@types.Dot)
-  let index = @attr.BasicAttrIndex::new()
   // Add vectors with attrs
   let id1 = @types.VectorId::from_int(1)
   let id2 = @types.VectorId::from_int(2)
@@ -609,8 +681,6 @@ test "vectordb/prefilter_excludes_tombstoned" {
   attrs2.set("type", @types.String("test"))
   db.add(id1, [1.0, 0.0], attrs1)
   db.add(id2, [0.0, 1.0], attrs2)
-  index.set_attrs(id1, attrs1)
-  index.set_attrs(id2, attrs2)
   // Remove id1 (tombstone in HNSW)
   let _ = db.remove(id1)
   // Pre-filter search should NOT return id1
@@ -619,7 +689,7 @@ test "vectordb/prefilter_excludes_tombstoned" {
     [1.0, 0.0],
     10,
     Some(expr),
-    Some(index),
+    None,
     @filter.PreFilter,
   )
   // Should only find id2 (id1 is tombstoned)

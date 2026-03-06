@@ -229,6 +229,59 @@ pub fn get_candidates_basic(
 }
 
 ///|
+/// Get candidate IDs from a B+ tree attribute index using a filter expression
+/// Returns None if pre-filtering is not possible (should use post-filter)
+pub fn get_candidates_bptree(
+  expr : FilterExpr,
+  index : @attr.BPTreeAttrIndex,
+) -> Array[@types.VectorId]? {
+  match expr {
+    Leaf(Match(key, value)) => Some(index.eq(key, value))
+    Leaf(Exists(key)) => Some(index.exists(key))
+    Leaf(Range(key, range)) => index.range(key, range)
+    Leaf(IsNull(_)) => None
+    Must(exprs) => {
+      let mut result : Array[@types.VectorId]? = None
+      for e in exprs {
+        match get_candidates_bptree(e, index) {
+          None => return None
+          Some(candidates) =>
+            match result {
+              None => result = Some(candidates)
+              Some(current) => result = Some(intersect_ids(current, candidates))
+            }
+        }
+      }
+      result
+    }
+    MustNot(_) => None
+    Should(exprs, min) => {
+      if min <= 0 {
+        return None
+      }
+      if min > 1 {
+        return None
+      }
+      let all : Array[@types.VectorId] = []
+      let seen : Map[Int64, Bool] = {}
+      for e in exprs {
+        match get_candidates_bptree(e, index) {
+          None => return None
+          Some(candidates) =>
+            for id in candidates {
+              if not(seen.contains(id.to_int64())) {
+                seen.set(id.to_int64(), true)
+                all.push(id)
+              }
+            }
+        }
+      }
+      Some(all)
+    }
+  }
+}
+
+///|
 /// Intersect two ID arrays
 fn intersect_ids(
   a : Array[@types.VectorId],

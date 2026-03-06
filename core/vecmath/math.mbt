@@ -3,7 +3,7 @@
 /// Leaves a zero vector unchanged (avoids dividing by zero).
 pub fn normalize_in_place(vec : Array[Double]) -> Unit {
   let len = vec.length()
-  let end4 = len - (len % 4)
+  let end4 = len - len % 4
   let mut s0 = 0.0
   let mut s1 = 0.0
   let mut s2 = 0.0
@@ -63,7 +63,7 @@ pub fn dot_at(
   let mut s1 = 0.0
   let mut s2 = 0.0
   let mut s3 = 0.0
-  let end4 = dim - (dim % 4)
+  let end4 = dim - dim % 4
   let mut i = 0
   while i < end4 {
     s0 += data[base + i] * q[i]
@@ -94,7 +94,7 @@ pub fn l2neg_at(
   let mut s1 = 0.0
   let mut s2 = 0.0
   let mut s3 = 0.0
-  let end4 = dim - (dim % 4)
+  let end4 = dim - dim % 4
   let mut i = 0
   while i < end4 {
     let d0 = data[base + i] - q[i]
@@ -133,7 +133,7 @@ pub fn get_score_fn(
 /// Compute L2 norm of a vector
 pub fn l2_norm(vec : Array[Double]) -> Double {
   let len = vec.length()
-  let end4 = len - (len % 4)
+  let end4 = len - len % 4
   let mut s0 = 0.0
   let mut s1 = 0.0
   let mut s2 = 0.0
@@ -163,7 +163,7 @@ pub fn l2_norm(vec : Array[Double]) -> Double {
 /// Compute dot product of two vectors
 pub fn dot(a : Array[Double], b : Array[Double]) -> Double {
   let len = if a.length() < b.length() { a.length() } else { b.length() }
-  let end4 = len - (len % 4)
+  let end4 = len - len % 4
   let mut s0 = 0.0
   let mut s1 = 0.0
   let mut s2 = 0.0
@@ -188,7 +188,7 @@ pub fn dot(a : Array[Double], b : Array[Double]) -> Double {
 /// Compute squared L2 distance between two vectors
 pub fn l2_squared(a : Array[Double], b : Array[Double]) -> Double {
   let len = if a.length() < b.length() { a.length() } else { b.length() }
-  let end4 = len - (len % 4)
+  let end4 = len - len % 4
   let mut s0 = 0.0
   let mut s1 = 0.0
   let mut s2 = 0.0

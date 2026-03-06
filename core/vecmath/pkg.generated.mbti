@@ -1,0 +1,36 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/vecmath"
+
+import {
+  "trkbt10/vcdb/core/types",
+}
+
+// Values
+pub fn cosine_similarity(Array[Double], Array[Double]) -> Double
+
+pub fn dot(Array[Double], Array[Double]) -> Double
+
+pub fn dot_at(Array[Double], Int, Array[Double], Int) -> Double
+
+pub fn get_score_fn(@types.Metric) -> (Array[Double], Int, Array[Double], Int) -> Double
+
+pub fn l2_norm(Array[Double]) -> Double
+
+pub fn l2_squared(Array[Double], Array[Double]) -> Double
+
+pub fn l2neg_at(Array[Double], Int, Array[Double], Int) -> Double
+
+pub fn ln(Double) -> Double
+
+pub fn normalize(Array[Double]) -> Array[Double]
+
+pub fn normalize_in_place(Array[Double]) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

@@ -654,14 +654,12 @@ test "api/bulk_remove" {
 /// Test: Search with range filter using attr index
 test "api/search_range_prefilter" {
   let db = @vcdb.VectorDB::with_dim(2)
-  let attr_index = @attr.BasicAttrIndex::new()
   // Add vectors with numeric values
   for i in 1..<=100 {
     let attrs = @types.empty_attrs()
     attrs.set("price", @types.Int(i.to_int64() * 10L))
     let id = @types.VectorId::from_int(i)
     db.add(id, [i.to_double() / 100.0, 1.0 - i.to_double() / 100.0], attrs)
-    attr_index.set_attrs(id, attrs)
   }
   // Filter: price >= 500 AND price <= 690
   let range = @types.NumericRange::between(500.0, 690.0)
@@ -670,7 +668,7 @@ test "api/search_range_prefilter" {
     [1.0, 0.0],
     50,
     Some(expr),
-    Some(attr_index),
+    None,
     @filter.PreFilter,
   )
   // Should get IDs 50-69 (price 500-690)
@@ -749,7 +747,6 @@ test "api/high_dimensional" {
 /// Test: Complex must/must_not/should expressions
 test "api/complex_expr_search" {
   let db = @vcdb.VectorDB::with_dim(2)
-  let attr_index = @attr.BasicAttrIndex::new()
   // Setup data
   for i in 1..<=20 {
     let attrs = @types.empty_attrs()
@@ -758,7 +755,6 @@ test "api/complex_expr_search" {
     attrs.set("category", @types.String(if i <= 10 { "X" } else { "Y" }))
     let id = @types.VectorId::from_int(i)
     db.add(id, [i.to_double() / 20.0, 1.0 - i.to_double() / 20.0], attrs)
-    attr_index.set_attrs(id, attrs)
   }
   // Must: category=X AND active=true
   let expr = @filter.FilterExpr::must([
@@ -769,7 +765,7 @@ test "api/complex_expr_search" {
     [1.0, 0.0],
     10,
     Some(expr),
-    Some(attr_index),
+    None,
     @filter.PostFilter,
   )
   // IDs 2,4,6,8,10 (even numbers in 1-10)

@@ -878,7 +878,7 @@ test "edge/ops/upsert_search_interleave" {
 /// Test: PreFilter with empty candidate set
 test "edge/prefilter/empty_candidates" {
   let db = @vcdb.VectorDB::with_dim(2)
-  let index = @attr.BasicAttrIndex::new()
+  let index = @attr.BPTreeAttrIndex::new()
 
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
@@ -906,7 +906,7 @@ test "edge/prefilter/empty_candidates" {
 /// Test: Index and DB out of sync
 test "edge/index/desync" {
   let db = @vcdb.VectorDB::with_dim(2)
-  let index = @attr.BasicAttrIndex::new()
+  let index = @attr.BPTreeAttrIndex::new()
 
   // Add to both
   let attrs = @types.empty_attrs()

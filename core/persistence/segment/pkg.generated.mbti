@@ -2,30 +2,27 @@
 package "trkbt10/vcdb/core/persistence/segment"
 
 import {
-  "trkbt10/vcdb/core",
   "trkbt10/vcdb/core/binary",
+  "trkbt10/vcdb/core/store",
+  "trkbt10/vcdb/core/types",
 }
 
 // Values
 pub fn decode_index_file(Bytes) -> DecodedIndexFile?
 
-pub fn decode_metric(Int) -> @core.Metric
+pub fn decode_metric(Int) -> @types.Metric
 
 pub fn decode_strategy_type(Int) -> Int
 
 pub fn encode_index_file(IndexHeader, Array[IndexEntry], Bytes?) -> Bytes
 
-pub fn encode_metric(@core.Metric) -> Int
+pub fn encode_metric(@types.Metric) -> Int
 
-pub fn encode_strategy(@core.Strategy) -> Int
+pub fn encode_strategy(@types.Strategy) -> Int
 
-pub let index_magic : UInt
+pub let index_version : Byte
 
-pub let index_version : UInt
-
-pub let segment_magic : UInt
-
-pub let segment_version : UInt
+pub let segment_version : Byte
 
 // Errors
 
@@ -46,7 +43,7 @@ pub struct DecodedIndexFile {
 pub impl Show for DecodedIndexFile
 
 pub(all) struct IndexEntry {
-  id : @core.VectorId
+  id : @types.VectorId
   ptr : DataPointer
 }
 pub impl Show for IndexEntry
@@ -58,24 +55,24 @@ pub(all) struct IndexHeader {
   strategy_code : Int
   has_ann : Bool
 }
-pub fn IndexHeader::from_store(@core.CoreStore, @core.Strategy, Bool) -> Self
+pub fn IndexHeader::from_store(@store.CoreStore, @types.Strategy, Bool) -> Self
 pub impl Show for IndexHeader
 
 pub struct SegmentReader {
   name : String
   data : Bytes
 }
-pub fn SegmentReader::collect(Self) -> Array[(@core.VectorId, Array[Double], @core.Attrs)]
+pub fn SegmentReader::collect(Self) -> Array[(@types.VectorId, Array[Double], @types.Attrs)]
 pub fn SegmentReader::from_bytes(String, Bytes) -> Self?
-pub fn SegmentReader::iter(Self) -> Iter[(@core.VectorId, Array[Double], @core.Attrs)]
-pub fn SegmentReader::read_at(Self, Int, Int) -> (@core.VectorId, Array[Double], @core.Attrs)?
+pub fn SegmentReader::iter(Self) -> Iter[(@types.VectorId, Array[Double], @types.Attrs)]
+pub fn SegmentReader::read_at(Self, Int, Int) -> (@types.VectorId, Array[Double], @types.Attrs)?
 
 pub struct SegmentWriter {
   name : String
   buffer : @binary.BinaryWriter
   mut size : Int
 }
-pub fn SegmentWriter::append(Self, @core.VectorId, Array[Double], @core.Attrs) -> DataPointer
+pub fn SegmentWriter::append(Self, @types.VectorId, Array[Double], @types.Attrs) -> DataPointer
 pub fn SegmentWriter::get_name(Self) -> String
 pub fn SegmentWriter::new(String) -> Self
 pub fn SegmentWriter::to_bytes(Self) -> Bytes

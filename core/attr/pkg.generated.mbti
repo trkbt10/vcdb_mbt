@@ -2,13 +2,13 @@
 package "trkbt10/vcdb/core/attr"
 
 import {
-  "trkbt10/vcdb/core",
+  "trkbt10/vcdb/core/types",
 }
 
 // Values
-pub fn attr_value_to_key(@core.AttrValue) -> String
+pub fn attr_value_to_key(@types.AttrValue) -> String
 
-pub fn attr_value_to_number(@core.AttrValue) -> Double?
+pub fn attr_value_to_number(@types.AttrValue) -> Double?
 
 pub fn lower_bound(Array[NumEntry], Double) -> Int
 
@@ -37,45 +37,47 @@ type BPTree
 pub struct BPTreeAttrIndex {
   field_trees : Map[String, BPTree]
   exists_trees : Map[String, BPTree]
-  data : Map[Int64, @core.Attrs]
+  data : Map[Int64, @types.Attrs]
   order : Int
 }
-pub fn BPTreeAttrIndex::eq(Self, String, @core.AttrValue) -> Array[@core.VectorId]
-pub fn BPTreeAttrIndex::exists(Self, String) -> Array[@core.VectorId]
-pub fn BPTreeAttrIndex::get_attrs(Self, @core.VectorId) -> @core.Attrs?
+pub fn BPTreeAttrIndex::deserialize(Bytes) -> Self
+pub fn BPTreeAttrIndex::eq(Self, String, @types.AttrValue) -> Array[@types.VectorId]
+pub fn BPTreeAttrIndex::exists(Self, String) -> Array[@types.VectorId]
+pub fn BPTreeAttrIndex::get_attrs(Self, @types.VectorId) -> @types.Attrs?
 pub fn BPTreeAttrIndex::new(order? : Int) -> Self
-pub fn BPTreeAttrIndex::range(Self, String, @core.NumericRange) -> Array[@core.VectorId]?
-pub fn BPTreeAttrIndex::remove_id(Self, @core.VectorId) -> Unit
-pub fn BPTreeAttrIndex::set_attrs(Self, @core.VectorId, @core.Attrs) -> Unit
+pub fn BPTreeAttrIndex::range(Self, String, @types.NumericRange) -> Array[@types.VectorId]?
+pub fn BPTreeAttrIndex::remove_id(Self, @types.VectorId) -> Unit
+pub fn BPTreeAttrIndex::serialize(Self) -> Bytes
+pub fn BPTreeAttrIndex::set_attrs(Self, @types.VectorId, @types.Attrs) -> Unit
 pub fn BPTreeAttrIndex::size(Self) -> Int
 
 pub struct BasicAttrIndex {
-  data : Map[Int64, @core.Attrs]
+  data : Map[Int64, @types.Attrs]
   eq_map : Map[String, Map[String, Array[Int64]]]
   exists_map : Map[String, Array[Int64]]
   num_map : Map[String, (Array[NumEntry], Bool)]
 }
-pub fn BasicAttrIndex::eq(Self, String, @core.AttrValue) -> Array[@core.VectorId]
-pub fn BasicAttrIndex::exists(Self, String) -> Array[@core.VectorId]
-pub fn BasicAttrIndex::get_attrs(Self, @core.VectorId) -> @core.Attrs?
+pub fn BasicAttrIndex::eq(Self, String, @types.AttrValue) -> Array[@types.VectorId]
+pub fn BasicAttrIndex::exists(Self, String) -> Array[@types.VectorId]
+pub fn BasicAttrIndex::get_attrs(Self, @types.VectorId) -> @types.Attrs?
 pub fn BasicAttrIndex::new() -> Self
-pub fn BasicAttrIndex::range(Self, String, @core.NumericRange) -> Array[@core.VectorId]?
-pub fn BasicAttrIndex::remove_id(Self, @core.VectorId) -> Unit
-pub fn BasicAttrIndex::set_attrs(Self, @core.VectorId, @core.Attrs) -> Unit
+pub fn BasicAttrIndex::range(Self, String, @types.NumericRange) -> Array[@types.VectorId]?
+pub fn BasicAttrIndex::remove_id(Self, @types.VectorId) -> Unit
+pub fn BasicAttrIndex::set_attrs(Self, @types.VectorId, @types.Attrs) -> Unit
 pub fn BasicAttrIndex::size(Self) -> Int
 
 pub struct BitmapAttrIndex {
-  data : Map[Int64, @core.Attrs]
+  data : Map[Int64, @types.Attrs]
   eq_map : Map[String, Map[String, Array[Int64]]]
   exists_map : Map[String, Array[Int64]]
 }
-pub fn BitmapAttrIndex::eq(Self, String, @core.AttrValue) -> Array[@core.VectorId]
-pub fn BitmapAttrIndex::exists(Self, String) -> Array[@core.VectorId]
-pub fn BitmapAttrIndex::get_attrs(Self, @core.VectorId) -> @core.Attrs?
+pub fn BitmapAttrIndex::eq(Self, String, @types.AttrValue) -> Array[@types.VectorId]
+pub fn BitmapAttrIndex::exists(Self, String) -> Array[@types.VectorId]
+pub fn BitmapAttrIndex::get_attrs(Self, @types.VectorId) -> @types.Attrs?
 pub fn BitmapAttrIndex::new() -> Self
-pub fn BitmapAttrIndex::range(Self, String, @core.NumericRange) -> Array[@core.VectorId]?
-pub fn BitmapAttrIndex::remove_id(Self, @core.VectorId) -> Unit
-pub fn BitmapAttrIndex::set_attrs(Self, @core.VectorId, @core.Attrs) -> Unit
+pub fn BitmapAttrIndex::range(Self, String, @types.NumericRange) -> Array[@types.VectorId]?
+pub fn BitmapAttrIndex::remove_id(Self, @types.VectorId) -> Unit
+pub fn BitmapAttrIndex::set_attrs(Self, @types.VectorId, @types.Attrs) -> Unit
 pub fn BitmapAttrIndex::size(Self) -> Int
 
 pub struct BloomFilter {
@@ -91,18 +93,18 @@ pub fn BloomFilter::might_contain(Self, Bytes) -> Bool
 pub struct LSMAttrIndex {
   memtable : Memtable
   exists_memtable : Memtable
-  data : Map[Int64, @core.Attrs]
+  data : Map[Int64, @types.Attrs]
   flush_threshold : Int
 }
 pub fn LSMAttrIndex::clear_memtable(Self) -> Unit
-pub fn LSMAttrIndex::eq(Self, String, @core.AttrValue) -> Array[@core.VectorId]
-pub fn LSMAttrIndex::exists(Self, String) -> Array[@core.VectorId]
-pub fn LSMAttrIndex::get_attrs(Self, @core.VectorId) -> @core.Attrs?
+pub fn LSMAttrIndex::eq(Self, String, @types.AttrValue) -> Array[@types.VectorId]
+pub fn LSMAttrIndex::exists(Self, String) -> Array[@types.VectorId]
+pub fn LSMAttrIndex::get_attrs(Self, @types.VectorId) -> @types.Attrs?
 pub fn LSMAttrIndex::memtable_size(Self) -> Int
 pub fn LSMAttrIndex::new(flush_threshold? : Int) -> Self
-pub fn LSMAttrIndex::range(Self, String, @core.NumericRange) -> Array[@core.VectorId]?
-pub fn LSMAttrIndex::remove_id(Self, @core.VectorId) -> Unit
-pub fn LSMAttrIndex::set_attrs(Self, @core.VectorId, @core.Attrs) -> Unit
+pub fn LSMAttrIndex::range(Self, String, @types.NumericRange) -> Array[@types.VectorId]?
+pub fn LSMAttrIndex::remove_id(Self, @types.VectorId) -> Unit
+pub fn LSMAttrIndex::set_attrs(Self, @types.VectorId, @types.Attrs) -> Unit
 pub fn LSMAttrIndex::should_flush(Self) -> Bool
 pub fn LSMAttrIndex::size(Self) -> Int
 
