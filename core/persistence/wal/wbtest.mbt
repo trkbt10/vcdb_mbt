@@ -791,7 +791,6 @@ test "wal/truncated_record" {
 ///|
 test "wal/corrupted_checksum_rejected" {
   let storage = @storage.MemoryStorage::new()
-  // Create valid WAL segment with footer
   let record : WalRecord = {
     record_type: WalRecordType::Upsert,
     id: @types.VectorId::from_int(1),
@@ -809,20 +808,13 @@ test "wal/corrupted_checksum_rejected" {
     }
   }
   let corrupted = w.concat()
-  // Write corrupted WAL
   storage.atomic_write("test.wal", corrupted)
-  // Replay should fail with checksum error
+  // Replay returns 0 records — corrupted WAL is silently skipped
   let wal = WalRuntime::new(storage, "test.wal")
   let store = @store.CoreStore::new(2, @types.Cosine)
-  let mut replay_failed = false
-  let _ = wal.replay_into(store) catch {
-    IoFailed(_) => {
-      replay_failed = true
-      0
-    }
-    _ => 0 // Other errors don't count as checksum failure
-  }
-  inspect(replay_failed, content="true")
+  let applied = wal.replay_into(store) catch { _ => -1 }
+  inspect(applied, content="0")
+  inspect(store.size(), content="0")
 }
 
 ///|
@@ -1020,22 +1012,14 @@ test "wal/append_rejects_corrupted_checksum" {
 ///|
 test "wal/replay_rejects_invalid_header" {
   let storage = @storage.MemoryStorage::new()
-  // Write non-WAL data (valid checksum won't help)
   let garbage = Bytes::new(20) // >= 16 bytes but not a WAL
   storage.atomic_write("garbage.wal", garbage)
   let wal = WalRuntime::new(storage, "garbage.wal")
   let store = @store.CoreStore::new(2, @types.Cosine)
-  let mut replay_failed = false
-  let _ = wal.replay_into(store) catch {
-    IoFailed(msg) => {
-      if msg == "WAL header invalid" {
-        replay_failed = true
-      }
-      0
-    }
-    _ => 0
-  }
-  inspect(replay_failed, content="true")
+  // Invalid header → replay returns 0 (no records applied, no crash)
+  let applied = wal.replay_into(store) catch { _ => -1 }
+  inspect(applied, content="0")
+  inspect(store.size(), content="0")
 }
 
 ///|

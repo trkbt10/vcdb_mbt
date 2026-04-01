@@ -5,4 +5,11 @@ import {
   "trkbt10/vcdb/core/binary",
   "trkbt10/vcdb/core/persistence/codec",
   "trkbt10/vcdb/core/storage",
+  "moonbitlang/async/js_async",
 }
+
+options(
+  targets: {
+    "async_runtime.mbt": [ "js" ],
+  },
+)

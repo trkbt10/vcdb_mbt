@@ -216,6 +216,61 @@ pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
 }
 
 ///|
+/// Merge an existing WAL with a new WAL segment, producing a valid
+/// WAL file with correct CRC footer.
+///
+/// This is the SoT for WAL merge logic. Used by:
+/// - WalRuntime::append (sync, reads existing from storage)
+/// - JS async gateway (passes existing + new as byte arrays)
+///
+/// existing: previous WAL data (may be empty, may have footer, may be corrupt)
+/// new_segment: new WAL segment from encode_wal_segment (has header + footer)
+/// Returns: merged WAL with valid header + all records + CRC footer
+pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
+  let w = @binary.BinaryWriter::new()
+  let mut use_existing = false
+
+  if existing.length() >= @codec.header_size {
+    if verify_wal_checksum(existing) {
+      let safe_len = get_safe_copy_length(existing)
+      if safe_len >= @codec.header_size {
+        for i in 0..<safe_len {
+          w.push_byte(existing[i])
+        }
+        use_existing = true
+      }
+    }
+  }
+
+  if not(use_existing) {
+    w.push_bytes(encode_wal_header())
+  }
+
+  // Extract records from new_segment (skip header, skip footer)
+  let new_body_len = wal_body_length(new_segment)
+  if new_segment.length() >= @codec.header_size {
+    let r = @binary.BinaryReader::new(new_segment)
+    // Skip header
+    r.skip(@codec.header_size)
+    // Copy records
+    while r.position() < new_body_len {
+      match decode_wal_record(r) {
+        None => break
+        Some(record) => encode_wal_record_to(w, record)
+      }
+    }
+  }
+
+  // Compute CRC footer over the full body
+  let body = w.concat()
+  let footer = encode_wal_footer(body)
+  let final_w = @binary.BinaryWriter::new()
+  final_w.push_bytes(body)
+  final_w.push_bytes(footer)
+  final_w.concat()
+}
+
+///|
 /// Verify WAL header
 pub fn verify_wal_header(r : @binary.BinaryReader) -> Bool {
   match @codec.read_header(r) {

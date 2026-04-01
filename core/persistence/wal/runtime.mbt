@@ -17,6 +17,12 @@ pub fn[S] WalRuntime::new(
 }
 
 ///|
+/// Get the WAL file path
+pub fn[S] WalRuntime::path(self : WalRuntime[S]) -> String {
+  self.path
+}
+
+///|
 /// Get safe copy length - up to the last decodable record boundary
 /// Returns header length (12) if no records are decodable
 fn get_safe_copy_length(data : Bytes) -> Int {
@@ -42,7 +48,8 @@ fn get_safe_copy_length(data : Bytes) -> Int {
 }
 
 ///|
-/// Append records to the WAL with checksum footer
+/// Append records to the WAL with checksum footer.
+/// Delegates merge logic to format.mbt's merge_wal (the SoT).
 pub fn[S : @storage.Storage] WalRuntime::append(
   self : WalRuntime[S],
   records : Array[WalRecord],
@@ -50,41 +57,14 @@ pub fn[S : @storage.Storage] WalRuntime::append(
   if records.is_empty() {
     return
   }
-  let w = @binary.BinaryWriter::new()
-  // Read existing WAL and copy only up to last decodable record
-  let mut use_existing = false
-  if self.storage.exists(self.path, self.kind) {
-    let existing = self.storage.read(self.path, self.kind)
-    // First verify checksum - if it fails, the file is corrupted
-    if verify_wal_checksum(existing) {
-      // Checksum valid: get safe copy length (up to last decodable record boundary)
-      let safe_len = get_safe_copy_length(existing)
-      if safe_len >= @codec.header_size {
-        // Copy header + valid records only (excludes corrupt tail)
-        for i in 0..<safe_len {
-          w.push_byte(existing[i])
-        }
-        use_existing = true
-      }
-    }
-    // If checksum fails, start fresh (use_existing stays false)
+  let existing = if self.storage.exists(self.path, self.kind) {
+    self.storage.read(self.path, self.kind)
+  } else {
+    Bytes::new(0)
   }
-  if not(use_existing) {
-    // Write header for new/invalid/corrupted WAL
-    w.push_bytes(encode_wal_header())
-  }
-  // Append new records
-  for record in records {
-    w.push_bytes(encode_wal_record(record))
-  }
-  // Get body and compute footer with checksum
-  let body = w.concat()
-  let footer = encode_wal_footer(body)
-  // Write complete WAL atomically
-  let final_w = @binary.BinaryWriter::new()
-  final_w.push_bytes(body)
-  final_w.push_bytes(footer)
-  self.storage.atomic_write(self.path, final_w.concat(), self.kind)
+  let new_segment = encode_wal_segment(records)
+  let merged = merge_wal(existing, new_segment)
+  self.storage.atomic_write(self.path, merged, self.kind)
 }
 
 ///|
@@ -98,17 +78,27 @@ pub fn[S : @storage.Storage] WalRuntime::replay_into(
     return 0
   }
   let data = self.storage.read(self.path, self.kind)
-  // Verify header first - reject non-WAL files
+  replay_wal_data(data, store)
+}
+
+///|
+/// Replay WAL binary data into a CoreStore (no Storage dependency).
+/// This is the SoT for WAL replay logic. Used by:
+/// - WalRuntime::replay_into (reads from Storage, then delegates here)
+/// - JS async gateway (passes WAL bytes directly)
+/// - AsyncWalRuntime::replay_into (reads from AsyncStorage, then delegates here)
+///
+/// Returns the number of records applied. Returns 0 for empty/invalid data.
+pub fn replay_wal_data(data : Bytes, store : @store.CoreStore) -> Int {
   if data.length() < @codec.header_size {
-    raise @storage.IoFailed("WAL file too short")
+    return 0
   }
   let header_reader = @binary.BinaryReader::new(data)
   if not(verify_wal_header(header_reader)) {
-    raise @storage.IoFailed("WAL header invalid")
+    return 0
   }
-  // Verify checksum before applying records to prevent corruption
   if not(verify_wal_checksum(data)) {
-    raise @storage.IoFailed("WAL checksum verification failed")
+    return 0
   }
   let records = decode_wal_records(data)
   let mut applied = 0
