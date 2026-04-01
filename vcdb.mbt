@@ -312,6 +312,44 @@ pub fn VectorDB::get(
 }
 
 ///|
+/// Scroll points in ascending ID order, similar to Qdrant scroll.
+pub fn VectorDB::scroll(
+  self : VectorDB,
+  offset? : Int64? = None,
+  limit? : Int = 10,
+) -> Array[(@types.VectorId, @types.VectorRecord)] {
+  let visible : Array[(@types.VectorId, @types.VectorRecord)] = []
+  for i in 0..<self.store.size() {
+    let id = match self.store.id_at(i) {
+      Some(id) => id
+      None => continue
+    }
+    match self.get(id) {
+      Some(record) => visible.push((id, record))
+      None => ()
+    }
+  }
+  visible.sort_by(fn(a, b) {
+    let (id_a, _) = a
+    let (id_b, _) = b
+    id_a.to_int64().compare(id_b.to_int64())
+  })
+  let threshold = offset.unwrap_or(-9223372036854775808L)
+  let points : Array[(@types.VectorId, @types.VectorRecord)] = []
+  for entry in visible {
+    let (id, _) = entry
+    if id.to_int64() < threshold {
+      continue
+    }
+    points.push(entry)
+    if points.length() >= limit {
+      break
+    }
+  }
+  points
+}
+
+///|
 /// Add a new vector to the database.
 ///
 /// For HNSW mode, allows re-adding tombstoned IDs (clears tombstone and re-indexes).
@@ -654,6 +692,38 @@ pub fn VectorDB::train(self : VectorDB, iterations? : Int = 10) -> Unit {
   match self.ivf {
     Some(state) => @ann.ivf_train(state, self.store, iterations~)
     None => ()
+  }
+}
+
+///|
+/// Compact the database by removing tombstoned vectors (HNSW only).
+///
+/// HNSW uses soft-delete (tombstones) for remove(). Over time, tombstones
+/// accumulate and waste memory. compact() rebuilds the HNSW graph
+/// without tombstoned entries.
+///
+/// For Bruteforce and IVF, this is a no-op (they physically remove).
+///
+/// Returns: A new VectorDB with the compacted state, and the number of
+/// removed tombstones.
+pub fn VectorDB::compact(self : VectorDB) -> (VectorDB, Int) {
+  match self.hnsw {
+    Some(state) => {
+      let (new_state, removed) = @ann.hnsw_compact_and_rebuild(
+        state,
+        self.store,
+      )
+      let new_db : VectorDB = {
+        store: self.store,
+        attr_index: self.attr_index,
+        strategy: self.strategy,
+        bruteforce: None,
+        hnsw: Some(new_state),
+        ivf: None,
+      }
+      (new_db, removed)
+    }
+    None => (self, 0)
   }
 }
 

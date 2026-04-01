@@ -54,6 +54,7 @@ options(
         "async_has",
         "async_update_attrs",
         "async_scroll",
+        "async_compact",
         "async_serialize_filter",
       ],
     },

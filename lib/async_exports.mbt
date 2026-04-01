@@ -308,9 +308,19 @@ pub fn async_scroll(
   results
 }
 
-// Note: HNSW compaction (hnsw_compact_and_rebuild) is available in
-// core/ann/maintain.mbt but requires VectorDB-level integration.
-// Add async_compact when VectorDB::compact() is implemented.
+///|
+/// Compact the HNSW index by removing tombstoned vectors.
+/// Returns snapshot bytes for persistence (caller should checkpoint).
+/// Returns the number of tombstones removed.
+pub fn async_compact() -> (Bytes, Int) {
+  let db = match async_db_instance.val {
+    Some(d) => d
+    None => abort("DB not initialized")
+  }
+  let (new_db, removed) = db.compact()
+  async_db_instance.val = Some(new_db)
+  (new_db.serialize(), removed)
+}
 
 ///|
 /// Serialize a FilterExpr to JSON string (round-trip with parse_filter_json).
