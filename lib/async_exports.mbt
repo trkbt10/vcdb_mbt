@@ -143,7 +143,7 @@ pub fn async_search(
     Some(d) => d
     None => abort("DB not initialized")
   }
-  let filter = parse_filter(filter_json)
+  let filter = @filter.parse_filter_json(filter_json)
   let hits = db.search_with_expr(query, k, filter, None, @filter.Auto)
   let results : Array[(Double, Double, String)] = []
   for hit in hits {
@@ -160,30 +160,6 @@ pub fn async_search(
   results
 }
 
-///|
-/// Parse a flat JSON object into a FilterExpr.
-/// {"category": "科学"} → Must([Match("category", String("科学"))])
-/// Empty/null → None (no filtering)
-fn parse_filter(json : String) -> @filter.FilterExpr? {
-  if json.length() == 0 || json == "{}" {
-    return None
-  }
-  let attrs = parse_json_to_attrs(json)
-  let conditions : Array[@filter.FilterExpr] = []
-  for key in attrs.keys() {
-    match attrs.get(key) {
-      Some(value) => conditions.push(@filter.FilterExpr::match_(key, value))
-      None => ()
-    }
-  }
-  if conditions.is_empty() {
-    None
-  } else if conditions.length() == 1 {
-    Some(conditions[0])
-  } else {
-    Some(@filter.FilterExpr::must(conditions))
-  }
-}
 
 ///|
 /// Serialize the current DB state as a snapshot.
