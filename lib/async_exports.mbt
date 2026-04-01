@@ -97,8 +97,10 @@ pub fn async_replay_wal_and_init(
 /// Upsert points into the in-memory DB.
 /// payload_json is a JSON string for each point's attrs.
 /// Returns the WAL binary data that JS must persist.
+/// timestamp_ns: nanoseconds since Unix epoch. 0 = no timestamp.
 pub fn async_upsert(
   points : Array[(Double, Array[Double], String)],
+  timestamp_ns : Int64,
 ) -> Bytes {
   let db = match async_db_instance.val {
     Some(d) => d
@@ -114,7 +116,7 @@ pub fn async_upsert(
   }
   let records : Array[@wal.WalRecord] = typed_points.map(fn(p) {
     let (id, vector, attrs) = p
-    @wal.WalRecord::upsert(id, vector, attrs)
+    @wal.WalRecord::upsert(id, vector, attrs, timestamp=timestamp_ns)
   })
   @wal.encode_wal_segment(records)
 }
@@ -194,6 +196,40 @@ pub fn async_merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
 }
 
 ///|
+/// Get the maximum timestamp across all records in a WAL.
+pub fn async_max_wal_timestamp(wal_data : Bytes) -> Int64 {
+  @wal.max_wal_timestamp(wal_data)
+}
+
+///|
+/// Replay WAL with timestamp cutoff (read-at-timestamp).
+/// Only applies records with timestamp <= cutoff_ts.
+pub fn async_replay_wal_at_timestamp(
+  wal_data : Bytes,
+  snapshot_data : Bytes,
+  dim : Int,
+  capacity : Int,
+  cutoff_ts : Int64,
+) -> Int {
+  if snapshot_data.length() > 0 {
+    let db = @vcdb.VectorDB::deserialize(snapshot_data)
+    let store = db.store()
+    let applied = @wal.replay_wal_data(wal_data, store, cutoff_ts=cutoff_ts)
+    if applied > 0 {
+      async_init_db_from_store(store, dim, capacity)
+    } else {
+      async_db_instance.val = Some(db)
+    }
+    applied
+  } else {
+    let store = @store.CoreStore::new(dim, @types.Cosine, capacity=capacity)
+    let applied = @wal.replay_wal_data(wal_data, store, cutoff_ts=cutoff_ts)
+    async_init_db_from_store(store, dim, capacity)
+    applied
+  }
+}
+
+///|
 /// Get the current DB size (excludes tombstoned vectors in HNSW).
 pub fn async_db_size() -> Int {
   match async_db_instance.val {
@@ -223,14 +259,14 @@ pub fn async_db_dim() -> Int {
 ///|
 /// Remove a vector by ID. Returns WAL segment bytes for persistence.
 /// Returns empty bytes if ID not found.
-pub fn async_remove(id : Double) -> Bytes {
+pub fn async_remove(id : Double, timestamp_ns : Int64) -> Bytes {
   let db = match async_db_instance.val {
     Some(d) => d
     None => abort("DB not initialized")
   }
   let vid = @types.VectorId(id.to_int64())
   if db.remove(vid) {
-    @wal.encode_wal_segment([@wal.WalRecord::remove(vid)])
+    @wal.encode_wal_segment([@wal.WalRecord::remove(vid, timestamp=timestamp_ns)])
   } else {
     Bytes::new(0)
   }
@@ -271,7 +307,7 @@ pub fn async_has(id : Double) -> Bool {
 /// Update attributes of an existing vector without re-embedding.
 /// Returns WAL segment bytes for persistence.
 /// Returns empty bytes if ID not found.
-pub fn async_update_attrs(id : Double, attrs_json : String) -> Bytes {
+pub fn async_update_attrs(id : Double, attrs_json : String, timestamp_ns : Int64) -> Bytes {
   let db = match async_db_instance.val {
     Some(d) => d
     None => abort("DB not initialized")
@@ -282,7 +318,7 @@ pub fn async_update_attrs(id : Double, attrs_json : String) -> Bytes {
   }
   let attrs = parse_json_to_attrs(attrs_json)
   let _ = db.update_attrs(vid, attrs)
-  @wal.encode_wal_segment([@wal.WalRecord::set_attrs(vid, attrs)])
+  @wal.encode_wal_segment([@wal.WalRecord::set_attrs(vid, attrs, timestamp=timestamp_ns)])
 }
 
 ///|

@@ -635,6 +635,7 @@ test "wal/upsert_no_attrs" {
     id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
+    timestamp: 0L,
   }
   let encoded = encode_wal_record(record)
   // Should still encode/decode
@@ -773,6 +774,7 @@ test "wal/truncated_record" {
     id: @types.VectorId::from_int(1),
     attrs: Some(attrs),
     vector: Some([1.0, 2.0, 3.0]),
+    timestamp: 0L,
   }
   let full_segment = encode_wal_segment([record])
   // Truncate in the middle of the record body - copy first half
@@ -796,6 +798,7 @@ test "wal/corrupted_checksum_rejected" {
     id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
+    timestamp: 0L,
   }
   let segment = encode_wal_segment([record])
   // Corrupt a byte in the body (before footer) - flip bit at position 10
@@ -849,6 +852,7 @@ test "wal/replay_after_truncate" {
     id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
+    timestamp: 0L,
   }
   wal.append([record]) catch {
     _ => ()
@@ -919,6 +923,7 @@ test "wal/append_writes_footer" {
     id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
+    timestamp: 0L,
   }
   wal.append([record]) catch {
     _ => ()
@@ -949,6 +954,7 @@ test "wal/append_reinit_invalid_header" {
     id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
+    timestamp: 0L,
   }
   wal.append([record]) catch {
     _ => ()
@@ -972,6 +978,7 @@ test "wal/append_rejects_corrupted_checksum" {
     id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
+    timestamp: 0L,
   }
   wal.append([record1]) catch {
     _ => ()
@@ -996,6 +1003,7 @@ test "wal/append_rejects_corrupted_checksum" {
     id: @types.VectorId::from_int(2),
     attrs: None,
     vector: Some([3.0, 4.0]),
+    timestamp: 0L,
   }
   wal.append([record2]) catch {
     _ => ()
@@ -1032,6 +1040,7 @@ test "wal/append_truncated_tail" {
     id: @types.VectorId::from_int(1),
     attrs: None,
     vector: Some([1.0, 2.0]),
+    timestamp: 0L,
   }
   wal.append([record1]) catch {
     _ => ()
@@ -1050,6 +1059,7 @@ test "wal/append_truncated_tail" {
     id: @types.VectorId::from_int(2),
     attrs: None,
     vector: Some([3.0, 4.0]),
+    timestamp: 0L,
   }
   wal.append([record2]) catch {
     _ => ()
@@ -1073,6 +1083,7 @@ test "wal/json_control_chars" {
     id: @types.VectorId::from_int(1),
     attrs: Some(attrs),
     vector: Some([1.0, 2.0]),
+    timestamp: 0L,
   }
   wal.append([record]) catch {
     _ => ()

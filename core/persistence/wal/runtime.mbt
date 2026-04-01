@@ -89,7 +89,11 @@ pub fn[S : @storage.Storage] WalRuntime::replay_into(
 /// - AsyncWalRuntime::replay_into (reads from AsyncStorage, then delegates here)
 ///
 /// Returns the number of records applied. Returns 0 for empty/invalid data.
-pub fn replay_wal_data(data : Bytes, store : @store.CoreStore) -> Int {
+pub fn replay_wal_data(
+  data : Bytes,
+  store : @store.CoreStore,
+  cutoff_ts? : Int64 = 0L,
+) -> Int {
   if data.length() < @codec.header_size {
     return 0
   }
@@ -100,7 +104,11 @@ pub fn replay_wal_data(data : Bytes, store : @store.CoreStore) -> Int {
   if not(verify_wal_checksum(data)) {
     return 0
   }
-  let records = decode_wal_records(data)
+  let records = if cutoff_ts > 0L {
+    filter_wal_by_timestamp(data, cutoff_ts)
+  } else {
+    decode_wal_records(data)
+  }
   let mut applied = 0
   for record in records {
     match record.record_type {

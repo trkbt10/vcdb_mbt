@@ -55,6 +55,8 @@ options(
         "async_update_attrs",
         "async_scroll",
         "async_compact",
+        "async_max_wal_timestamp",
+        "async_replay_wal_at_timestamp",
         "async_serialize_filter",
       ],
     },

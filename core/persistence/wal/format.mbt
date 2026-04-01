@@ -1,19 +1,37 @@
 ///|
 /// Write-Ahead Log (WAL) implementation
-/// Format:
-/// - Header (12 bytes): Magic (8 bytes "VCDBMBT\0") + Type (1) + Version (1) + Reserved (2)
-/// - Records: Type (1 byte) + Reserved (1 byte) + ID (8 bytes) + AttrsLen (4 bytes) + VectorLen (4 bytes) + Data
-/// - Footer (8 bytes, optional): Magic (4 bytes) + CRC32 (4 bytes)
-/// - Attrs: JSON encoded UTF-8 string
-/// - Vectors: Float32 array (4 bytes per element)
+///
+/// Format v1 (wal_version=0x01):
+///   Header (12 bytes): Magic (8 bytes "VCDBMBT\0") + Type (1) + Version (1) + Reserved (2)
+///   Records: Type (1) + Reserved (1) + ID (8) + AttrsLen (4) + VectorLen (4) + Attrs + Vector
+///   Footer (8 bytes, optional): Magic (4 bytes) + CRC32 (4 bytes)
+///
+/// Format v2 (wal_version=0x02):
+///   Header: same as v1 (version byte = 0x02)
+///   Records: Type (1) + Flags (1) + Timestamp (8) + ID (8) + AttrsLen (4) + VectorLen (4) + Attrs + Vector
+///   Footer: same as v1
+///
+/// Flags byte: bit 0 = has timestamp (always 1 in v2)
+/// Timestamp: nanoseconds since Unix epoch (Int64)
+///
+/// v2 reader can read v1 records (flags=0 → timestamp=0)
+/// v1 reader cannot read v2 records (version check rejects)
 
 ///|
 /// WAL Footer magic: "WCRC" in little-endian
 pub let wal_footer_magic : UInt = 0x43524357U
 
 ///|
-/// WAL format version
-pub let wal_version : Byte = b'\x01'
+/// Current WAL format version
+pub let wal_version : Byte = b'\x02'
+
+///|
+/// V1 WAL version (for backward compatibility)
+let wal_version_v1 : Byte = b'\x01'
+
+///|
+/// Flags
+let flag_has_timestamp : Byte = b'\x01'
 
 ///|
 /// WAL record types
@@ -24,7 +42,6 @@ pub enum WalRecordType {
 } derive(Eq, Show)
 
 ///|
-/// Convert record type to byte
 pub fn WalRecordType::to_byte(self : WalRecordType) -> Byte {
   match self {
     Upsert => b'\x01'
@@ -34,7 +51,6 @@ pub fn WalRecordType::to_byte(self : WalRecordType) -> Byte {
 }
 
 ///|
-/// Convert byte to record type
 pub fn WalRecordType::from_byte(b : Byte) -> WalRecordType? {
   match b {
     b'\x01' => Some(Upsert)
@@ -45,54 +61,58 @@ pub fn WalRecordType::from_byte(b : Byte) -> WalRecordType? {
 }
 
 ///|
-/// WAL record
+/// WAL record with timestamp
 pub struct WalRecord {
   record_type : WalRecordType
   id : @types.VectorId
   attrs : @types.Attrs?
   vector : Array[Double]?
+  /// Nanoseconds since Unix epoch. 0 = no timestamp (v1 compatibility).
+  timestamp : Int64
 } derive(Show)
 
 ///|
-/// Create an upsert record
+/// Create an upsert record with timestamp
 pub fn WalRecord::upsert(
   id : @types.VectorId,
   vector : Array[Double],
   attrs : @types.Attrs,
+  timestamp? : Int64 = 0L,
 ) -> WalRecord {
-  { record_type: Upsert, id, attrs: Some(attrs), vector: Some(vector) }
+  { record_type: Upsert, id, attrs: Some(attrs), vector: Some(vector), timestamp }
 }
 
 ///|
-/// Create a remove record
-pub fn WalRecord::remove(id : @types.VectorId) -> WalRecord {
-  { record_type: Remove, id, attrs: None, vector: None }
+/// Create a remove record with timestamp
+pub fn WalRecord::remove(
+  id : @types.VectorId,
+  timestamp? : Int64 = 0L,
+) -> WalRecord {
+  { record_type: Remove, id, attrs: None, vector: None, timestamp }
 }
 
 ///|
-/// Create a set_attrs record
+/// Create a set_attrs record with timestamp
 pub fn WalRecord::set_attrs(
   id : @types.VectorId,
   attrs : @types.Attrs,
+  timestamp? : Int64 = 0L,
 ) -> WalRecord {
-  { record_type: SetAttrs, id, attrs: Some(attrs), vector: None }
+  { record_type: SetAttrs, id, attrs: Some(attrs), vector: None, timestamp }
 }
 
 ///|
-/// Encode attrs to JSON bytes (TypeScript compatible)
 fn encode_attrs_json(attrs : @types.Attrs?) -> Bytes {
   @codec.encode_attrs_json(attrs)
 }
 
 ///|
-/// Decode JSON string to attrs
 fn decode_attrs_json(bytes : Bytes) -> @types.Attrs? {
   @codec.decode_attrs_json(bytes)
 }
 
 ///|
-/// Encode a WAL record to bytes
-/// Note: Uses 64-bit IDs to preserve full VectorId range
+/// Encode a WAL record to bytes (v2 format with timestamp)
 pub fn encode_wal_record(record : WalRecord) -> Bytes {
   let w = @binary.BinaryWriter::new()
   encode_wal_record_to(w, record)
@@ -100,27 +120,25 @@ pub fn encode_wal_record(record : WalRecord) -> Bytes {
 }
 
 ///|
-/// Encode a WAL record to an existing writer (avoids intermediate allocations)
+/// Encode a WAL record to an existing writer (v2 format)
 fn encode_wal_record_to(w : @binary.BinaryWriter, record : WalRecord) -> Unit {
   // Type (1 byte)
   w.push_byte(record.record_type.to_byte())
-  // Reserved (1 byte)
-  w.push_byte(b'\x00')
-  // ID (8 bytes as u64 to preserve full Int64 range)
+  // Flags (1 byte) — v2: always has timestamp
+  w.push_byte(flag_has_timestamp)
+  // Timestamp (8 bytes, Int64 nanoseconds)
+  w.push_i64(record.timestamp)
+  // ID (8 bytes)
   w.push_u64(record.id.to_int64().reinterpret_as_uint64())
-  // Encode attrs as JSON
+  // Attrs
   let attrs_bytes = encode_attrs_json(record.attrs)
-  // Calculate vector length
   let vector_len = match record.vector {
     None => 0
     Some(v) => v.length() * 4
   }
-  // Write lengths
   w.push_u32(attrs_bytes.length().reinterpret_as_uint())
   w.push_u32(vector_len.reinterpret_as_uint())
-  // Write attrs
   w.push_bytes(attrs_bytes)
-  // Write vector inline (no intermediate buffer)
   match record.vector {
     None => ()
     Some(v) =>
@@ -131,11 +149,9 @@ fn encode_wal_record_to(w : @binary.BinaryWriter, record : WalRecord) -> Unit {
 }
 
 ///|
-/// Decode a WAL record from reader
-/// Note: Uses 64-bit IDs to preserve full VectorId range
+/// Decode a WAL record from reader (supports both v1 and v2)
 pub fn decode_wal_record(r : @binary.BinaryReader) -> WalRecord? {
   if r.remaining() < 18 {
-    // Minimum: type(1) + reserved(1) + id(8) + attrs_len(4) + vector_len(4)
     return None
   }
   // Type
@@ -144,32 +160,45 @@ pub fn decode_wal_record(r : @binary.BinaryReader) -> WalRecord? {
     None => return None
     Some(t) => t
   }
-  // Reserved
-  let _ = r.read_byte()
-  // ID (8 bytes as u64)
+  // Flags/Reserved
+  let flags = r.read_byte()
+  // Timestamp (v2) or skip (v1)
+  let timestamp : Int64 = if flags.land(flag_has_timestamp) != b'\x00' {
+    // v2: read 8-byte timestamp
+    if r.remaining() < 24 {
+      // Need: timestamp(8) + id(8) + attrs_len(4) + vector_len(4)
+      return None
+    }
+    r.read_i64()
+  } else {
+    // v1: no timestamp, flags byte was reserved=0x00
+    0L
+  }
+  // ID (8 bytes)
+  if r.remaining() < 16 {
+    return None
+  }
   let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
   // Lengths
   let attrs_len = r.read_u32().reinterpret_as_int()
   let vector_len = r.read_u32().reinterpret_as_int()
-  // Validate payload lengths fit in remaining buffer (corruption/truncation check)
   if attrs_len < 0 || vector_len < 0 || r.remaining() < attrs_len + vector_len {
     return None
   }
-  // Read attrs (JSON)
+  // Attrs
   let attrs = if attrs_len > 0 {
     let attrs_bytes = r.read_bytes(attrs_len)
     decode_attrs_json(attrs_bytes)
   } else {
     None
   }
-  // Read vector (Float32) - reject non-aligned payloads
+  // Vector
   let vector = if vector_len > 0 {
-    // Reject if not Float32-aligned (must be multiple of 4)
     if vector_len % 4 != 0 {
       return None
     }
     let vec : Array[Double] = []
-    let count = vector_len / 4 // Float32 = 4 bytes
+    let count = vector_len / 4
     for _ in 0..<count {
       vec.push(r.read_f32().to_double())
     }
@@ -177,7 +206,7 @@ pub fn decode_wal_record(r : @binary.BinaryReader) -> WalRecord? {
   } else {
     None
   }
-  Some({ record_type, id, attrs, vector })
+  Some({ record_type, id, attrs, vector, timestamp })
 }
 
 ///|
@@ -201,31 +230,95 @@ pub fn encode_wal_footer(body : Bytes) -> Bytes {
 /// Encode multiple records to a complete WAL segment
 pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
   let w = @binary.BinaryWriter::new()
-  // Write header inline (12 bytes)
   @codec.encode_header(w, Wal, wal_version)
-  // Write records directly (no intermediate allocations)
   for record in records {
     encode_wal_record_to(w, record)
   }
-  // Get body (header + records)
   let body = w.concat()
-  // Add footer with CRC32 inline
   w.push_u32(wal_footer_magic)
   w.push_u32(@binary.crc32_fast(body))
   w.concat()
 }
 
 ///|
-/// Merge an existing WAL with a new WAL segment, producing a valid
-/// WAL file with correct CRC footer.
-///
-/// This is the SoT for WAL merge logic. Used by:
-/// - WalRuntime::append (sync, reads existing from storage)
-/// - JS async gateway (passes existing + new as byte arrays)
-///
-/// existing: previous WAL data (may be empty, may have footer, may be corrupt)
-/// new_segment: new WAL segment from encode_wal_segment (has header + footer)
-/// Returns: merged WAL with valid header + all records + CRC footer
+/// Verify WAL header (accepts both v1 and v2)
+pub fn verify_wal_header(r : @binary.BinaryReader) -> Bool {
+  match @codec.read_header(r) {
+    None => false
+    Some((file_type, version)) =>
+      file_type == Wal && (version == wal_version || version == wal_version_v1)
+  }
+}
+
+///|
+fn wal_footer_start(data : Bytes) -> Int? {
+  if data.length() < @codec.header_size + 8 {
+    return None
+  }
+  let footer_start = data.length() - 8
+  let r = @binary.BinaryReader::new(data)
+  r.skip(footer_start)
+  let footer_magic = r.read_u32()
+  if footer_magic == wal_footer_magic {
+    Some(footer_start)
+  } else {
+    None
+  }
+}
+
+///|
+fn wal_body_length(data : Bytes) -> Int {
+  match wal_footer_start(data) {
+    Some(footer_start) => footer_start
+    None => data.length()
+  }
+}
+
+///|
+/// Check if WAL has valid footer and verify CRC32
+pub fn verify_wal_checksum(data : Bytes) -> Bool {
+  if data.length() < @codec.header_size {
+    return false
+  }
+  if data.length() < @codec.header_size + 8 {
+    return true
+  }
+  let footer_start = match wal_footer_start(data) {
+    None => return true
+    Some(offset) => offset
+  }
+  let footer_reader = @binary.BinaryReader::new(data)
+  footer_reader.skip(footer_start + 4)
+  let stored_crc = footer_reader.read_u32()
+  let body_reader = @binary.BinaryReader::new(data)
+  let body = body_reader.read_bytes(footer_start)
+  let computed_crc = @binary.crc32_fast(body)
+  stored_crc == computed_crc
+}
+
+///|
+/// Decode all records from WAL data (supports v1 and v2)
+pub fn decode_wal_records(data : Bytes) -> Array[WalRecord] {
+  let records : Array[WalRecord] = []
+  if data.length() < @codec.header_size {
+    return records
+  }
+  let r = @binary.BinaryReader::new(data)
+  if not(verify_wal_header(r)) {
+    return records
+  }
+  let body_len = wal_body_length(data)
+  while r.position() < body_len {
+    match decode_wal_record(r) {
+      None => break
+      Some(record) => records.push(record)
+    }
+  }
+  records
+}
+
+///|
+/// Merge an existing WAL with a new WAL segment (SoT for WAL merge).
 pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
   let w = @binary.BinaryWriter::new()
   let mut use_existing = false
@@ -246,13 +339,10 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
     w.push_bytes(encode_wal_header())
   }
 
-  // Extract records from new_segment (skip header, skip footer)
   let new_body_len = wal_body_length(new_segment)
   if new_segment.length() >= @codec.header_size {
     let r = @binary.BinaryReader::new(new_segment)
-    // Skip header
     r.skip(@codec.header_size)
-    // Copy records
     while r.position() < new_body_len {
       match decode_wal_record(r) {
         None => break
@@ -261,7 +351,6 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
     }
   }
 
-  // Compute CRC footer over the full body
   let body = w.concat()
   let footer = encode_wal_footer(body)
   let final_w = @binary.BinaryWriter::new()
@@ -271,85 +360,33 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
 }
 
 ///|
-/// Verify WAL header
-pub fn verify_wal_header(r : @binary.BinaryReader) -> Bool {
-  match @codec.read_header(r) {
-    None => false
-    Some((file_type, version)) => file_type == Wal && version == wal_version
-  }
-}
-
-///|
-/// Return footer start offset when WAL checksum footer is present.
-fn wal_footer_start(data : Bytes) -> Int? {
-  if data.length() < @codec.header_size + 8 {
-    return None
-  }
-  let footer_start = data.length() - 8
-  let r = @binary.BinaryReader::new(data)
-  r.skip(footer_start)
-  let footer_magic = r.read_u32()
-  if footer_magic == wal_footer_magic {
-    Some(footer_start)
-  } else {
-    None
-  }
-}
-
-///|
-/// Return WAL body length (header + records, excludes checksum footer if present).
-fn wal_body_length(data : Bytes) -> Int {
-  match wal_footer_start(data) {
-    Some(footer_start) => footer_start
-    None => data.length()
-  }
-}
-
-///|
-/// Check if WAL has valid footer and verify CRC32
-/// A header-only WAL (12 bytes) is valid - no footer to verify
-pub fn verify_wal_checksum(data : Bytes) -> Bool {
-  // Too short to even have a header
-  if data.length() < @codec.header_size {
-    return false
-  }
-  // Header-only WAL (no footer) is valid
-  if data.length() < @codec.header_size + 8 {
-    return true
-  }
-  let footer_start = match wal_footer_start(data) {
-    None => return true // No footer, assume valid
-    Some(offset) => offset
-  }
-  let footer_reader = @binary.BinaryReader::new(data)
-  footer_reader.skip(footer_start + 4)
-  let stored_crc = footer_reader.read_u32()
-  let body_reader = @binary.BinaryReader::new(data)
-  let body = body_reader.read_bytes(footer_start)
-  let computed_crc = @binary.crc32_fast(body)
-  stored_crc == computed_crc
-}
-
-///|
-/// Decode all records from WAL data
-pub fn decode_wal_records(data : Bytes) -> Array[WalRecord] {
-  let records : Array[WalRecord] = []
-  if data.length() < @codec.header_size {
-    return records
-  }
-  let r = @binary.BinaryReader::new(data)
-  // Verify header
-  if not(verify_wal_header(r)) {
-    return records
-  }
-  // Calculate body length
-  let body_len = wal_body_length(data)
-  // Read records
-  while r.position() < body_len {
-    match decode_wal_record(r) {
-      None => break
-      Some(record) => records.push(record)
+/// Filter WAL records by timestamp — returns only records with timestamp <= cutoff.
+/// Used for read-at-timestamp (consistent cross-shard reads).
+pub fn filter_wal_by_timestamp(
+  data : Bytes,
+  cutoff_ts : Int64,
+) -> Array[WalRecord] {
+  let all = decode_wal_records(data)
+  let filtered : Array[WalRecord] = []
+  for record in all {
+    // timestamp=0 means v1 record (no timestamp) — always include
+    if record.timestamp == 0L || record.timestamp <= cutoff_ts {
+      filtered.push(record)
     }
   }
-  records
+  filtered
+}
+
+///|
+/// Get the maximum timestamp across all records in a WAL.
+/// Returns 0 if no timestamped records.
+pub fn max_wal_timestamp(data : Bytes) -> Int64 {
+  let records = decode_wal_records(data)
+  let mut max_ts = 0L
+  for record in records {
+    if record.timestamp > max_ts {
+      max_ts = record.timestamp
+    }
+  }
+  max_ts
 }
