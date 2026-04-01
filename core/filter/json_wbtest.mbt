@@ -156,6 +156,34 @@ test "filter_json/nested_must_with_must_not" {
 }
 
 ///|
+test "filter_json/round_trip_match" {
+  let json = "{\"match\":{\"key\":\"category\",\"value\":\"科学\"}}"
+  let expr = parse_filter_json(json).unwrap()
+  let serialized = filter_to_json(expr)
+  let reparsed = parse_filter_json(serialized).unwrap()
+  // Verify structural equivalence
+  inspect(filter_to_json(reparsed) == serialized, content="true")
+}
+
+///|
+test "filter_json/round_trip_must" {
+  let json = "{\"must\":[{\"match\":{\"key\":\"a\",\"value\":\"x\"}},{\"match\":{\"key\":\"b\",\"value\":1}}]}"
+  let expr = parse_filter_json(json).unwrap()
+  let serialized = filter_to_json(expr)
+  let reparsed = parse_filter_json(serialized)
+  inspect(reparsed is Some(_), content="true")
+}
+
+///|
+test "filter_json/serialize_range" {
+  let json = "{\"range\":{\"key\":\"score\",\"gte\":0.5,\"lt\":1}}"
+  let expr = parse_filter_json(json).unwrap()
+  let serialized = filter_to_json(expr)
+  inspect(serialized.contains("\"range\""), content="true")
+  inspect(serialized.contains("\"gte\""), content="true")
+}
+
+///|
 test "filter_json/invalid_json" {
   inspect(parse_filter_json("not json") is None, content="true")
   inspect(parse_filter_json("[1,2,3]") is None, content="true")

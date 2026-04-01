@@ -187,10 +187,136 @@ pub fn async_merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
 }
 
 ///|
-/// Get the current DB size.
+/// Get the current DB size (excludes tombstoned vectors in HNSW).
 pub fn async_db_size() -> Int {
   match async_db_instance.val {
     Some(db) => db.size()
     None => 0
+  }
+}
+
+///|
+/// Get the raw size including tombstoned vectors.
+pub fn async_db_raw_size() -> Int {
+  match async_db_instance.val {
+    Some(db) => db.raw_size()
+    None => 0
+  }
+}
+
+///|
+/// Get the vector dimension.
+pub fn async_db_dim() -> Int {
+  match async_db_instance.val {
+    Some(db) => db.dim()
+    None => 0
+  }
+}
+
+///|
+/// Remove a vector by ID. Returns WAL segment bytes for persistence.
+/// Returns empty bytes if ID not found.
+pub fn async_remove(id : Double) -> Bytes {
+  let db = match async_db_instance.val {
+    Some(d) => d
+    None => abort("DB not initialized")
+  }
+  let vid = @types.VectorId(id.to_int64())
+  if db.remove(vid) {
+    @wal.encode_wal_segment([@wal.WalRecord::remove(vid)])
+  } else {
+    Bytes::new(0)
+  }
+}
+
+///|
+/// Get a single vector and its payload by ID.
+/// Returns (found, payload_json). found=false if not found.
+pub fn async_get(id : Double, with_payload : Bool) -> (Bool, String) {
+  let db = match async_db_instance.val {
+    Some(d) => d
+    None => abort("DB not initialized")
+  }
+  let vid = @types.VectorId(id.to_int64())
+  match db.get(vid) {
+    Some(record) => {
+      let payload = if with_payload {
+        @codec.attrs_to_json(Some(record.attrs))
+      } else {
+        ""
+      }
+      (true, payload)
+    }
+    None => (false, "")
+  }
+}
+
+///|
+/// Check if a vector exists by ID.
+pub fn async_has(id : Double) -> Bool {
+  match async_db_instance.val {
+    Some(db) => db.has(@types.VectorId(id.to_int64()))
+    None => false
+  }
+}
+
+///|
+/// Update attributes of an existing vector without re-embedding.
+/// Returns WAL segment bytes for persistence.
+/// Returns empty bytes if ID not found.
+pub fn async_update_attrs(id : Double, attrs_json : String) -> Bytes {
+  let db = match async_db_instance.val {
+    Some(d) => d
+    None => abort("DB not initialized")
+  }
+  let vid = @types.VectorId(id.to_int64())
+  if not(db.has(vid)) {
+    return Bytes::new(0)
+  }
+  let attrs = parse_json_to_attrs(attrs_json)
+  let _ = db.update_attrs(vid, attrs)
+  @wal.encode_wal_segment([@wal.WalRecord::set_attrs(vid, attrs)])
+}
+
+///|
+/// Scroll through vectors in ascending ID order (cursor-based pagination).
+/// Returns array of (id, payload_json).
+pub fn async_scroll(
+  offset : Double?,
+  limit : Int,
+  with_payload : Bool,
+) -> Array[(Double, String)] {
+  let db = match async_db_instance.val {
+    Some(d) => d
+    None => abort("DB not initialized")
+  }
+  let offset_i64 : Int64? = match offset {
+    Some(o) => Some(o.to_int64())
+    None => None
+  }
+  let entries = db.scroll(offset=offset_i64, limit=limit)
+  let results : Array[(Double, String)] = []
+  for entry in entries {
+    let (vid, record) = entry
+    let payload = if with_payload {
+      @codec.attrs_to_json(Some(record.attrs))
+    } else {
+      ""
+    }
+    results.push((vector_id_to_double(vid), payload))
+  }
+  results
+}
+
+// Note: HNSW compaction (hnsw_compact_and_rebuild) is available in
+// core/ann/maintain.mbt but requires VectorDB-level integration.
+// Add async_compact when VectorDB::compact() is implemented.
+
+///|
+/// Serialize a FilterExpr to JSON string (round-trip with parse_filter_json).
+pub fn async_serialize_filter(filter_json : String) -> String {
+  match @filter.parse_filter_json(filter_json) {
+    Some(expr) => @filter.filter_to_json(expr)
+    None => "{}"
   }
 }

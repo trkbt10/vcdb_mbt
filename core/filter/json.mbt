@@ -25,7 +25,6 @@ pub fn parse_filter_json(json : String) -> FilterExpr? {
 }
 
 ///|
-/// Convert a parsed Json value to a FilterExpr.
 fn json_to_filter(j : Json) -> FilterExpr? {
   match j {
     { "match": Object(inner), .. } => parse_match(inner)
@@ -49,7 +48,6 @@ fn json_to_filter(j : Json) -> FilterExpr? {
 }
 
 ///|
-/// {"match": {"key": "k", "value": <v>}} → Match(k, v)
 fn parse_match(inner : Map[String, Json]) -> FilterExpr? {
   let key = match inner.get("key") {
     Some(String(k)) => k
@@ -58,11 +56,10 @@ fn parse_match(inner : Map[String, Json]) -> FilterExpr? {
   let value = match inner.get("value") {
     Some(String(s)) => @types.String(s)
     Some(Number(n)) => {
-      let d = n
-      if d == d.to_int().to_double() {
-        @types.Int(d.to_int64())
+      if n == n.to_int().to_double() {
+        @types.Int(n.to_int64())
       } else {
-        @types.Float(d)
+        @types.Float(n)
       }
     }
     Some(True) => @types.Bool(true)
@@ -74,7 +71,6 @@ fn parse_match(inner : Map[String, Json]) -> FilterExpr? {
 }
 
 ///|
-/// {"range": {"key": "k", "gt": n, "gte": n, "lt": n, "lte": n}} → Range(k, range)
 fn parse_range(inner : Map[String, Json]) -> FilterExpr? {
   let key = match inner.get("key") {
     Some(String(k)) => k
@@ -98,29 +94,18 @@ fn json_to_double(j : Json?) -> Double? {
 }
 
 ///|
-/// {"must": [<expr>, ...]} → Must([...])
 fn parse_compound_must(exprs : Array[Json]) -> FilterExpr? {
   let children = parse_expr_array(exprs)
-  if children.is_empty() {
-    None
-  } else {
-    Some(FilterExpr::must(children))
-  }
+  if children.is_empty() { None } else { Some(FilterExpr::must(children)) }
 }
 
 ///|
-/// {"must_not": [<expr>, ...]} → MustNot([...])
 fn parse_compound_must_not(exprs : Array[Json]) -> FilterExpr? {
   let children = parse_expr_array(exprs)
-  if children.is_empty() {
-    None
-  } else {
-    Some(FilterExpr::must_not(children))
-  }
+  if children.is_empty() { None } else { Some(FilterExpr::must_not(children)) }
 }
 
 ///|
-/// {"should": {"exprs": [...], "min": N}} → Should([...], N)
 fn parse_compound_should(inner : Map[String, Json]) -> FilterExpr? {
   let exprs = match inner.get("exprs") {
     Some(Array(arr)) => parse_expr_array(arr)
@@ -130,51 +115,34 @@ fn parse_compound_should(inner : Map[String, Json]) -> FilterExpr? {
     Some(Number(n)) => n.to_int()
     _ => 1
   }
-  if exprs.is_empty() {
-    None
-  } else {
-    Some(FilterExpr::should(exprs, min=min))
-  }
+  if exprs.is_empty() { None } else { Some(FilterExpr::should(exprs, min=min)) }
 }
 
 ///|
-/// Parse an array of JSON filter expressions recursively.
 fn parse_expr_array(arr : Array[Json]) -> Array[FilterExpr] {
   let result : Array[FilterExpr] = []
   for item in arr {
     match json_to_filter(item) {
       Some(expr) => result.push(expr)
-      None => () // skip invalid entries
+      None => ()
     }
   }
   result
 }
 
 ///|
-/// Shorthand: flat {"key": "value", ...} → Must([Match(k,v), ...])
 fn parse_shorthand(map : Map[String, Json]) -> FilterExpr? {
   let conditions : Array[FilterExpr] = []
   for entry in map {
     let (key, json_val) = entry
-    // Skip structural keys
-    if key == "match" ||
-      key == "range" ||
-      key == "exists" ||
-      key == "is_null" ||
-      key == "must" ||
-      key == "must_not" ||
-      key == "should" {
+    if key == "match" || key == "range" || key == "exists" ||
+      key == "is_null" || key == "must" || key == "must_not" || key == "should" {
       continue
     }
     let value = match json_val {
       String(s) => @types.String(s)
       Number(n) => {
-        let d = n
-        if d == d.to_int().to_double() {
-          @types.Int(d.to_int64())
-        } else {
-          @types.Float(d)
-        }
+        if n == n.to_int().to_double() { @types.Int(n.to_int64()) } else { @types.Float(n) }
       }
       True => @types.Bool(true)
       False => @types.Bool(false)
@@ -189,5 +157,73 @@ fn parse_shorthand(map : Map[String, Json]) -> FilterExpr? {
     Some(conditions[0])
   } else {
     Some(FilterExpr::must(conditions))
+  }
+}
+
+// ============================================================================
+// FilterExpr → JSON serialization (round-trip with parse_filter_json)
+// Uses @json.Json type for correct serialization.
+// ============================================================================
+
+///|
+/// Serialize a FilterExpr to JSON string.
+pub fn filter_to_json(expr : FilterExpr) -> String {
+  expr.to_json().stringify()
+}
+
+///|
+fn FilterExpr::to_json(self : FilterExpr) -> Json {
+  match self {
+    Leaf(leaf) => leaf.to_json()
+    Must(exprs) => { "must": exprs.map(FilterExpr::to_json) }
+    MustNot(exprs) => { "must_not": exprs.map(FilterExpr::to_json) }
+    Should(exprs, min) => {
+      "should": { "exprs": exprs.map(FilterExpr::to_json), "min": min }
+    }
+  }
+}
+
+///|
+fn LeafExpr::to_json(self : LeafExpr) -> Json {
+  match self {
+    Match(key, value) => { "match": { "key": key, "value": value.to_json() } }
+    Range(key, range) => {
+      let inner : Map[String, Json] = {}
+      inner["key"] = key.to_json()
+      match range.gt {
+        Some(v) => inner["gt"] = v.to_json()
+        None => ()
+      }
+      match range.gte {
+        Some(v) => inner["gte"] = v.to_json()
+        None => ()
+      }
+      match range.lt {
+        Some(v) => inner["lt"] = v.to_json()
+        None => ()
+      }
+      match range.lte {
+        Some(v) => inner["lte"] = v.to_json()
+        None => ()
+      }
+      { "range": inner.to_json() }
+    }
+    Exists(key) => { "exists": { "key": key } }
+    IsNull(key) => { "is_null": { "key": key } }
+  }
+}
+
+///|
+///|
+fn @types.AttrValue::to_json(self : @types.AttrValue) -> Json {
+  match self {
+    @types.String(s) => s.to_json()
+    @types.Int(n) => n.to_double().to_json()
+    @types.Float(f) => f.to_json()
+    @types.Bool(b) => b.to_json()
+    @types.Null => {
+      let fallback : Json = { "null": true }
+      try { @json.parse("null") } catch { _ => fallback }
+    }
   }
 }
