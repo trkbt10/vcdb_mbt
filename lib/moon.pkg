@@ -5,6 +5,7 @@ import {
   "trkbt10/vcdb/core/store",
   "trkbt10/vcdb/core/persistence/wal",
   "trkbt10/vcdb/core/persistence/codec",
+  "trkbt10/vcdb/core/filter",
   "trkbt10/vcdb/gateway",
   "moonbitlang/core/hashmap",
 }

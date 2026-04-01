@@ -125,18 +125,26 @@ fn parse_json_to_attrs(json : String) -> @types.Attrs {
 }
 
 ///|
-/// Search the in-memory DB. Pure computation, no I/O.
+/// Search the in-memory DB with optional attribute filtering.
+/// filter_json: JSON string describing filter conditions, or empty for no filter.
+///
+/// Filter format (flat key-value match, AND logic):
+///   {"category": "科学", "status": "解決済み"}
+///   → must match both category=科学 AND status=解決済み
+///
 /// Returns array of (id, score, payload_json_or_empty).
 pub fn async_search(
   query : Array[Double],
   k : Int,
   with_payload : Bool,
+  filter_json : String,
 ) -> Array[(Double, Double, String)] {
   let db = match async_db_instance.val {
     Some(d) => d
     None => abort("DB not initialized")
   }
-  let hits = db.search(query, k, None)
+  let filter = parse_filter(filter_json)
+  let hits = db.search_with_expr(query, k, filter, None, @filter.Auto)
   let results : Array[(Double, Double, String)] = []
   for hit in hits {
     let payload_json = if with_payload {
@@ -150,6 +158,31 @@ pub fn async_search(
     results.push((vector_id_to_double(hit.id), hit.score, payload_json))
   }
   results
+}
+
+///|
+/// Parse a flat JSON object into a FilterExpr.
+/// {"category": "科学"} → Must([Match("category", String("科学"))])
+/// Empty/null → None (no filtering)
+fn parse_filter(json : String) -> @filter.FilterExpr? {
+  if json.length() == 0 || json == "{}" {
+    return None
+  }
+  let attrs = parse_json_to_attrs(json)
+  let conditions : Array[@filter.FilterExpr] = []
+  for key in attrs.keys() {
+    match attrs.get(key) {
+      Some(value) => conditions.push(@filter.FilterExpr::match_(key, value))
+      None => ()
+    }
+  }
+  if conditions.is_empty() {
+    None
+  } else if conditions.length() == 1 {
+    Some(conditions[0])
+  } else {
+    Some(@filter.FilterExpr::must(conditions))
+  }
 }
 
 ///|
