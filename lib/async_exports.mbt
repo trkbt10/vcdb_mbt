@@ -29,8 +29,8 @@ pub fn async_init_db(dim : Int) -> Unit {
   let options : @types.DatabaseOptions = {
     dim,
     metric: @types.Cosine,
-    capacity: 1024,
-    strategy: @types.Bruteforce,
+    capacity: 65536,
+    strategy: @types.HNSW(@types.HNSWParams::default()),
   }
   async_db_instance.val = Some(@vcdb.VectorDB::new(options))
 }
@@ -50,8 +50,8 @@ fn async_init_db_from_store(
   let options : @types.DatabaseOptions = {
     dim,
     metric: @types.Cosine,
-    capacity: store.size() + 1024,
-    strategy: @types.Bruteforce,
+    capacity: @math.maximum(store.size() + 4096, 65536),
+    strategy: @types.HNSW(@types.HNSWParams::default()),
   }
   async_db_instance.val = Some(@vcdb.VectorDB::from_store(store, options))
 }
