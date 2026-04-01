@@ -39,9 +39,14 @@ type MoonBitModule = {
 let wasmModule: MoonBitModule | null = null;
 const DEFAULT_LIB_PATH = "./lib.js";
 
-export async function loadWasm(modulePath?: string): Promise<void> {
+export async function loadWasm(moduleOrPath?: string | Record<string, unknown>): Promise<void> {
   if (wasmModule) return;
-  const path = modulePath ?? DEFAULT_LIB_PATH;
+  if (typeof moduleOrPath === "object" && moduleOrPath !== null) {
+    // Accept a pre-imported module object directly (for bundlers like Wrangler)
+    wasmModule = moduleOrPath as unknown as MoonBitModule;
+    return;
+  }
+  const path = moduleOrPath ?? DEFAULT_LIB_PATH;
   const mod = await import(path);
   wasmModule = mod as unknown as MoonBitModule;
 }

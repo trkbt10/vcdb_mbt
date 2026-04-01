@@ -1,6 +1,9 @@
 ///|
 /// FFI exports for JavaScript interop.
 ///
+/// Vector IDs use Double (= JS number) to avoid i32 truncation.
+/// JS numbers can exactly represent integers up to 2^53, which is sufficient
+/// for VectorId(Int64) in practice.
 
 ///|
 /// Global instance storage
@@ -13,6 +16,18 @@ priv struct Counter {
 
 ///|
 let counter : Counter = { value: 1 }
+
+///|
+/// Convert a JS number (Double) to VectorId without i32 truncation.
+fn double_to_vector_id(id : Double) -> @types.VectorId {
+  @types.VectorId(id.to_int64())
+}
+
+///|
+/// Convert a VectorId to JS number (Double) without i32 truncation.
+fn vector_id_to_double(id : @types.VectorId) -> Double {
+  id.to_int64().to_double()
+}
 
 ///|
 pub fn vcdb_create(dim : Int) -> Int {
@@ -65,12 +80,12 @@ pub fn vcdb_dim(instance_id : Int) -> Int {
 ///|
 pub fn vcdb_add(
   instance_id : Int,
-  vector_id : Int,
+  vector_id : Double,
   vector : Array[Double],
 ) -> Int {
   match instances.get(instance_id) {
     Some(db) => {
-      let id = @types.VectorId(vector_id.to_int64())
+      let id = double_to_vector_id(vector_id)
       if db.has(id) {
         return -2
       }
@@ -85,13 +100,13 @@ pub fn vcdb_add(
 ///|
 pub fn vcdb_upsert(
   instance_id : Int,
-  vector_id : Int,
+  vector_id : Double,
   vector : Array[Double],
 ) -> Int {
   match instances.get(instance_id) {
     Some(db) => {
       let attrs = @types.empty_attrs()
-      let _ = db.upsert(@types.VectorId(vector_id.to_int64()), vector, attrs)
+      let _ = db.upsert(double_to_vector_id(vector_id), vector, attrs)
       0
     }
     None => -1
@@ -99,10 +114,13 @@ pub fn vcdb_upsert(
 }
 
 ///|
-pub fn vcdb_get(instance_id : Int, vector_id : Int) -> (Array[Double], Int) {
+pub fn vcdb_get(
+  instance_id : Int,
+  vector_id : Double,
+) -> (Array[Double], Int) {
   match instances.get(instance_id) {
     Some(db) =>
-      match db.get(@types.VectorId(vector_id.to_int64())) {
+      match db.get(double_to_vector_id(vector_id)) {
         Some(record) => (record.vector, 1)
         None => ([], 0)
       }
@@ -115,13 +133,13 @@ pub fn vcdb_search(
   instance_id : Int,
   query : Array[Double],
   k : Int,
-) -> Array[(Int, Double)] {
+) -> Array[(Double, Double)] {
   match instances.get(instance_id) {
     Some(db) => {
       let results = db.search(query, k, None)
-      let out : Array[(Int, Double)] = []
+      let out : Array[(Double, Double)] = []
       for hit in results {
-        out.push((hit.id.0.to_int(), hit.score))
+        out.push((vector_id_to_double(hit.id), hit.score))
       }
       out
     }
@@ -130,10 +148,10 @@ pub fn vcdb_search(
 }
 
 ///|
-pub fn vcdb_has(instance_id : Int, vector_id : Int) -> Int {
+pub fn vcdb_has(instance_id : Int, vector_id : Double) -> Int {
   match instances.get(instance_id) {
     Some(db) =>
-      if db.has(@types.VectorId(vector_id.to_int64())) {
+      if db.has(double_to_vector_id(vector_id)) {
         1
       } else {
         0
@@ -143,10 +161,10 @@ pub fn vcdb_has(instance_id : Int, vector_id : Int) -> Int {
 }
 
 ///|
-pub fn vcdb_remove(instance_id : Int, vector_id : Int) -> Int {
+pub fn vcdb_remove(instance_id : Int, vector_id : Double) -> Int {
   match instances.get(instance_id) {
     Some(db) =>
-      if db.remove(@types.VectorId(vector_id.to_int64())) {
+      if db.remove(double_to_vector_id(vector_id)) {
         1
       } else {
         0

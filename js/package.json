@@ -44,6 +44,9 @@
     "./wasm": {
       "types": "./dist/wasm/index.d.ts",
       "import": "./dist/wasm/index.js"
+    },
+    "./wasm/lib.js": {
+      "default": "./dist/wasm/lib.js"
     }
   },
   "scripts": {
