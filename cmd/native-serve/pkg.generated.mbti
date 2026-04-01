@@ -1,0 +1,14 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/cmd/native-serve"
+
+// Values
+
+// Errors
+
+// Types and methods
+type ServerOptions
+
+// Type aliases
+
+// Traits
+

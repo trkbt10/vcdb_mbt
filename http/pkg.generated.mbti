@@ -13,11 +13,7 @@ pub fn[S : @storage.Storage] handle_http(Router[S], String, String, String) -> H
 
 pub fn handle_options() -> HttpResponse
 
-pub fn parse_path(String) -> Array[String]
-
 pub fn parse_query(String) -> Map[String, String]
-
-pub fn split_path_query(String) -> (String, String)
 
 // Errors
 
@@ -50,6 +46,7 @@ pub struct Router[S] {
 pub fn[S] Router::get_manager(Self[S]) -> @gateway.CollectionManager[S]
 pub fn[S] Router::new(base_path? : String) -> Self[S]
 pub fn[S : @storage.Storage] Router::route(Self[S], HttpRequest) -> HttpResponse
+pub fn[S] Router::with_storage(S, base_path? : String) -> Self[S]
 
 // Type aliases
 

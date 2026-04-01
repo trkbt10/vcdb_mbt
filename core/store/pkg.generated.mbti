@@ -28,6 +28,7 @@ pub fn CoreStore::get(Self, @types.VectorId) -> @types.VectorRecord?
 pub fn CoreStore::get_by_index(Self, Int) -> @types.VectorRecord
 pub fn CoreStore::get_index(Self, @types.VectorId) -> Int?
 pub fn CoreStore::has(Self, @types.VectorId) -> Bool
+pub fn CoreStore::id_at(Self, Int) -> @types.VectorId?
 pub fn CoreStore::new(Int, @types.Metric, capacity? : Int) -> Self
 pub fn CoreStore::normalize_query(Self, Array[Double]) -> Array[Double]
 pub fn CoreStore::remove_by_id(Self, @types.VectorId) -> MoveInfo?

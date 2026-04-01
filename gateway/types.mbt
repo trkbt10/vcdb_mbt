@@ -257,6 +257,71 @@ pub fn PointResponse::to_json(self : PointResponse) -> JsonValue {
 }
 
 ///|
+/// Scroll request, modelled after Qdrant's scroll points API.
+pub struct ScrollRequest {
+  offset : Int64?
+  limit : Int
+  with_payload : Bool
+  with_vector : Bool
+} derive(Show)
+
+///|
+pub fn ScrollRequest::from_json(json : JsonValue) -> ScrollRequest? {
+  match json {
+    JObject(_) =>
+      Some({
+        offset: get_int64(json, "offset"),
+        limit: get_int(json, "limit").unwrap_or(10),
+        with_payload: get_bool(json, "with_payload").unwrap_or(true),
+        with_vector: get_bool(json, "with_vector").unwrap_or(false),
+      })
+    _ => None
+  }
+}
+
+///|
+pub struct ScrollPointResponse {
+  id : Int64
+  payload : @types.Attrs?
+  vector : Array[Double]?
+} derive(Show)
+
+///|
+pub fn ScrollPointResponse::to_json(self : ScrollPointResponse) -> JsonValue {
+  let parts : Array[(String, JsonValue)] = [
+    ("id", JNumber(self.id.to_double())),
+  ]
+  match self.payload {
+    Some(payload) => parts.push(("payload", attrs_to_json(payload)))
+    None => ()
+  }
+  match self.vector {
+    Some(vector) => parts.push(("vector", vector_to_json(vector)))
+    None => ()
+  }
+  json_object(parts)
+}
+
+///|
+pub struct ScrollResponse {
+  points : Array[ScrollPointResponse]
+  next_page_offset : Int64?
+} derive(Show)
+
+///|
+pub fn ScrollResponse::to_json(self : ScrollResponse) -> JsonValue {
+  let parts : Array[(String, JsonValue)] = [
+    ("points", JArray(self.points.map(fn(point) { point.to_json() }))),
+  ]
+  match self.next_page_offset {
+    Some(offset) =>
+      parts.push(("next_page_offset", JNumber(offset.to_double())))
+    None => ()
+  }
+  json_object(parts)
+}
+
+///|
 /// Collection info response
 pub struct CollectionInfo {
   name : String

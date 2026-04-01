@@ -1,11 +1,28 @@
 ## Usage
 
-### REST API
+### Native Gateway
 
-Start the gateway server:
+Execute the gateway layer directly:
 
 ```bash
-moon run cmd/main
+moon run cmd/native-gateway -- healthz
+moon run cmd/native-gateway -- request --method GET --path /collections
+```
+
+### HTTP API
+
+Start the JavaScript transport adapter:
+
+```bash
+cd js
+npm run build
+node dist/server.js --host 127.0.0.1 --port 6333 --storage ../.local-storage
+```
+
+Or start the native MoonBit transport adapter:
+
+```bash
+moon run cmd/native-serve -- --host 127.0.0.1 --port 6333
 ```
 
 #### Create Collection

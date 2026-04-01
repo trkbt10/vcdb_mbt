@@ -1,12 +1,12 @@
 # http
 
-HTTP routing layer for vcdb REST API.
+HTTP transport adapter for the vcdb gateway execution layer.
 
 ## Types
 
 - `HttpRequest`: HTTP request with method, path, headers, body
 - `HttpResponse`: HTTP response with status, headers, body
-- `Router[S]`: Routes requests to gateway handlers
+- `Router[S]`: Converts HTTP requests into gateway executions
 
 ## Usage
 

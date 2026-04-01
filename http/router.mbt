@@ -68,27 +68,6 @@ pub fn HttpResponse::internal_error(body : String) -> HttpResponse {
 }
 
 ///|
-/// Parse URL path into segments
-pub fn parse_path(path : String) -> Array[String] {
-  let segments : Array[String] = []
-  let current : Array[Char] = []
-  for c in path {
-    if c == '/' {
-      if current.length() > 0 {
-        segments.push(String::from_array(current))
-        current.clear()
-      }
-    } else {
-      current.push(c)
-    }
-  }
-  if current.length() > 0 {
-    segments.push(String::from_array(current))
-  }
-  segments
-}
-
-///|
 /// Parse query string into key-value pairs
 pub fn parse_query(query : String) -> Map[String, String] {
   let params : Map[String, String] = {}
@@ -125,26 +104,6 @@ fn split_string(s : String, delim : Char) -> Array[String] {
 }
 
 ///|
-/// Extract path and query from full path
-pub fn split_path_query(full_path : String) -> (String, String) {
-  let chars = full_path.to_array()
-  let mut query_start = -1
-  for i in 0..<chars.length() {
-    if chars[i] == '?' {
-      query_start = i
-      break
-    }
-  }
-  if query_start < 0 {
-    (full_path, "")
-  } else {
-    let path = String::from_array(chars[0:query_start])
-    let query = String::from_array(chars[query_start + 1:])
-    (path, query)
-  }
-}
-
-///|
 /// HTTP router that wraps gateway handlers
 pub struct Router[S] {
   manager : @gateway.CollectionManager[S]
@@ -154,6 +113,15 @@ pub struct Router[S] {
 /// Create a new router
 pub fn[S] Router::new(base_path? : String = "./storage") -> Router[S] {
   { manager: @gateway.CollectionManager::new(base_path~) }
+}
+
+///|
+/// Create a new router with an explicit storage backend
+pub fn[S] Router::with_storage(
+  storage : S,
+  base_path? : String = "./storage",
+) -> Router[S] {
+  { manager: @gateway.CollectionManager::with_storage(storage, base_path~) }
 }
 
 ///|
@@ -170,14 +138,10 @@ pub fn[S : @storage.Storage] Router::route(
   self : Router[S],
   request : HttpRequest,
 ) -> HttpResponse {
-  let (path, _query) = split_path_query(request.path)
-  let segments = parse_path(path)
-
-  // Execute the request through gateway
-  let response = @gateway.execute_request(
+  let response = @gateway.execute_path_request(
     self.manager,
     request.http_method,
-    segments,
+    request.path,
     request.body,
   )
 

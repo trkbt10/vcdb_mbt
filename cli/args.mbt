@@ -228,9 +228,9 @@ pub fn print_help() -> String {
     "    --payload <k1=v1,k2=v2>     Payload key-value pairs", "  points get <collection> <id>  Get a point by ID",
     "  points delete <collection> <id>  Delete a point", "  points search <collection>    Search for similar vectors",
     "    --vector <v1,v2,...>        Query vector", "    --k <n>                     Number of results (default: 10)",
-    "", "  serve                         Start HTTP server", "    --port <n>                  Server port (default: 6333)",
-    "    --host <addr>               Server host (default: 0.0.0.0)", "", "Options:",
-    "  --help                        Show this help message", "  --version                     Show version",
+    "", "  request                       Execute one gateway request natively", "    --method <verb>             HTTP method (default: GET)",
+    "    --path </path>              Gateway path (default: /healthz)", "    --body <json>               Optional JSON request body",
+    "", "Options:", "  --help                        Show this help message", "  --version                     Show version",
   ]
   lines.iter().intersperse("\n").fold(init="", fn(acc, s) { acc + s })
 }

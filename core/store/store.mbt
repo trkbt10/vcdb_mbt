@@ -132,6 +132,16 @@ pub fn CoreStore::get_by_index(
 }
 
 ///|
+/// Get vector ID by index.
+pub fn CoreStore::id_at(self : CoreStore, index : Int) -> @types.VectorId? {
+  if index < 0 || index >= self.count {
+    None
+  } else {
+    Some(self.ids[index])
+  }
+}
+
+///|
 /// Get vector and attrs by id
 pub fn CoreStore::get(
   self : CoreStore,

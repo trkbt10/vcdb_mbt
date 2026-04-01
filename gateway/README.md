@@ -1,6 +1,6 @@
 # gateway
 
-REST API gateway for vcdb collections.
+Transport-agnostic API execution layer for vcdb collections.
 
 ## Features
 
@@ -8,22 +8,25 @@ REST API gateway for vcdb collections.
 - Point operations (upsert, get, delete)
 - Vector search with pagination
 - Persistence with pluggable storage backends
+- Raw-path execution for transport adapters and native entrypoints
 
-## API Endpoints
+## Responsibility
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/collections` | List all collections |
-| POST | `/collections/{name}` | Create collection |
-| DELETE | `/collections/{name}` | Delete collection |
-| PUT | `/collections/{name}/points` | Upsert points |
-| GET | `/collections/{name}/points/{id}` | Get point by ID |
-| DELETE | `/collections/{name}/points/{id}` | Delete point |
-| POST | `/collections/{name}/points/search` | Search vectors |
+- Accept API-shaped requests as `method + path + body`
+- Execute vcdb collection commands
+- Return structured JSON responses
+
+It does not open sockets or serve HTTP directly. Runtime-specific transports
+belong in adapter packages such as `http` and `js`.
 
 ## Usage
 
 ```moonbit
 let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::new()
-let response = execute_request(manager, "POST", ["collections", "test"], body)
+let response = execute_path_request(
+  manager,
+  "POST",
+  "/collections/test",
+  body,
+)
 ```
