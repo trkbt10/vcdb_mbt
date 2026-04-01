@@ -179,58 +179,70 @@ test "wal/upsert_creates_wal" {
 }
 
 ///|
-test "wal/delete_creates_wal_record" {
+test "wal/delete_persists_via_wal" {
   let storage = @storage.MemoryStorage::new()
-  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+  let manager1 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
     storage,
   )
   let _ = execute_path_request(
-    manager,
+    manager1,
     "POST",
     "/collections/test",
     "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
   )
   let _ = execute_path_request(
-    manager,
+    manager1,
     "PUT",
     "/collections/test/points",
     "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}},{\"id\":2,\"vector\":[0,1],\"payload\":{}}]}",
   )
+  manager1.checkpoint("test")
   let del = execute_path_request(
-    manager, "DELETE", "/collections/test/points/1", "",
+    manager1, "DELETE", "/collections/test/points/1", "",
   )
   assert_eq(del.status, "ok")
-  // WAL should have 3 records (2 upserts + 1 remove)
-  let wal = manager.get_wal("test")
-  match wal {
-    Some(w) => assert_eq(w.record_count(), 3)
+  // Reload — deletion should be replayed from WAL
+  let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+  )
+  match manager2.get("test") {
+    Some(d) => {
+      assert_eq(d.size(), 1)
+      assert_true(d.has(@types.VectorId::from_int(2)))
+      assert_true(not(d.has(@types.VectorId::from_int(1))))
+    }
     None => assert_true(false)
   }
 }
 
 ///|
-test "wal/checkpoint_resets_wal" {
+test "wal/checkpoint_snapshot_is_current" {
   let storage = @storage.MemoryStorage::new()
-  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+  let manager1 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
     storage,
   )
   let _ = execute_path_request(
-    manager,
+    manager1,
     "POST",
     "/collections/test",
     "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
   )
   let _ = execute_path_request(
-    manager,
+    manager1,
     "PUT",
     "/collections/test/points",
     "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
   )
-  // Force checkpoint
-  manager.checkpoint("test")
-  // WAL should be truncated (0 records)
-  match manager.get_wal("test") {
-    Some(w) => assert_eq(w.record_count(), 0)
+  manager1.checkpoint("test")
+  // After checkpoint, reload should see the data without WAL
+  let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+  )
+  match manager2.get("test") {
+    Some(d) => {
+      assert_eq(d.size(), 1)
+      assert_true(d.has(@types.VectorId::from_int(1)))
+    }
     None => assert_true(false)
   }
 }
@@ -284,30 +296,34 @@ test "wal/reload_replays_wal" {
 test "wal/auto_checkpoint_on_threshold" {
   let storage = @storage.MemoryStorage::new()
   // Set very low threshold for testing
-  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+  let manager1 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
     storage,
     checkpoint_threshold=3,
   )
   let _ = execute_path_request(
-    manager,
+    manager1,
     "POST",
     "/collections/test",
     "{\"dim\":1,\"strategy\":\"Bruteforce\"}",
   )
   // Add 3 points in one batch → reaches threshold → auto-checkpoint
   let _ = execute_path_request(
-    manager,
+    manager1,
     "PUT",
     "/collections/test/points",
     "{\"points\":[{\"id\":1,\"vector\":[1],\"payload\":{}},{\"id\":2,\"vector\":[2],\"payload\":{}},{\"id\":3,\"vector\":[3],\"payload\":{}}]}",
   )
-  // After auto-checkpoint, WAL should be truncated
-  match manager.get_wal("test") {
-    Some(w) => assert_eq(w.record_count(), 0)
+  // Data should be accessible
+  match manager1.get("test") {
+    Some(d) => assert_eq(d.size(), 3)
     None => assert_true(false)
   }
-  // Data should still be accessible (in snapshot now)
-  match manager.get("test") {
+  // Auto-checkpoint means data survives reload without explicit checkpoint
+  let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+    checkpoint_threshold=3,
+  )
+  match manager2.get("test") {
     Some(d) => assert_eq(d.size(), 3)
     None => assert_true(false)
   }
@@ -336,6 +352,239 @@ test "wal/delete_collection_removes_wal" {
   // WAL file should be gone
   let wal_path = @storage.collection_wal_path("test")
   assert_eq(storage.exists(wal_path), false)
+}
+
+///|
+test "segmented/persist_and_reload" {
+  let storage = @storage.MemoryStorage::new()
+  // segment_bytes=200 forces segmentation with small data
+  let manager1 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+    segment_bytes=Some(200),
+  )
+  let _ = execute_path_request(
+    manager1,
+    "POST",
+    "/collections/seg",
+    "{\"dim\":3,\"strategy\":\"Bruteforce\"}",
+  )
+  // Add several points
+  let _ = execute_path_request(
+    manager1,
+    "PUT",
+    "/collections/seg/points",
+    "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{\"tag\":\"a\"}},{\"id\":2,\"vector\":[0,1,0],\"payload\":{\"tag\":\"b\"}},{\"id\":3,\"vector\":[0,0,1],\"payload\":{\"tag\":\"c\"}}]}",
+  )
+  // Force checkpoint to trigger segmented persist
+  manager1.checkpoint("seg")
+
+  // Verify segment files were created (Data kind)
+  let data_files = storage.list()
+  let mut has_segment = false
+  for f in data_files {
+    if f.has_suffix(".vseg") {
+      has_segment = true
+    }
+  }
+  assert_true(has_segment)
+
+  // Verify manifest was created (Index kind)
+  let mut has_manifest = false
+  for f in data_files {
+    if f.has_suffix(".vcdb.manifest") {
+      has_manifest = true
+    }
+  }
+  assert_true(has_manifest)
+
+  // Reload from storage in a new manager
+  let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+    segment_bytes=Some(200),
+  )
+  let db = manager2.get("seg")
+  match db {
+    Some(d) => {
+      assert_eq(d.size(), 3)
+      assert_true(d.has(@types.VectorId::from_int(1)))
+      assert_true(d.has(@types.VectorId::from_int(2)))
+      assert_true(d.has(@types.VectorId::from_int(3)))
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+test "segmented/wal_replay_after_segments" {
+  let storage = @storage.MemoryStorage::new()
+  let manager1 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+    segment_bytes=Some(200),
+  )
+  let _ = execute_path_request(
+    manager1,
+    "POST",
+    "/collections/seg",
+    "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+  )
+  // Add points and checkpoint (creates segments)
+  let _ = execute_path_request(
+    manager1,
+    "PUT",
+    "/collections/seg/points",
+    "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
+  )
+  manager1.checkpoint("seg")
+
+  // Add more points (only in WAL, not in segments)
+  let _ = execute_path_request(
+    manager1,
+    "PUT",
+    "/collections/seg/points",
+    "{\"points\":[{\"id\":2,\"vector\":[0,1],\"payload\":{}}]}",
+  )
+
+  // Reload: should have segments + WAL replay
+  let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+    segment_bytes=Some(200),
+  )
+  let db = manager2.get("seg")
+  match db {
+    Some(d) => {
+      assert_eq(d.size(), 2)
+      assert_true(d.has(@types.VectorId::from_int(1))) // from segments
+      assert_true(d.has(@types.VectorId::from_int(2))) // from WAL
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+test "segmented/kind_routing_config_index_data" {
+  // Use KindAwareStorage to verify each file goes to the correct StorageKind
+  let storage = @storage.KindAwareStorage::new()
+  let manager : CollectionManager[@storage.KindAwareStorage] = CollectionManager::with_storage(
+    storage,
+    segment_bytes=Some(200),
+  )
+
+  let config : CollectionConfig = {
+    name: "kinds",
+    dim: 2,
+    metric: @types.Cosine,
+    strategy: @types.Bruteforce,
+  }
+  let _ = manager.create(config)
+
+  let _ = manager.upsert_points(
+    "kinds",
+    [
+      (@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs()),
+      (@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs()),
+    ],
+  )
+
+  // Force checkpoint to trigger segmented persist
+  manager.checkpoint("kinds")
+
+  // Config kind: should contain .config.json
+  let config_files = storage.list_kind(@storage.Config)
+  let mut has_config = false
+  for f in config_files {
+    if f.has_suffix(".config.json") {
+      has_config = true
+    }
+  }
+  assert_true(has_config)
+  // Config kind should NOT contain segments or index
+  for f in config_files {
+    assert_true(not(f.has_suffix(".vseg")))
+    assert_true(not(f.has_suffix(".vidx")))
+    assert_true(not(f.has_suffix(".vcdb.manifest")))
+  }
+
+  // Index kind: should contain .vidx and .vcdb.manifest
+  let index_files = storage.list_kind(@storage.Index)
+  let mut has_vidx = false
+  let mut has_manifest = false
+  for f in index_files {
+    if f.has_suffix(".vidx") {
+      has_vidx = true
+    }
+    if f.has_suffix(".vcdb.manifest") {
+      has_manifest = true
+    }
+  }
+  assert_true(has_vidx)
+  assert_true(has_manifest)
+  // Index kind should NOT contain segments or config
+  for f in index_files {
+    assert_true(not(f.has_suffix(".vseg")))
+    assert_true(not(f.has_suffix(".config.json")))
+  }
+
+  // Data kind: should contain .vseg segment files
+  let data_files = storage.list_kind(@storage.Data)
+  let mut has_segment = false
+  for f in data_files {
+    if f.has_suffix(".vseg") {
+      has_segment = true
+    }
+  }
+  assert_true(has_segment)
+  // Data kind should NOT contain config or index
+  for f in data_files {
+    assert_true(not(f.has_suffix(".config.json")))
+    assert_true(not(f.has_suffix(".vidx")))
+    assert_true(not(f.has_suffix(".vcdb.manifest")))
+  }
+}
+
+///|
+test "segmented/reload_from_kind_aware_storage" {
+  // Verify round-trip: persist with kind separation → reload correctly
+  let storage = @storage.KindAwareStorage::new()
+  let manager1 : CollectionManager[@storage.KindAwareStorage] = CollectionManager::with_storage(
+    storage,
+    segment_bytes=Some(200),
+  )
+
+  let config : CollectionConfig = {
+    name: "rt",
+    dim: 3,
+    metric: @types.Cosine,
+    strategy: @types.Bruteforce,
+  }
+  let _ = manager1.create(config)
+  let a = @types.empty_attrs()
+  a.set("label", @types.String("alpha"))
+  let b = @types.empty_attrs()
+  b.set("label", @types.String("beta"))
+  let _ = manager1.upsert_points(
+    "rt",
+    [
+      (@types.VectorId::from_int(1), [1.0, 0.0, 0.0], a),
+      (@types.VectorId::from_int(2), [0.0, 1.0, 0.0], b),
+    ],
+  )
+  manager1.checkpoint("rt")
+
+  // Reload in a new manager using the SAME kind-aware storage
+  // If kind routing is wrong, load will fail because data is in the wrong map
+  let manager2 : CollectionManager[@storage.KindAwareStorage] = CollectionManager::with_storage(
+    storage,
+    segment_bytes=Some(200),
+  )
+  let db2 = manager2.get("rt")
+  match db2 {
+    Some(d) => {
+      assert_eq(d.size(), 2)
+      assert_true(d.has(@types.VectorId::from_int(1)))
+      assert_true(d.has(@types.VectorId::from_int(2)))
+    }
+    None => assert_true(false)
+  }
 }
 
 ///|

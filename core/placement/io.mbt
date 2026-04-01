@@ -21,6 +21,16 @@ pub fn SegmentOptions::default(
 }
 
 ///|
+/// Create segment options with segmentation enabled and custom size limit
+pub fn SegmentOptions::segmented(
+  base_name : String,
+  crush : CrushMap,
+  segment_bytes : Int,
+) -> SegmentOptions {
+  { base_name, crush, segmented: true, segment_bytes }
+}
+
+///|
 /// Result of writing segments
 pub struct SegmentResult {
   entries : Array[@segment.IndexEntry]

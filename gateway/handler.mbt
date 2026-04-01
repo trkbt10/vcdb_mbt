@@ -3,27 +3,6 @@
 /// These handlers implement the business logic for CLI and HTTP operations
 
 ///|
-/// Handle upsert points into a collection
-/// Returns (count, needs_persist) - caller should persist if needed
-pub fn handle_upsert(
-  db : @vcdb.VectorDB,
-  req : UpsertRequest,
-) -> Result[Int, GatewayError] {
-  let dim = db.dim()
-  let mut count = 0
-  for point in req.points {
-    let vec_dim = point.vector.length()
-    if vec_dim != dim {
-      return Err(DimensionMismatch(expected=dim, got=vec_dim))
-    }
-    let id = @types.VectorId::from_int64(point.id)
-    let _ = db.upsert(id, point.vector, point.payload)
-    count = count + 1
-  }
-  Ok(count)
-}
-
-///|
 /// Handle search in a collection
 pub fn handle_search(
   db : @vcdb.VectorDB,
@@ -98,20 +77,6 @@ pub fn handle_scroll(
     }
   }
   Ok({ points, next_page_offset })
-}
-
-///|
-/// Handle delete point by ID
-pub fn handle_delete_point(
-  db : @vcdb.VectorDB,
-  id : Int64,
-) -> Result[Unit, GatewayError] {
-  let vec_id = @types.VectorId::from_int64(id)
-  if not(db.has(vec_id)) {
-    return Err(NotFound("Point with id " + id.to_string() + " not found"))
-  }
-  let _ = db.remove(vec_id)
-  Ok(())
 }
 
 ///|
@@ -248,22 +213,19 @@ pub fn[S : @storage.Storage] execute_request(
           }
         None => return ApiResponse::err("Invalid JSON")
       }
-      match with_collection(manager, name, fn(db) { handle_upsert(db, req) }) {
-        Ok(count) => {
-          // Record upserts to WAL for differential persistence
-          let wal_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = req
-            .points
-            .map(fn(p) {
-              (@types.VectorId::from_int64(p.id), p.vector, p.payload)
-            })
-          manager.notify_upsert(name, wal_points)
+      let points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = req
+        .points
+        .map(fn(p) {
+          (@types.VectorId::from_int64(p.id), p.vector, p.payload)
+        })
+      match manager.upsert_points(name, points) {
+        Ok(count) =>
           ApiResponse::ok(
             json_object([
               ("status", JString("ok")),
               ("upserted", JNumber(count.to_double())),
             ]),
           )
-        }
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     }
@@ -317,12 +279,8 @@ pub fn[S : @storage.Storage] execute_request(
         Ok(i) => i
         Err(_) => return ApiResponse::err("Invalid point ID")
       }
-      match
-        with_collection(manager, name, fn(db) { handle_delete_point(db, id) }) {
-        Ok(_) => {
-          manager.notify_remove(name, [@types.VectorId::from_int64(id)])
-          ApiResponse::ok(JBool(true))
-        }
+      match manager.remove_point(name, @types.VectorId::from_int64(id)) {
+        Ok(_) => ApiResponse::ok(JBool(true))
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     }
