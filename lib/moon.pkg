@@ -2,11 +2,17 @@ import {
   "trkbt10/vcdb",
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/storage",
+  "trkbt10/vcdb/core/store",
+  "trkbt10/vcdb/core/persistence/wal",
+  "trkbt10/vcdb/core/persistence/codec",
   "trkbt10/vcdb/gateway",
   "moonbitlang/core/hashmap",
 }
 
 options(
+  targets: {
+    "async_exports.mbt": [ "js" ],
+  },
   link: {
     "js": {
       "exports": [
@@ -31,6 +37,15 @@ options(
         "gateway_storage_read",
         "gateway_storage_write",
         "gateway_storage_exists",
+        "async_init_db",
+        "async_init_db_from_snapshot",
+        "async_replay_wal_and_init",
+        "async_upsert",
+        "async_search",
+        "async_serialize_snapshot",
+        "async_wal_header",
+        "async_merge_wal",
+        "async_db_size",
       ],
     },
   },
