@@ -1,8 +1,11 @@
 ///|
 /// CollectionManager - manages multiple VectorDB collections
 ///
-/// Simple storage: uses single Storage for all data.
-/// Distributed storage: app layer handles routing via placement/io.mbt functions.
+/// Supports two persistence modes:
+/// - Snapshot-only: full serialize on every modification (legacy, via notify_modified)
+/// - WAL-based: append WAL records on mutations, periodic checkpoint (snapshot + truncate)
+///
+/// WAL-based persistence is storage-agnostic: works with fs, S3, Durable Objects, etc.
 
 ///|
 /// Collection entry
@@ -12,11 +15,17 @@ pub struct Collection {
 }
 
 ///|
+/// Default checkpoint threshold (number of WAL records before auto-checkpoint)
+let default_checkpoint_threshold : Int = 1000
+
+///|
 /// Collection manager with optional storage
 pub struct CollectionManager[S] {
   collections : Map[String, Collection]
   storage : S?
   base_path : String
+  wals : Map[String, @wal.WalRuntime[S]]
+  checkpoint_threshold : Int
 }
 
 ///|
@@ -24,7 +33,13 @@ pub struct CollectionManager[S] {
 pub fn[S] CollectionManager::new(
   base_path? : String = "",
 ) -> CollectionManager[S] {
-  { collections: {}, storage: None, base_path }
+  {
+    collections: {},
+    storage: None,
+    base_path,
+    wals: {},
+    checkpoint_threshold: default_checkpoint_threshold,
+  }
 }
 
 ///|
@@ -32,8 +47,15 @@ pub fn[S] CollectionManager::new(
 pub fn[S] CollectionManager::with_storage(
   storage : S,
   base_path? : String = "",
+  checkpoint_threshold? : Int = default_checkpoint_threshold,
 ) -> CollectionManager[S] {
-  { collections: {}, storage: Some(storage), base_path }
+  {
+    collections: {},
+    storage: Some(storage),
+    base_path,
+    wals: {},
+    checkpoint_threshold,
+  }
 }
 
 ///|
@@ -46,6 +68,31 @@ fn make_path(base_path : String, path : String) -> String {
 }
 
 ///|
+/// Get or create WAL runtime for a collection
+fn[S] CollectionManager::get_wal(
+  self : CollectionManager[S],
+  name : String,
+) -> @wal.WalRuntime[S]? {
+  match self.wals.get(name) {
+    Some(w) => Some(w)
+    None =>
+      match self.storage {
+        None => None
+        Some(storage) => {
+          let wal_path = make_path(
+            self.base_path,
+            @storage.collection_wal_path(name),
+          )
+          let w = @wal.WalRuntime::new(storage, wal_path)
+          self.wals[name] = w
+          Some(w)
+        }
+      }
+  }
+}
+
+///|
+/// Persist collection snapshot (config + full data)
 fn[S : @storage.Storage] CollectionManager::persist_collection(
   self : CollectionManager[S],
   name : String,
@@ -81,6 +128,72 @@ fn[S : @storage.Storage] CollectionManager::persist_collection(
 }
 
 ///|
+/// Checkpoint: write snapshot and truncate WAL
+pub fn[S : @storage.Storage] CollectionManager::checkpoint(
+  self : CollectionManager[S],
+  name : String,
+) -> Unit {
+  self.persist_collection(name)
+  match self.get_wal(name) {
+    Some(w) => w.truncate()
+    None => ()
+  }
+}
+
+///|
+/// Record upsert operations to WAL (differential persistence)
+pub fn[S : @storage.Storage] CollectionManager::notify_upsert(
+  self : CollectionManager[S],
+  name : String,
+  points : Array[(@types.VectorId, Array[Double], @types.Attrs)],
+) -> Unit {
+  match self.get_wal(name) {
+    None => return
+    Some(w) => {
+      let records : Array[@wal.WalRecord] = points.map(fn(p) {
+        let (id, vector, attrs) = p
+        @wal.WalRecord::upsert(id, vector, attrs)
+      })
+      w.append(records) catch { _ => () }
+      // Auto-checkpoint if threshold exceeded
+      if w.record_count() >= self.checkpoint_threshold {
+        self.checkpoint(name)
+      }
+    }
+  }
+}
+
+///|
+/// Record remove operations to WAL (differential persistence)
+pub fn[S : @storage.Storage] CollectionManager::notify_remove(
+  self : CollectionManager[S],
+  name : String,
+  ids : Array[@types.VectorId],
+) -> Unit {
+  match self.get_wal(name) {
+    None => return
+    Some(w) => {
+      let records : Array[@wal.WalRecord] = ids.map(fn(id) {
+        @wal.WalRecord::remove(id)
+      })
+      w.append(records) catch { _ => () }
+      if w.record_count() >= self.checkpoint_threshold {
+        self.checkpoint(name)
+      }
+    }
+  }
+}
+
+///|
+/// Legacy: force full snapshot (backward-compatible, acts as checkpoint)
+pub fn[S : @storage.Storage] CollectionManager::notify_modified(
+  self : CollectionManager[S],
+  name : String,
+) -> Unit {
+  self.checkpoint(name)
+}
+
+///|
 fn[S : @storage.Storage] CollectionManager::load_collection_from_storage(
   self : CollectionManager[S],
   name : String,
@@ -107,10 +220,19 @@ fn[S : @storage.Storage] CollectionManager::load_collection_from_storage(
     None => return None
   }
 
-  // Load data
+  // Load snapshot
   let data_path = make_path(self.base_path, @storage.collection_data_path(name))
   let data = storage.read(data_path, @storage.Data) catch { _ => return None }
   let db = @vcdb.VectorDB::deserialize(data)
+
+  // Replay WAL on top of snapshot (if WAL exists)
+  match self.get_wal(name) {
+    Some(w) => {
+      let _ = w.replay_into(db.store()) catch { _ => 0 }
+    }
+    None => ()
+  }
+
   Some({ config, db })
 }
 
@@ -138,6 +260,10 @@ fn[S : @storage.Storage] CollectionManager::remove_persisted_collection(
     @storage.collection_config_path(name),
   )
   let data_path = make_path(self.base_path, @storage.collection_data_path(name))
+  let wal_path = make_path(
+    self.base_path,
+    @storage.collection_wal_path(name),
+  )
 
   if storage.exists(config_path, @storage.Config) {
     storage.del(config_path, @storage.Config) catch {
@@ -149,6 +275,12 @@ fn[S : @storage.Storage] CollectionManager::remove_persisted_collection(
       _ => ()
     }
   }
+  if storage.exists(wal_path, @storage.Data) {
+    storage.del(wal_path, @storage.Data) catch {
+      _ => ()
+    }
+  }
+  self.wals.remove(name)
 }
 
 ///|
@@ -156,7 +288,16 @@ pub fn[S : @storage.Storage] CollectionManager::create(
   self : CollectionManager[S],
   config : CollectionConfig,
 ) -> Result[Unit, GatewayError] {
-  if self.collections.contains(config.name) {
+  let config_path = make_path(
+    self.base_path,
+    @storage.collection_config_path(config.name),
+  )
+  let already_exists = self.collections.contains(config.name) ||
+    (match self.storage {
+      Some(storage) => storage.exists(config_path, @storage.Config)
+      None => false
+    })
+  if already_exists {
     return Err(CollectionExists(config.name))
   }
   let options : @types.DatabaseOptions = {
@@ -191,7 +332,7 @@ pub fn[S : @storage.Storage] CollectionManager::get(
 }
 
 ///|
-pub fn[S] CollectionManager::get_info(
+pub fn[S : @storage.Storage] CollectionManager::get_info(
   self : CollectionManager[S],
   name : String,
 ) -> CollectionInfo? {
@@ -215,7 +356,14 @@ pub fn[S] CollectionManager::get_info(
         strategy: strategy_str,
       })
     }
-    None => None
+    None =>
+      match self.load_collection_from_storage(name) {
+        Some(col) => {
+          self.collections[name] = col
+          self.get_info(name)
+        }
+        None => None
+      }
   }
 }
 
@@ -225,7 +373,10 @@ pub fn[S : @storage.Storage] CollectionManager::delete(
   name : String,
 ) -> Result[Unit, GatewayError] {
   if not(self.collections.contains(name)) {
-    return Err(CollectionNotFound(name))
+    match self.load_collection_from_storage(name) {
+      Some(col) => self.collections[name] = col
+      None => return Err(CollectionNotFound(name))
+    }
   }
   self.collections.remove(name)
   self.remove_persisted_collection(name)
@@ -233,20 +384,43 @@ pub fn[S : @storage.Storage] CollectionManager::delete(
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::notify_modified(
+fn config_name_from_path(path : String) -> String? {
+  let suffix = ".config.json"
+  if path.has_suffix(suffix) {
+    Some(path.unsafe_substring(start=0, end=path.length() - suffix.length()))
+  } else {
+    None
+  }
+}
+
+///|
+pub fn[S : @storage.Storage] CollectionManager::list(
   self : CollectionManager[S],
-  name : String,
-) -> Unit {
-  self.persist_collection(name)
+) -> Array[String] {
+  let names : Array[String] = self.collections.keys().collect()
+  let seen : Map[String, Bool] = {}
+  for name in names {
+    seen[name] = true
+  }
+  match self.storage {
+    Some(storage) =>
+      for path in storage.list(@storage.Config) {
+        match config_name_from_path(path) {
+          Some(name) =>
+            if not(seen.contains(name)) {
+              names.push(name)
+              seen[name] = true
+            }
+          None => ()
+        }
+      }
+    None => ()
+  }
+  names
 }
 
 ///|
-pub fn[S] CollectionManager::list(self : CollectionManager[S]) -> Array[String] {
-  self.collections.keys().collect()
-}
-
-///|
-pub fn[S] CollectionManager::list_info(
+pub fn[S : @storage.Storage] CollectionManager::list_info(
   self : CollectionManager[S],
 ) -> Array[CollectionInfo] {
   let infos : Array[CollectionInfo] = []

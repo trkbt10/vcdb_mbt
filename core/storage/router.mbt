@@ -28,6 +28,12 @@ pub fn collection_manifest_path(collection_name : String) -> String {
 }
 
 ///|
+/// Path for collection WAL file
+pub fn collection_wal_path(collection_name : String) -> String {
+  collection_name + @codec.ext_wal
+}
+
+///|
 /// Path for data segment file
 pub fn segment_data_path(base : String, pg : Int, part : Int) -> String {
   base +

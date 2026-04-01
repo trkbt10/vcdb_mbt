@@ -1,17 +1,19 @@
 ///|
 /// WAL Runtime - manages append, replay, and truncate operations
-pub struct WalRuntime {
-  storage : @storage.MemoryStorage
+pub struct WalRuntime[S] {
+  storage : S
   path : String
+  kind : @storage.StorageKind
 }
 
 ///|
-/// Create a new WAL runtime with memory storage
-pub fn WalRuntime::new(
-  storage : @storage.MemoryStorage,
+/// Create a new WAL runtime with any Storage backend
+pub fn[S] WalRuntime::new(
+  storage : S,
   path : String,
-) -> WalRuntime {
-  { storage, path }
+  kind? : @storage.StorageKind = Data,
+) -> WalRuntime[S] {
+  { storage, path, kind }
 }
 
 ///|
@@ -41,8 +43,8 @@ fn get_safe_copy_length(data : Bytes) -> Int {
 
 ///|
 /// Append records to the WAL with checksum footer
-pub fn WalRuntime::append(
-  self : WalRuntime,
+pub fn[S : @storage.Storage] WalRuntime::append(
+  self : WalRuntime[S],
   records : Array[WalRecord],
 ) -> Unit raise @storage.IOError {
   if records.is_empty() {
@@ -51,8 +53,8 @@ pub fn WalRuntime::append(
   let w = @binary.BinaryWriter::new()
   // Read existing WAL and copy only up to last decodable record
   let mut use_existing = false
-  if self.storage.exists(self.path) {
-    let existing = self.storage.read(self.path)
+  if self.storage.exists(self.path, self.kind) {
+    let existing = self.storage.read(self.path, self.kind)
     // First verify checksum - if it fails, the file is corrupted
     if verify_wal_checksum(existing) {
       // Checksum valid: get safe copy length (up to last decodable record boundary)
@@ -82,20 +84,20 @@ pub fn WalRuntime::append(
   let final_w = @binary.BinaryWriter::new()
   final_w.push_bytes(body)
   final_w.push_bytes(footer)
-  self.storage.atomic_write(self.path, final_w.concat())
+  self.storage.atomic_write(self.path, final_w.concat(), self.kind)
 }
 
 ///|
 /// Replay WAL records into a CoreStore
 /// Returns the number of records applied
-pub fn WalRuntime::replay_into(
-  self : WalRuntime,
+pub fn[S : @storage.Storage] WalRuntime::replay_into(
+  self : WalRuntime[S],
   store : @store.CoreStore,
 ) -> Int raise @storage.IOError {
-  if not(self.storage.exists(self.path)) {
+  if not(self.storage.exists(self.path, self.kind)) {
     return 0
   }
-  let data = self.storage.read(self.path)
+  let data = self.storage.read(self.path, self.kind)
   // Verify header first - reject non-WAL files
   if data.length() < @codec.header_size {
     raise @storage.IoFailed("WAL file too short")
@@ -143,18 +145,22 @@ pub fn WalRuntime::replay_into(
 
 ///|
 /// Truncate (clear) the WAL
-pub fn WalRuntime::truncate(self : WalRuntime) -> Unit {
-  if self.storage.exists(self.path) {
+pub fn[S : @storage.Storage] WalRuntime::truncate(
+  self : WalRuntime[S],
+) -> Unit {
+  if self.storage.exists(self.path, self.kind) {
     // Write empty WAL with just header
-    self.storage.atomic_write(self.path, encode_wal_header())
+    self.storage.atomic_write(self.path, encode_wal_header(), self.kind) catch {
+      _ => ()
+    }
   }
 }
 
 ///|
 /// Get WAL size in bytes
-pub fn WalRuntime::size(self : WalRuntime) -> Int {
-  if self.storage.exists(self.path) {
-    self.storage.read(self.path).length() catch {
+pub fn[S : @storage.Storage] WalRuntime::size(self : WalRuntime[S]) -> Int {
+  if self.storage.exists(self.path, self.kind) {
+    self.storage.read(self.path, self.kind).length() catch {
       _ => 0
     }
   } else {
@@ -164,6 +170,20 @@ pub fn WalRuntime::size(self : WalRuntime) -> Int {
 
 ///|
 /// Check if WAL exists
-pub fn WalRuntime::exists(self : WalRuntime) -> Bool {
-  self.storage.exists(self.path)
+pub fn[S : @storage.Storage] WalRuntime::exists(
+  self : WalRuntime[S],
+) -> Bool {
+  self.storage.exists(self.path, self.kind)
+}
+
+///|
+/// Count records in the WAL without replaying
+pub fn[S : @storage.Storage] WalRuntime::record_count(
+  self : WalRuntime[S],
+) -> Int {
+  if not(self.storage.exists(self.path, self.kind)) {
+    return 0
+  }
+  let data = self.storage.read(self.path, self.kind) catch { _ => return 0 }
+  decode_wal_records(data).length()
 }

@@ -53,6 +53,19 @@ pub fn MemoryStorage::read(Self, String) -> Bytes raise IOError
 pub fn MemoryStorage::write(Self, String, Bytes) -> Unit
 pub impl Storage for MemoryStorage
 
+pub struct NativeFileStorage {
+  root_dir : String
+}
+pub fn NativeFileStorage::append(Self, String, Bytes, StorageKind) -> Unit raise IOError
+pub fn NativeFileStorage::atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+pub fn NativeFileStorage::del(Self, String, StorageKind) -> Unit raise IOError
+pub fn NativeFileStorage::exists(Self, String, StorageKind) -> Bool
+pub fn NativeFileStorage::list(Self, StorageKind) -> Array[String]
+pub fn NativeFileStorage::new(String) -> Self
+pub fn NativeFileStorage::read(Self, String, StorageKind) -> Bytes raise IOError
+pub fn NativeFileStorage::write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+pub impl Storage for NativeFileStorage
+
 pub struct StorageCallbacks {
   read : (String, StorageKind) -> Bytes
   write : (String, Bytes, StorageKind) -> Unit

@@ -65,6 +65,42 @@ pub fn handle_get_point(
 }
 
 ///|
+/// Handle scrolling points in a collection.
+pub fn handle_scroll(
+  db : @vcdb.VectorDB,
+  req : ScrollRequest,
+) -> Result[ScrollResponse, GatewayError] {
+  let entries = db.scroll(offset=req.offset, limit=req.limit)
+  let points : Array[ScrollPointResponse] = []
+  for i, entry in entries {
+    let (id, record) = entry
+    points.push({
+      id: id.to_int64(),
+      payload: if req.with_payload {
+        Some(record.attrs)
+      } else {
+        None
+      },
+      vector: if req.with_vector {
+        Some(record.vector)
+      } else {
+        None
+      },
+    })
+    ignore(i)
+  }
+  let next_page_offset = if entries.length() < req.limit {
+    None
+  } else {
+    match entries.last() {
+      Some((id, _)) => Some(id.to_int64() + 1L)
+      None => None
+    }
+  }
+  Ok({ points, next_page_offset })
+}
+
+///|
 /// Handle delete point by ID
 pub fn handle_delete_point(
   db : @vcdb.VectorDB,
@@ -106,7 +142,7 @@ pub fn[S : @storage.Storage] handle_list_collections(
 
 ///|
 /// Handle get collection info
-pub fn[S] handle_get_collection(
+pub fn[S : @storage.Storage] handle_get_collection(
   manager : CollectionManager[S],
   name : String,
 ) -> Result[CollectionInfo, GatewayError] {
@@ -214,7 +250,13 @@ pub fn[S : @storage.Storage] execute_request(
       }
       match with_collection(manager, name, fn(db) { handle_upsert(db, req) }) {
         Ok(count) => {
-          manager.notify_modified(name) // Persist changes
+          // Record upserts to WAL for differential persistence
+          let wal_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = req
+            .points
+            .map(fn(p) {
+              (@types.VectorId::from_int64(p.id), p.vector, p.payload)
+            })
+          manager.notify_upsert(name, wal_points)
           ApiResponse::ok(
             json_object([
               ("status", JString("ok")),
@@ -235,6 +277,24 @@ pub fn[S : @storage.Storage] execute_request(
         None => return ApiResponse::err("Invalid JSON")
       }
       match with_collection(manager, name, fn(db) { handle_search(db, req) }) {
+        Ok(resp) => ApiResponse::ok(resp.to_json())
+        Err(e) => ApiResponse::err(error_to_string(e))
+      }
+    }
+    ("POST", ["collections", name, "points", "scroll"]) => {
+      let req = if body.length() == 0 {
+        { offset: None, limit: 10, with_payload: true, with_vector: false }
+      } else {
+        match parse_json(body) {
+          Some(json) =>
+            match ScrollRequest::from_json(json) {
+              Some(r) => r
+              None => return ApiResponse::err("Invalid request body")
+            }
+          None => return ApiResponse::err("Invalid JSON")
+        }
+      }
+      match with_collection(manager, name, fn(db) { handle_scroll(db, req) }) {
         Ok(resp) => ApiResponse::ok(resp.to_json())
         Err(e) => ApiResponse::err(error_to_string(e))
       }
@@ -260,7 +320,7 @@ pub fn[S : @storage.Storage] execute_request(
       match
         with_collection(manager, name, fn(db) { handle_delete_point(db, id) }) {
         Ok(_) => {
-          manager.notify_modified(name) // Persist changes
+          manager.notify_remove(name, [@types.VectorId::from_int64(id)])
           ApiResponse::ok(JBool(true))
         }
         Err(e) => ApiResponse::err(error_to_string(e))

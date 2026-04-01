@@ -136,3 +136,252 @@ test "json/escape_roundtrip" {
   let parsed = parse_json(s)
   assert_eq(parsed, Some(JString(special)))
 }
+
+///|
+test "request/parse_request_path" {
+  let segments = parse_request_path("/collections/test/points")
+  assert_eq(segments, ["collections", "test", "points"])
+}
+
+///|
+test "request/parse_request_path_empty" {
+  assert_eq(parse_request_path("/"), [])
+  assert_eq(parse_request_path(""), [])
+}
+
+///|
+test "request/split_request_target" {
+  let (path, query) = split_request_target("/collections/test?limit=10")
+  assert_eq(path, "/collections/test")
+  assert_eq(query, "limit=10")
+}
+
+///|
+test "wal/upsert_creates_wal" {
+  let storage = @storage.MemoryStorage::new()
+  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+  )
+  let create = execute_path_request(
+    manager, "POST", "/collections/test", "{\"dim\":3,\"strategy\":\"Bruteforce\"}",
+  )
+  assert_eq(create.status, "ok")
+  let upsert = execute_path_request(
+    manager,
+    "PUT",
+    "/collections/test/points",
+    "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{}}]}",
+  )
+  assert_eq(upsert.status, "ok")
+  // WAL file should exist
+  let wal_path = @storage.collection_wal_path("test")
+  assert_true(storage.exists(wal_path))
+}
+
+///|
+test "wal/delete_creates_wal_record" {
+  let storage = @storage.MemoryStorage::new()
+  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+  )
+  let _ = execute_path_request(
+    manager,
+    "POST",
+    "/collections/test",
+    "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+  )
+  let _ = execute_path_request(
+    manager,
+    "PUT",
+    "/collections/test/points",
+    "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}},{\"id\":2,\"vector\":[0,1],\"payload\":{}}]}",
+  )
+  let del = execute_path_request(
+    manager, "DELETE", "/collections/test/points/1", "",
+  )
+  assert_eq(del.status, "ok")
+  // WAL should have 3 records (2 upserts + 1 remove)
+  let wal = manager.get_wal("test")
+  match wal {
+    Some(w) => assert_eq(w.record_count(), 3)
+    None => assert_true(false)
+  }
+}
+
+///|
+test "wal/checkpoint_resets_wal" {
+  let storage = @storage.MemoryStorage::new()
+  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+  )
+  let _ = execute_path_request(
+    manager,
+    "POST",
+    "/collections/test",
+    "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+  )
+  let _ = execute_path_request(
+    manager,
+    "PUT",
+    "/collections/test/points",
+    "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
+  )
+  // Force checkpoint
+  manager.checkpoint("test")
+  // WAL should be truncated (0 records)
+  match manager.get_wal("test") {
+    Some(w) => assert_eq(w.record_count(), 0)
+    None => assert_true(false)
+  }
+}
+
+///|
+test "wal/reload_replays_wal" {
+  let storage = @storage.MemoryStorage::new()
+  // Phase 1: create collection, add data, checkpoint, then add more via WAL
+  let manager1 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+  )
+  let _ = execute_path_request(
+    manager1,
+    "POST",
+    "/collections/test",
+    "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+  )
+  // Add initial points and checkpoint (snapshot includes these)
+  let _ = execute_path_request(
+    manager1,
+    "PUT",
+    "/collections/test/points",
+    "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{\"tag\":\"a\"}}]}",
+  )
+  manager1.checkpoint("test")
+  // Add more points (only in WAL, not in snapshot)
+  let _ = execute_path_request(
+    manager1,
+    "PUT",
+    "/collections/test/points",
+    "{\"points\":[{\"id\":2,\"vector\":[0,1],\"payload\":{\"tag\":\"b\"}}]}",
+  )
+
+  // Phase 2: create new manager from same storage - should replay WAL
+  let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+  )
+  let db = manager2.get("test")
+  match db {
+    Some(d) => {
+      // Both points should exist: id=1 from snapshot, id=2 from WAL replay
+      assert_eq(d.size(), 2)
+      assert_true(d.has(@types.VectorId::from_int(1)))
+      assert_true(d.has(@types.VectorId::from_int(2)))
+    }
+    None => assert_true(false)
+  }
+}
+
+///|
+test "wal/auto_checkpoint_on_threshold" {
+  let storage = @storage.MemoryStorage::new()
+  // Set very low threshold for testing
+  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+    checkpoint_threshold=3,
+  )
+  let _ = execute_path_request(
+    manager,
+    "POST",
+    "/collections/test",
+    "{\"dim\":1,\"strategy\":\"Bruteforce\"}",
+  )
+  // Add 3 points in one batch → reaches threshold → auto-checkpoint
+  let _ = execute_path_request(
+    manager,
+    "PUT",
+    "/collections/test/points",
+    "{\"points\":[{\"id\":1,\"vector\":[1],\"payload\":{}},{\"id\":2,\"vector\":[2],\"payload\":{}},{\"id\":3,\"vector\":[3],\"payload\":{}}]}",
+  )
+  // After auto-checkpoint, WAL should be truncated
+  match manager.get_wal("test") {
+    Some(w) => assert_eq(w.record_count(), 0)
+    None => assert_true(false)
+  }
+  // Data should still be accessible (in snapshot now)
+  match manager.get("test") {
+    Some(d) => assert_eq(d.size(), 3)
+    None => assert_true(false)
+  }
+}
+
+///|
+test "wal/delete_collection_removes_wal" {
+  let storage = @storage.MemoryStorage::new()
+  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    storage,
+  )
+  let _ = execute_path_request(
+    manager, "POST", "/collections/test", "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+  )
+  let _ = execute_path_request(
+    manager,
+    "PUT",
+    "/collections/test/points",
+    "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
+  )
+  // Delete collection
+  let del = execute_path_request(
+    manager, "DELETE", "/collections/test", "",
+  )
+  assert_eq(del.status, "ok")
+  // WAL file should be gone
+  let wal_path = @storage.collection_wal_path("test")
+  assert_eq(storage.exists(wal_path), false)
+}
+
+///|
+test "request/execute_path_request" {
+  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    @storage.MemoryStorage::new(),
+  )
+  let create = execute_path_request(
+    manager, "POST", "/collections/demo", "{\"dim\":3}",
+  )
+  assert_eq(create.status, "ok")
+
+  let list = execute_path_request(manager, "GET", "/collections?limit=10", "")
+  assert_eq(list.status, "ok")
+}
+
+///|
+test "request/scroll_points" {
+  let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+    @storage.MemoryStorage::new(),
+  )
+  let create = execute_path_request(
+    manager, "POST", "/collections/demo", "{\"dim\":3,\"strategy\":\"Bruteforce\"}",
+  )
+  assert_eq(create.status, "ok")
+
+  let upsert = execute_path_request(
+    manager, "PUT", "/collections/demo/points", "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{\"label\":\"alpha\"}},{\"id\":2,\"vector\":[0,1,0],\"payload\":{\"label\":\"beta\"}}]}",
+  )
+  assert_eq(upsert.status, "ok")
+
+  let scroll = execute_path_request(
+    manager, "POST", "/collections/demo/points/scroll", "{\"limit\":1,\"with_payload\":true}",
+  )
+  assert_eq(scroll.status, "ok")
+  match scroll.result {
+    Some(JObject(result)) => {
+      match result.get("points") {
+        Some(JArray(points)) => assert_eq(points.length(), 1)
+        _ => assert_true(false)
+      }
+      match result.get("next_page_offset") {
+        Some(JNumber(offset)) => assert_eq(offset, 2.0)
+        _ => assert_true(false)
+      }
+    }
+    _ => assert_true(false)
+  }
+}

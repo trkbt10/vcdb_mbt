@@ -2,5 +2,6 @@ import {
   "trkbt10/vcdb",
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/storage",
+  "trkbt10/vcdb/core/persistence/wal",
   "moonbitlang/core/strconv",
 }
