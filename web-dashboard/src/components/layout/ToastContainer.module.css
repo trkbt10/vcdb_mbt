@@ -1,0 +1,119 @@
+.container {
+  position: fixed;
+  bottom: var(--space-5);
+  right: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: var(--z-toast);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: slideIn var(--transition-slow);
+  min-width: 280px;
+  max-width: 400px;
+  pointer-events: auto;
+}
+
+.toast[data-type="info"] {
+  border-left: 3px solid var(--color-info);
+}
+
+.toast[data-type="success"] {
+  border-left: 3px solid var(--color-success);
+}
+
+.toast[data-type="warning"] {
+  border-left: 3px solid var(--color-warning);
+}
+
+.toast[data-type="error"] {
+  border-left: 3px solid var(--color-error);
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast[data-type="success"] .icon {
+  color: var(--color-success);
+}
+
+.toast[data-type="error"] .icon {
+  color: var(--color-error);
+}
+
+.toast[data-type="warning"] .icon {
+  color: var(--color-warning);
+}
+
+.toast[data-type="info"] .icon {
+  color: var(--color-info);
+}
+
+.message {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  line-height: var(--leading-snug);
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.close:active {
+  transform: scale(0.92);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Exit animation class */
+.exiting {
+  animation: slideOut var(--transition-normal) forwards;
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}

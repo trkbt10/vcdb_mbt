@@ -1,0 +1,90 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--color-border-hover);
+}
+
+.card[data-status="ready"] {
+  border-left: 3px solid var(--color-success);
+}
+
+.card[data-status="building"] {
+  border-left: 3px solid var(--color-warning);
+}
+
+.card[data-status="error"] {
+  border-left: 3px solid var(--color-danger);
+}
+
+.card[data-status="pending"] {
+  border-left: 3px solid var(--color-text-tertiary);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.type,
+.execution {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+}
+
+.label {
+  color: var(--color-text-tertiary);
+}
+
+.value {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.error {
+  padding: var(--space-sm);
+  background: var(--color-danger-bg);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.errorLabel {
+  color: var(--color-danger);
+  font-weight: 500;
+  margin-right: var(--space-xs);
+}
+
+.errorMessage {
+  color: var(--color-danger);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: auto;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}

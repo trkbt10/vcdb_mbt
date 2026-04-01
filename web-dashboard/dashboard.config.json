@@ -1,0 +1,5 @@
+{
+  "baseDir": "./.dashboard-data",
+  "port": 8765,
+  "host": "0.0.0.0"
+}

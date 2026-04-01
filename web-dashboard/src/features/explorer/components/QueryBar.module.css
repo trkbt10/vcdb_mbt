@@ -1,0 +1,180 @@
+/*
+ * QueryBar - Command Console Search Interface
+ * Precision instrument aesthetic with unified single-row layout
+ */
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.container:focus-within {
+  border-color: var(--color-border-hover);
+  box-shadow: 0 0 0 3px var(--color-bg-subtle);
+}
+
+/* Input wrapper with left accent */
+.inputWrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.inputWrapper::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: transparent;
+  border-radius: 1px;
+  transition: background var(--transition-fast);
+}
+
+.container:focus-within .inputWrapper::before {
+  background: var(--color-accent);
+}
+
+/* Main search input */
+.input {
+  flex: 1;
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-text-quaternary);
+}
+
+/* Vector mode uses mono font */
+.input[data-mode="vector"] {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* Search button */
+.searchBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.searchBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.searchBtn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.searchBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.searchBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Loading spinner in button */
+.searchBtn[data-loading="true"] svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Divider between sections */
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+/* Keyboard hint */
+.hint {
+  flex-shrink: 0;
+  padding: var(--space-0-5) var(--space-1-5);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-quaternary);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  letter-spacing: var(--tracking-wide);
+}
+
+/* Vector preview (shown in vector mode when has value) */
+.vectorPreview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-2xs);
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  max-width: 200px;
+  overflow: hidden;
+}
+
+.vectorPreview code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vectorPreview button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  font-size: 10px;
+  color: var(--color-text-quaternary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.vectorPreview button:hover {
+  color: var(--color-error);
+  background: var(--color-error-light);
+}

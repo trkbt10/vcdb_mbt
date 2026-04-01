@@ -1,0 +1,92 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input:hover:not(:focus) {
+  border-color: var(--color-border-hover);
+}
+
+.input:focus {
+  border-color: var(--color-text-primary);
+  box-shadow: 0 0 0 1px var(--color-text-primary);
+}
+
+.input::placeholder {
+  color: var(--color-text-quaternary);
+}
+
+.input[data-has-icon="true"] {
+  padding-left: 34px;
+}
+
+.icon {
+  position: absolute;
+  left: var(--space-2-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-quaternary);
+  pointer-events: none;
+}
+
+.wrapper[data-error="true"] .input {
+  border-color: var(--color-error);
+}
+
+.wrapper[data-error="true"] .input:focus {
+  box-shadow: 0 0 0 1px var(--color-error);
+}
+
+.error {
+  font-size: var(--text-xs);
+  color: var(--color-error);
+}
+
+/* ===================
+   Minimal variant
+   For inline/filter use
+   =================== */
+.minimal .input {
+  padding: var(--space-1) var(--space-1-5);
+  font-size: var(--text-xs);
+  height: 22px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+.minimal .input:hover {
+  background: var(--color-bg-hover);
+}
+
+.minimal .input:focus {
+  background: var(--color-bg-primary);
+  box-shadow: none;
+}

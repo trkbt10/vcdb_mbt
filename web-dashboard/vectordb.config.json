@@ -1,0 +1,10 @@
+{
+  "name": "db",
+  "storage": {
+    "index": ".vectordb/index",
+    "data": ".vectordb/data/{ns}"
+  },
+  "database": { "dim": 3, "metric": "cosine", "strategy": "bruteforce" },
+  "index": { "segmented": true },
+  "server": { "resultConsistency": true }
+}

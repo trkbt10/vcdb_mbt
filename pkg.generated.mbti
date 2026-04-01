@@ -34,6 +34,7 @@ pub fn VectorDB::metric(Self) -> @types.Metric
 pub fn VectorDB::new(@types.DatabaseOptions) -> Self
 pub fn VectorDB::raw_size(Self) -> Int
 pub fn VectorDB::remove(Self, @types.VectorId) -> Bool
+pub fn VectorDB::scroll(Self, offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
 pub fn VectorDB::search(Self, Array[Double], Int, ((@types.VectorId, @types.Attrs) -> Bool)?) -> Array[@types.SearchHit]
 pub fn VectorDB::search_with_expr(Self, Array[Double], Int, @filter.FilterExpr?, @attr.BPTreeAttrIndex?, @filter.FilterStrategy) -> Array[@types.SearchHit]
 pub fn VectorDB::serialize(Self) -> Bytes

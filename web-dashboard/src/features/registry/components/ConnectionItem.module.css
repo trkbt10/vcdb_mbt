@@ -1,0 +1,300 @@
+/* Compact mode (sidebar) */
+.compact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.compact::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 0;
+  background: var(--color-text-primary);
+  border-radius: var(--radius-full);
+  transition: height var(--transition-normal);
+}
+
+.compact:hover {
+  background: var(--color-bg-hover);
+}
+
+.compact[data-selected="true"] {
+  background: var(--color-bg-tertiary);
+}
+
+.compact[data-selected="true"]::before {
+  height: 16px;
+}
+
+.settingsButton,
+.removeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--color-text-quaternary);
+  border-radius: var(--radius-md);
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.compact:hover .settingsButton,
+.compact:hover .removeButton {
+  opacity: 1;
+}
+
+.settingsButton:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.settingsButton:active {
+  transform: scale(0.92);
+}
+
+.removeButton:hover {
+  background: var(--color-error-light);
+  color: var(--color-error);
+}
+
+.removeButton:active {
+  transform: scale(0.92);
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-tertiary);
+  transition: color var(--transition-fast);
+}
+
+.compact:hover .icon {
+  color: var(--color-text-secondary);
+}
+
+.compact[data-selected="true"] .icon {
+  color: var(--color-text-primary);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--leading-snug);
+}
+
+.host {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--color-text-quaternary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--leading-snug);
+}
+
+.error {
+  font-size: var(--text-xs);
+  color: var(--color-error);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compact[data-status="offline"] {
+  opacity: 0.6;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.actionButton:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.actionButton:active {
+  transform: scale(0.92);
+}
+
+/* Full mode (page/card) */
+.full {
+  padding: var(--space-5);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  transition: border-color var(--transition-fast);
+}
+
+.full:hover {
+  border-color: var(--color-border-hover);
+}
+
+.fullHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fullTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fullTitle h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.fullHost {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+.errorBox {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-error-light);
+  border: 1px solid color-mix(in srgb, var(--color-error) 25%, transparent);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.errorLabel {
+  color: var(--color-error);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.errorMessage {
+  color: var(--color-text-secondary);
+  word-break: break-word;
+}
+
+.full[data-status="offline"] {
+  opacity: 0.7;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.statValue {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.fullActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1-5) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.primaryButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.primaryButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1-5) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.secondaryButton:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.secondaryButton:active {
+  transform: scale(0.98);
+}

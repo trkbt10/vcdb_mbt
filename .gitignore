@@ -6,3 +6,9 @@ _build/
 # Coverage artifacts
 bisect.coverage
 coveralls.json
+
+# Web dashboard
+web-dashboard/node_modules/
+web-dashboard/dist/
+web-dashboard/playwright-report/
+web-dashboard/test-results/

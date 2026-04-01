@@ -8,7 +8,7 @@ High-performance vector database with multiple ANN algorithms for MoonBit.
 - **Flexible Storage**: Pluggable backends (memory, S3)
 - **Persistence**: WAL-based durability with segment management
 - **Attribute Filtering**: Metadata-based vector filtering
-- **REST Gateway**: HTTP API for collections and vectors
+- **Gateway Execution Layer**: API handling reusable across native and JS runtimes
 
 
 ## Overview
@@ -29,7 +29,11 @@ vcdb is structured as a layered architecture:
 
 | Package | Purpose |
 |---------|---------|
-| `gateway` | REST API server |
+| `gateway` | Transport-agnostic API execution core |
+| `http` | HTTP transport adapter over `gateway` |
+| `js` | JS runtime adapter, npm distribution, and HTTP server |
+| `cmd/native-gateway` | Native gateway execution entrypoint |
+| `cmd/native-serve` | Native HTTP server over `gateway` |
 | `cli` | Command-line interface |
 | `lib` | Library entry point |
 
@@ -58,12 +62,31 @@ let results = collection.search(
 
 ## Usage
 
-### REST API
+### Native Gateway Execution
 
-Start the gateway server:
+Execute gateway requests directly from MoonBit:
 
 ```bash
-moon run cmd/main
+moon run cmd/native-gateway -- healthz
+moon run cmd/native-gateway -- collections create demo --dim 3
+```
+
+### HTTP Serving via JS Adapter
+
+Start the JavaScript transport adapter:
+
+```bash
+cd js
+npm run build
+node dist/server.js --host 127.0.0.1 --port 6333 --storage ../.local-storage
+```
+
+### HTTP Serving via Native Adapter
+
+Start the MoonBit native transport adapter:
+
+```bash
+moon run cmd/native-serve -- --host 127.0.0.1 --port 6333
 ```
 
 #### Create Collection
@@ -111,6 +134,9 @@ moon build
 
 - MoonBit toolchain (moon >= 0.1.0)
 
+
+`gateway` is the API execution core. Long-lived HTTP serving is now available in
+both the JS adapter and the native async/http adapter.
 
 ## License
 

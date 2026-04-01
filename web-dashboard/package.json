@@ -1,0 +1,29 @@
+{
+  "name": "@vcdb/web-dashboard",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5179",
+    "build": "vite build",
+    "preview": "vite preview --port 5179",
+    "typecheck": "tsc --noEmit",
+    "test:client": "tsx e2e/client.mts",
+    "test:e2e": "bash e2e-test.sh"
+  },
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-panel-layout": "^0.6.0",
+    "react-use": "^17.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "playwright": "^1.58.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  }
+}
