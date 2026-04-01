@@ -25,11 +25,11 @@ let wal_state : WalState = { path: "", record_count: 0 }
 ///|
 /// Initialize a VectorDB from existing data (or create empty).
 /// Called by JS after loading snapshot + WAL replay.
-pub fn async_init_db(dim : Int) -> Unit {
+pub fn async_init_db(dim : Int, capacity : Int) -> Unit {
   let options : @types.DatabaseOptions = {
     dim,
     metric: @types.Cosine,
-    capacity: 65536,
+    capacity,
     strategy: @types.HNSW(@types.HNSWParams::default()),
   }
   async_db_instance.val = Some(@vcdb.VectorDB::new(options))
@@ -46,11 +46,21 @@ pub fn async_init_db_from_snapshot(data : Bytes) -> Unit {
 fn async_init_db_from_store(
   store : @store.CoreStore,
   dim : Int,
+  capacity : Int,
 ) -> Unit {
+  if store.size() > capacity {
+    abort(
+      "capacity (" +
+      capacity.to_string() +
+      ") is less than store size (" +
+      store.size().to_string() +
+      ")",
+    )
+  }
   let options : @types.DatabaseOptions = {
     dim,
     metric: @types.Cosine,
-    capacity: @math.maximum(store.size() + 4096, 65536),
+    capacity,
     strategy: @types.HNSW(@types.HNSWParams::default()),
   }
   async_db_instance.val = Some(@vcdb.VectorDB::from_store(store, options))
@@ -63,25 +73,22 @@ pub fn async_replay_wal_and_init(
   wal_data : Bytes,
   snapshot_data : Bytes,
   dim : Int,
+  capacity : Int,
 ) -> Int {
   if snapshot_data.length() > 0 {
-    // Snapshot is VectorDB::serialize format (includes strategy + index state)
     let db = @vcdb.VectorDB::deserialize(snapshot_data)
     let store = db.store()
     let applied = @wal.replay_wal_data(wal_data, store)
     if applied > 0 {
-      // WAL had records — rebuild DB from updated store
-      async_init_db_from_store(store, dim)
+      async_init_db_from_store(store, dim, capacity)
     } else {
-      // No WAL changes — use deserialized DB as-is
       async_db_instance.val = Some(db)
     }
     applied
   } else {
-    // No snapshot — build from WAL only
-    let store = @store.CoreStore::new(dim, @types.Cosine, capacity=1024)
+    let store = @store.CoreStore::new(dim, @types.Cosine, capacity=capacity)
     let applied = @wal.replay_wal_data(wal_data, store)
-    async_init_db_from_store(store, dim)
+    async_init_db_from_store(store, dim, capacity)
     applied
   }
 }
