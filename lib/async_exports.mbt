@@ -16,23 +16,7 @@
 let async_instances : @hashmap.HashMap[Int, @vcdb.VectorDB] = @hashmap.new()
 
 ///|
-/// Convert a JS number (Double) to VectorId.
-///
-/// Workaround for MoonBit JS target bug: Double.to_int64() produces
-/// {hi, lo} where lo uses `>>> 0` (unsigned), but BinaryReader's
-/// byte-by-byte reconstruction produces lo with `| 0` (signed).
-/// These are the same bit pattern but different JS Number values,
-/// so HashMap lookup fails for IDs where lo > 0x7FFFFFFF.
-///
-/// Fix: round-trip through BinaryWriter/Reader to normalize the
-/// Int64 representation to match the deserialization path.
-fn vid_from_double(id : Double) -> @types.VectorId {
-  let raw = id.to_int64()
-  let w = @binary.BinaryWriter::new()
-  w.push_i64(raw)
-  let r = @binary.BinaryReader::new(w.concat())
-  @types.VectorId(r.read_i64())
-}
+/// vid_from_pair and vid_to_pair are defined in exports.mbt (shared SoT).
 
 ///|
 fn get_db(instance_id : Int) -> @vcdb.VectorDB {
@@ -130,16 +114,17 @@ fn parse_json_to_attrs(json : String) -> @types.Attrs {
 
 ///|
 /// Upsert points into an instance. Returns WAL segment bytes.
+/// Each point is (id_hi, id_lo, vector, payload_json).
 pub fn async_upsert(
   instance_id : Int,
-  points : Array[(Double, Array[Double], String)],
+  points : Array[(Int, Int, Array[Double], String)],
   timestamp_ns : Int64,
 ) -> Bytes {
   let db = get_db(instance_id)
   let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = []
   for p in points {
-    let (id, vector, payload_json) = p
-    let vid = vid_from_double(id)
+    let (id_hi, id_lo, vector, payload_json) = p
+    let vid = vid_from_pair(id_hi, id_lo)
     let attrs = parse_json_to_attrs(payload_json)
     let _ = db.upsert(vid, vector, attrs)
     typed_points.push((vid, vector, attrs))
@@ -159,11 +144,11 @@ pub fn async_search(
   k : Int,
   with_payload : Bool,
   filter_json : String,
-) -> Array[(Double, Double, String)] {
+) -> Array[(Int, Int, Double, String)] {
   let db = get_db(instance_id)
   let filter = @filter.parse_filter_json(filter_json)
   let hits = db.search_with_expr(query, k, filter, None, @filter.Auto)
-  let results : Array[(Double, Double, String)] = []
+  let results : Array[(Int, Int, Double, String)] = []
   for hit in hits {
     let payload_json = if with_payload {
       match db.get(hit.id) {
@@ -173,7 +158,8 @@ pub fn async_search(
     } else {
       ""
     }
-    results.push((vector_id_to_double(hit.id), hit.score, payload_json))
+    let (hi, lo) = vid_to_pair(hit.id)
+    results.push((hi, lo, hit.score, payload_json))
   }
   results
 }
@@ -248,9 +234,9 @@ pub fn async_db_dim(instance_id : Int) -> Int {
 
 ///|
 /// Remove a vector by ID. Returns WAL segment bytes.
-pub fn async_remove(instance_id : Int, id : Double, timestamp_ns : Int64) -> Bytes {
+pub fn async_remove(instance_id : Int, id_hi : Int, id_lo : Int, timestamp_ns : Int64) -> Bytes {
   let db = get_db(instance_id)
-  let vid = vid_from_double(id)
+  let vid = vid_from_pair(id_hi, id_lo)
   if db.remove(vid) {
     @wal.encode_wal_segment([@wal.WalRecord::remove(vid, timestamp=timestamp_ns)])
   } else {
@@ -263,11 +249,12 @@ pub fn async_remove(instance_id : Int, id : Double, timestamp_ns : Int64) -> Byt
 /// Returns (found, vector, payload_json).
 pub fn async_get(
   instance_id : Int,
-  id : Double,
+  id_hi : Int,
+  id_lo : Int,
   with_payload : Bool,
 ) -> (Bool, Array[Double], String) {
   let db = get_db(instance_id)
-  let vid = vid_from_double(id)
+  let vid = vid_from_pair(id_hi, id_lo)
   match db.get(vid) {
     Some(record) => {
       let payload = if with_payload {
@@ -282,20 +269,21 @@ pub fn async_get(
 }
 
 ///|
-pub fn async_has(instance_id : Int, id : Double) -> Bool {
-  get_db(instance_id).has(vid_from_double(id))
+pub fn async_has(instance_id : Int, id_hi : Int, id_lo : Int) -> Bool {
+  get_db(instance_id).has(vid_from_pair(id_hi, id_lo))
 }
 
 ///|
 /// Update attributes without re-embedding. Returns WAL segment bytes.
 pub fn async_update_attrs(
   instance_id : Int,
-  id : Double,
+  id_hi : Int,
+  id_lo : Int,
   attrs_json : String,
   timestamp_ns : Int64,
 ) -> Bytes {
   let db = get_db(instance_id)
-  let vid = vid_from_double(id)
+  let vid = vid_from_pair(id_hi, id_lo)
   if not(db.has(vid)) {
     return Bytes::new(0)
   }
@@ -308,17 +296,20 @@ pub fn async_update_attrs(
 /// Scroll through vectors in ascending ID order.
 pub fn async_scroll(
   instance_id : Int,
-  offset : Double?,
+  offset_hi : Int,
+  offset_lo : Int,
+  has_offset : Bool,
   limit : Int,
   with_payload : Bool,
-) -> Array[(Double, String)] {
+) -> Array[(Int, Int, String)] {
   let db = get_db(instance_id)
-  let offset_i64 : Int64? = match offset {
-    Some(o) => Some(o.to_int64())
-    None => None
+  let offset_i64 : Int64? = if has_offset {
+    Some(vid_from_pair(offset_hi, offset_lo).to_int64())
+  } else {
+    None
   }
   let entries = db.scroll(offset=offset_i64, limit=limit)
-  let results : Array[(Double, String)] = []
+  let results : Array[(Int, Int, String)] = []
   for entry in entries {
     let (vid, record) = entry
     let payload = if with_payload {
@@ -326,7 +317,8 @@ pub fn async_scroll(
     } else {
       ""
     }
-    results.push((vector_id_to_double(vid), payload))
+    let (hi, lo) = vid_to_pair(vid)
+    results.push((hi, lo, payload))
   }
   results
 }
@@ -336,20 +328,23 @@ pub fn async_scroll(
 pub fn async_scroll_filtered(
   instance_id : Int,
   filter_json : String,
-  offset : Double?,
+  offset_hi : Int,
+  offset_lo : Int,
+  has_offset : Bool,
   limit : Int,
   with_payload : Bool,
-) -> Array[(Double, String)] {
+) -> Array[(Int, Int, String)] {
   let db = get_db(instance_id)
-  let offset_i64 : Int64? = match offset {
-    Some(o) => Some(o.to_int64())
-    None => None
+  let offset_i64 : Int64? = if has_offset {
+    Some(vid_from_pair(offset_hi, offset_lo).to_int64())
+  } else {
+    None
   }
   let entries = match @filter.parse_filter_json(filter_json) {
     Some(e) => db.scroll_filtered(expr=Some(e), offset=offset_i64, limit=limit)
     None => db.scroll_filtered(offset=offset_i64, limit=limit)
   }
-  let results : Array[(Double, String)] = []
+  let results : Array[(Int, Int, String)] = []
   for entry in entries {
     let (vid, record) = entry
     let payload = if with_payload {
@@ -357,7 +352,8 @@ pub fn async_scroll_filtered(
     } else {
       ""
     }
-    results.push((vector_id_to_double(vid), payload))
+    let (hi, lo) = vid_to_pair(vid)
+    results.push((hi, lo, payload))
   }
   results
 }

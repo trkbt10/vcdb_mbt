@@ -1,9 +1,9 @@
 ///|
 /// FFI exports for JavaScript interop.
 ///
-/// Vector IDs use Double (= JS number) to avoid i32 truncation.
-/// JS numbers can exactly represent integers up to 2^53, which is sufficient
-/// for VectorId(Int64) in practice.
+/// All vector IDs are passed as (hi: Int, lo: Int) pairs — never as Double.
+/// This is the only way to construct/extract VectorIds in the FFI.
+/// Double-based paths are structurally impossible.
 
 ///|
 /// Global instance storage
@@ -18,24 +18,20 @@ priv struct Counter {
 let counter : Counter = { value: 1 }
 
 ///|
-/// Convert a JS number (Double) to VectorId.
-///
-/// Uses binary round-trip to normalize Int64 representation —
-/// workaround for MoonBit JS target where Double.to_int64() and
-/// BinaryReader produce different lo representations for values
-/// > 0x7FFFFFFF.
-fn double_to_vector_id(id : Double) -> @types.VectorId {
-  let raw = id.to_int64()
-  let w = @binary.BinaryWriter::new()
-  w.push_i64(raw)
-  let r = @binary.BinaryReader::new(w.concat())
-  @types.VectorId(r.read_i64())
+/// Construct a VectorId from hi/lo Int pair (SoT for ID construction).
+fn vid_from_pair(hi : Int, lo : Int) -> @types.VectorId {
+  let hi64 = hi.to_int64()
+  let lo64 = lo.to_int64().land(0xFFFFFFFFL)
+  @types.VectorId(hi64.lsl(32).lor(lo64))
 }
 
 ///|
-/// Convert a VectorId to JS number (Double) without i32 truncation.
-fn vector_id_to_double(id : @types.VectorId) -> Double {
-  id.to_int64().to_double()
+/// Extract hi/lo pair from VectorId (SoT for ID extraction).
+fn vid_to_pair(id : @types.VectorId) -> (Int, Int) {
+  let v = id.to_int64()
+  let hi = v.lsr(32).to_int()
+  let lo = v.to_int()
+  (hi, lo)
 }
 
 ///|
@@ -89,12 +85,13 @@ pub fn vcdb_dim(instance_id : Int) -> Int {
 ///|
 pub fn vcdb_add(
   instance_id : Int,
-  vector_id : Double,
+  id_hi : Int,
+  id_lo : Int,
   vector : Array[Double],
 ) -> Int {
   match instances.get(instance_id) {
     Some(db) => {
-      let id = double_to_vector_id(vector_id)
+      let id = vid_from_pair(id_hi, id_lo)
       if db.has(id) {
         return -2
       }
@@ -109,13 +106,14 @@ pub fn vcdb_add(
 ///|
 pub fn vcdb_upsert(
   instance_id : Int,
-  vector_id : Double,
+  id_hi : Int,
+  id_lo : Int,
   vector : Array[Double],
 ) -> Int {
   match instances.get(instance_id) {
     Some(db) => {
       let attrs = @types.empty_attrs()
-      let _ = db.upsert(double_to_vector_id(vector_id), vector, attrs)
+      let _ = db.upsert(vid_from_pair(id_hi, id_lo), vector, attrs)
       0
     }
     None => -1
@@ -125,11 +123,12 @@ pub fn vcdb_upsert(
 ///|
 pub fn vcdb_get(
   instance_id : Int,
-  vector_id : Double,
+  id_hi : Int,
+  id_lo : Int,
 ) -> (Array[Double], Int) {
   match instances.get(instance_id) {
     Some(db) =>
-      match db.get(double_to_vector_id(vector_id)) {
+      match db.get(vid_from_pair(id_hi, id_lo)) {
         Some(record) => (record.vector, 1)
         None => ([], 0)
       }
@@ -142,13 +141,14 @@ pub fn vcdb_search(
   instance_id : Int,
   query : Array[Double],
   k : Int,
-) -> Array[(Double, Double)] {
+) -> Array[(Int, Int, Double)] {
   match instances.get(instance_id) {
     Some(db) => {
       let results = db.search(query, k, None)
-      let out : Array[(Double, Double)] = []
+      let out : Array[(Int, Int, Double)] = []
       for hit in results {
-        out.push((vector_id_to_double(hit.id), hit.score))
+        let (hi, lo) = vid_to_pair(hit.id)
+        out.push((hi, lo, hit.score))
       }
       out
     }
@@ -157,10 +157,10 @@ pub fn vcdb_search(
 }
 
 ///|
-pub fn vcdb_has(instance_id : Int, vector_id : Double) -> Int {
+pub fn vcdb_has(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
   match instances.get(instance_id) {
     Some(db) =>
-      if db.has(double_to_vector_id(vector_id)) {
+      if db.has(vid_from_pair(id_hi, id_lo)) {
         1
       } else {
         0
@@ -170,10 +170,10 @@ pub fn vcdb_has(instance_id : Int, vector_id : Double) -> Int {
 }
 
 ///|
-pub fn vcdb_remove(instance_id : Int, vector_id : Double) -> Int {
+pub fn vcdb_remove(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
   match instances.get(instance_id) {
     Some(db) =>
-      if db.remove(double_to_vector_id(vector_id)) {
+      if db.remove(vid_from_pair(id_hi, id_lo)) {
         1
       } else {
         0
