@@ -885,3 +885,15 @@ pub fn BPTreeAttrIndex::deserialize(data : Bytes) -> BPTreeAttrIndex {
 pub fn BPTreeAttrIndex::size(self : BPTreeAttrIndex) -> Int {
   self.data.length()
 }
+
+///|
+/// Return every indexed ID (from the data map).
+pub fn BPTreeAttrIndex::all_ids(
+  self : BPTreeAttrIndex,
+) -> Array[@types.VectorId] {
+  let result : Array[@types.VectorId] = []
+  for id_val, _ in self.data {
+    result.push(@types.VectorId(id_val))
+  }
+  result
+}

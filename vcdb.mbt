@@ -313,40 +313,98 @@ pub fn VectorDB::get(
 
 ///|
 /// Scroll points in ascending ID order, similar to Qdrant scroll.
+///
+/// Thin wrapper over scroll_filtered with no filter expression.
+/// Offset semantics: returns entries with ID >= offset (for backward
+/// compatibility with gateway which passes `last_id + 1`).
 pub fn VectorDB::scroll(
   self : VectorDB,
   offset? : Int64? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
-  let visible : Array[(@types.VectorId, @types.VectorRecord)] = []
-  for i in 0..<self.store.size() {
-    let id = match self.store.id_at(i) {
-      Some(id) => id
-      None => continue
-    }
-    match self.get(id) {
-      Some(record) => visible.push((id, record))
-      None => ()
-    }
+  // Convert >= semantics to > semantics by subtracting 1 from offset
+  let adjusted = match offset {
+    Some(o) => Some(o - 1L)
+    None => None
   }
-  visible.sort_by(fn(a, b) {
-    let (id_a, _) = a
-    let (id_b, _) = b
-    id_a.to_int64().compare(id_b.to_int64())
-  })
+  self.scroll_filtered(expr=None, offset=adjusted, limit=limit)
+}
+
+///|
+/// Scroll points in ascending ID order with optional filter expression.
+///
+/// When expr is None, returns all (non-tombstoned) entries.
+/// When expr is Some, resolves candidates via the B+ tree attribute
+/// index — every expression variant is handled by the index with a
+/// single execution path.
+///
+/// Offset semantics: returns entries with ID strictly greater than
+/// offset (cursor = last ID seen by caller).
+///
+/// Parameters:
+/// - expr: Optional filter expression to match against attributes
+/// - offset: Cursor — only IDs strictly greater than this value are returned
+/// - limit: Maximum number of entries to return
+///
+/// Returns: Array of (VectorId, VectorRecord) sorted by ID ascending
+pub fn VectorDB::scroll_filtered(
+  self : VectorDB,
+  expr? : @filter.FilterExpr? = None,
+  offset? : Int64? = None,
+  limit? : Int = 10,
+) -> Array[(@types.VectorId, @types.VectorRecord)] {
   let threshold = offset.unwrap_or(-9223372036854775808L)
+  let candidates = match expr {
+    Some(e) => @filter.resolve_candidates_bptree(e, self.attr_index)
+    None => self.attr_index.all_ids()
+  }
+  candidates.sort_by(fn(a, b) { a.to_int64().compare(b.to_int64()) })
   let points : Array[(@types.VectorId, @types.VectorRecord)] = []
-  for entry in visible {
-    let (id, _) = entry
-    if id.to_int64() < threshold {
+  for id in candidates {
+    if id.to_int64() <= threshold {
       continue
     }
-    points.push(entry)
+    if self.is_tombstoned(id) {
+      continue
+    }
+    match self.store.get(id) {
+      Some(record) => points.push((id, record))
+      None => ()
+    }
     if points.length() >= limit {
       break
     }
   }
   points
+}
+
+///|
+/// Count vectors matching an optional filter expression.
+///
+/// When expr is None, counts all non-tombstoned vectors.
+/// When expr is Some, resolves the expression to a candidate set via
+/// the B+ tree index, then subtracts tombstoned entries.
+/// No vector data is touched.
+///
+/// Parameters:
+/// - expr: Optional filter expression to count
+///
+/// Returns: Number of matching, non-tombstoned vectors
+pub fn VectorDB::count_filtered(
+  self : VectorDB,
+  expr? : @filter.FilterExpr? = None,
+) -> Int {
+  let candidates = match expr {
+    Some(e) => @filter.resolve_candidates_bptree(e, self.attr_index)
+    None => self.attr_index.all_ids()
+  }
+  let mut count = 0
+  for id in candidates {
+    if not(self.is_tombstoned(id)) {
+      count = count + 1
+    }
+  }
+  count
 }
 
 ///|
@@ -589,26 +647,18 @@ pub fn VectorDB::search_with_expr(
         Some(override_index) => override_index
         None => self.attr_index
       }
-      // Determine actual strategy
+      // Resolve candidates from the attribute index — always succeeds,
+      // no fallback path needed.
+      let candidates = @filter.resolve_candidates_bptree(filter_expr, index)
       let use_prefilter = match strategy {
         PreFilter => true
         PostFilter => false
         Auto =>
-          match @filter.get_candidates_bptree(filter_expr, index) {
-            None => false
-            Some(candidates) =>
-              // Use pre-filter if candidates < 50% of total
-              candidates.length() < self.store.size() / 2
-          }
+          // Use pre-filter if candidates < 50% of total
+          candidates.length() < self.store.size() / 2
       }
       if use_prefilter {
-        match @filter.get_candidates_bptree(filter_expr, index) {
-          None => {
-            let pred = @filter.compile_filter(filter_expr)
-            self.search(query, k, Some(pred))
-          }
-          Some(candidates) => self.search_candidates(query, k, candidates)
-        }
+        self.search_candidates(query, k, candidates)
       } else {
         let pred = @filter.compile_filter(filter_expr)
         self.search(query, k, Some(pred))

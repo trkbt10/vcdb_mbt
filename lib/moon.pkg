@@ -1,6 +1,7 @@
 import {
   "trkbt10/vcdb",
   "trkbt10/vcdb/core/types",
+  "trkbt10/vcdb/core/binary",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/store",
   "trkbt10/vcdb/core/persistence/wal",
@@ -54,7 +55,10 @@ options(
         "async_has",
         "async_update_attrs",
         "async_scroll",
+        "async_scroll_filtered",
+        "async_count_filtered",
         "async_compact",
+        "async_destroy",
         "async_max_wal_timestamp",
         "async_replay_wal_at_timestamp",
         "async_serialize_filter",

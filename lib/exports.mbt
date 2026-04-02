@@ -18,9 +18,18 @@ priv struct Counter {
 let counter : Counter = { value: 1 }
 
 ///|
-/// Convert a JS number (Double) to VectorId without i32 truncation.
+/// Convert a JS number (Double) to VectorId.
+///
+/// Uses binary round-trip to normalize Int64 representation —
+/// workaround for MoonBit JS target where Double.to_int64() and
+/// BinaryReader produce different lo representations for values
+/// > 0x7FFFFFFF.
 fn double_to_vector_id(id : Double) -> @types.VectorId {
-  @types.VectorId(id.to_int64())
+  let raw = id.to_int64()
+  let w = @binary.BinaryWriter::new()
+  w.push_i64(raw)
+  let r = @binary.BinaryReader::new(w.concat())
+  @types.VectorId(r.read_i64())
 }
 
 ///|

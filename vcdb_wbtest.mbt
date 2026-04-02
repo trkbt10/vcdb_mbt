@@ -698,6 +698,200 @@ test "vectordb/prefilter_excludes_tombstoned" {
 }
 
 ///|
+/// scroll_filtered: basic category filter
+test "vectordb/scroll_filtered_basic" {
+  let db = VectorDB::with_dim(2)
+  let cat_a = @types.empty_attrs()
+  cat_a.set("category", @types.String("科学"))
+  let cat_b = @types.empty_attrs()
+  cat_b.set("category", @types.String("歴史"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
+  db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
+  db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
+  let expr = @filter.FilterExpr::match_("category", @types.String("科学"))
+  let results = db.scroll_filtered(expr=Some(expr), limit=10)
+  inspect(results.length(), content="2")
+  // Verify ascending ID order
+  let (id0, _) = results[0]
+  let (id1, _) = results[1]
+  inspect(id0.to_int64(), content="1")
+  inspect(id1.to_int64(), content="3")
+}
+
+///|
+/// scroll_filtered: cursor-based pagination
+test "vectordb/scroll_filtered_pagination" {
+  let db = VectorDB::with_dim(2)
+  let attrs = @types.empty_attrs()
+  attrs.set("_type", @types.String("question"))
+  for i in 1..<=5 {
+    db.add(
+      @types.VectorId::from_int(i),
+      [i.to_double() / 5.0, 1.0 - i.to_double() / 5.0],
+      attrs,
+    )
+  }
+  let expr = @filter.FilterExpr::match_("_type", @types.String("question"))
+  // Page 1: first 2
+  let page1 = db.scroll_filtered(expr=Some(expr), limit=2)
+  inspect(page1.length(), content="2")
+  let (last_id, _) = page1[1]
+  inspect(last_id.to_int64(), content="2")
+  // Page 2: next 2 (offset = last seen ID)
+  let page2 = db.scroll_filtered(expr=Some(expr), offset=Some(last_id.to_int64()), limit=2)
+  inspect(page2.length(), content="2")
+  let (p2_first, _) = page2[0]
+  let (p2_last, _) = page2[1]
+  inspect(p2_first.to_int64(), content="3")
+  inspect(p2_last.to_int64(), content="4")
+  // Page 3: last 1
+  let page3 = db.scroll_filtered(
+    expr=Some(expr),
+    offset=Some(p2_last.to_int64()),
+    limit=2,
+  )
+  inspect(page3.length(), content="1")
+  let (p3_first, _) = page3[0]
+  inspect(p3_first.to_int64(), content="5")
+}
+
+///|
+/// scroll_filtered: empty results when no match
+test "vectordb/scroll_filtered_empty" {
+  let db = VectorDB::with_dim(2)
+  let attrs = @types.empty_attrs()
+  attrs.set("category", @types.String("科学"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+  let expr = @filter.FilterExpr::match_("category", @types.String("料理"))
+  let results = db.scroll_filtered(expr=Some(expr), limit=10)
+  inspect(results.length(), content="0")
+}
+
+///|
+/// scroll_filtered: MustNot (complement) — no fallback, index-only
+test "vectordb/scroll_filtered_must_not" {
+  let db = VectorDB::with_dim(2)
+  let cat_a = @types.empty_attrs()
+  cat_a.set("_type", @types.String("question"))
+  let cat_b = @types.empty_attrs()
+  cat_b.set("_type", @types.String("top"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
+  db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
+  db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
+  // "NOT top" should return questions only
+  let expr = @filter.FilterExpr::must_not(
+    [@filter.FilterExpr::match_("_type", @types.String("top"))],
+  )
+  let results = db.scroll_filtered(expr=Some(expr), limit=10)
+  inspect(results.length(), content="2")
+  let (id0, _) = results[0]
+  let (id1, _) = results[1]
+  inspect(id0.to_int64(), content="1")
+  inspect(id1.to_int64(), content="3")
+}
+
+///|
+/// scroll_filtered: IsNull (complement) — no fallback, index-only
+test "vectordb/scroll_filtered_is_null" {
+  let db = VectorDB::with_dim(2)
+  let with_cat = @types.empty_attrs()
+  with_cat.set("category", @types.String("科学"))
+  let without_cat = @types.empty_attrs()
+  without_cat.set("other", @types.String("value"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], with_cat)
+  db.add(@types.VectorId::from_int(2), [0.0, 1.0], without_cat)
+  // IsNull("category") should return ID 2 (no category attr)
+  let expr = @filter.FilterExpr::is_null("category")
+  let results = db.scroll_filtered(expr=Some(expr), limit=10)
+  inspect(results.length(), content="1")
+  let (id0, _) = results[0]
+  inspect(id0.to_int64(), content="2")
+}
+
+///|
+/// scroll_filtered: Should(min=2) — counting path
+test "vectordb/scroll_filtered_should_min2" {
+  let db = VectorDB::with_dim(2)
+  // ID 1: has tag=A and tag2=X
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("tag", @types.String("A"))
+  attrs1.set("tag2", @types.String("X"))
+  // ID 2: has tag=A only
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("tag", @types.String("A"))
+  // ID 3: has tag2=X only
+  let attrs3 = @types.empty_attrs()
+  attrs3.set("tag2", @types.String("X"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs1)
+  db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs2)
+  db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs3)
+  // Should match at least 2 of [tag=A, tag2=X] → only ID 1
+  let expr = @filter.FilterExpr::should(
+    [
+      @filter.FilterExpr::match_("tag", @types.String("A")),
+      @filter.FilterExpr::match_("tag2", @types.String("X")),
+    ],
+    min=2,
+  )
+  let results = db.scroll_filtered(expr=Some(expr), limit=10)
+  inspect(results.length(), content="1")
+  let (id0, _) = results[0]
+  inspect(id0.to_int64(), content="1")
+}
+
+///|
+/// count_filtered: basic
+test "vectordb/count_filtered" {
+  let db = VectorDB::with_dim(2)
+  let cat_a = @types.empty_attrs()
+  cat_a.set("category", @types.String("科学"))
+  let cat_b = @types.empty_attrs()
+  cat_b.set("category", @types.String("歴史"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
+  db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
+  db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
+  let expr_a = @filter.FilterExpr::match_("category", @types.String("科学"))
+  inspect(db.count_filtered(expr=Some(expr_a)), content="2")
+  let expr_b = @filter.FilterExpr::match_("category", @types.String("歴史"))
+  inspect(db.count_filtered(expr=Some(expr_b)), content="1")
+  let expr_c = @filter.FilterExpr::match_("category", @types.String("料理"))
+  inspect(db.count_filtered(expr=Some(expr_c)), content="0")
+}
+
+///|
+/// count_filtered: HNSW tombstone excluded
+test "vectordb/count_filtered_hnsw_tombstone" {
+  let db = VectorDB::with_hnsw(2, metric=@types.Dot)
+  let attrs = @types.empty_attrs()
+  attrs.set("_type", @types.String("q"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+  db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs)
+  let _ = db.remove(@types.VectorId::from_int(1))
+  let expr = @filter.FilterExpr::match_("_type", @types.String("q"))
+  inspect(db.count_filtered(expr=Some(expr)), content="1")
+}
+
+///|
+/// scroll_filtered: HNSW tombstoned entries excluded
+test "vectordb/scroll_filtered_hnsw_tombstone" {
+  let db = VectorDB::with_hnsw(2, metric=@types.Dot)
+  let attrs = @types.empty_attrs()
+  attrs.set("category", @types.String("科学"))
+  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+  db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs)
+  db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs)
+  // Tombstone ID 2
+  let _ = db.remove(@types.VectorId::from_int(2))
+  let expr = @filter.FilterExpr::match_("category", @types.String("科学"))
+  let results = db.scroll_filtered(expr=Some(expr), limit=10)
+  inspect(results.length(), content="2")
+  let (id0, _) = results[0]
+  let (id1, _) = results[1]
+  inspect(id0.to_int64(), content="1")
+  inspect(id1.to_int64(), content="3")
+}
+
+///|
 /// Test: IVF upsert updates don't grow centroid count
 test "vectordb/ivf_upsert_no_centroid_growth" {
   let db = VectorDB::with_ivf(2, metric=@types.Dot)

@@ -1,6 +1,9 @@
 ///|
 /// Persistence-aware FFI exports for JS environments.
 ///
+/// Each DO shard gets its own instance_id. Multiple instances can coexist
+/// in the same JS module without interfering — no global singleton.
+///
 /// Design principle: MoonBit handles data preparation synchronously.
 /// JS handles all I/O asynchronously with proper await ordering.
 ///
@@ -9,41 +12,60 @@
 /// while ensuring WAL writes are truly durable before proceeding.
 
 ///|
-/// Managed VectorDB instance for the async gateway.
-let async_db_instance : Ref[@vcdb.VectorDB?] = { val: None }
+/// Instance storage — each DO shard gets its own VectorDB by instance_id.
+let async_instances : @hashmap.HashMap[Int, @vcdb.VectorDB] = @hashmap.new()
 
 ///|
-/// WAL state tracking.
-struct WalState {
-  mut path : String
-  mut record_count : Int
+/// Convert a JS number (Double) to VectorId.
+///
+/// Workaround for MoonBit JS target bug: Double.to_int64() produces
+/// {hi, lo} where lo uses `>>> 0` (unsigned), but BinaryReader's
+/// byte-by-byte reconstruction produces lo with `| 0` (signed).
+/// These are the same bit pattern but different JS Number values,
+/// so HashMap lookup fails for IDs where lo > 0x7FFFFFFF.
+///
+/// Fix: round-trip through BinaryWriter/Reader to normalize the
+/// Int64 representation to match the deserialization path.
+fn vid_from_double(id : Double) -> @types.VectorId {
+  let raw = id.to_int64()
+  let w = @binary.BinaryWriter::new()
+  w.push_i64(raw)
+  let r = @binary.BinaryReader::new(w.concat())
+  @types.VectorId(r.read_i64())
 }
 
 ///|
-let wal_state : WalState = { path: "", record_count: 0 }
+fn get_db(instance_id : Int) -> @vcdb.VectorDB {
+  match async_instances.get(instance_id) {
+    Some(db) => db
+    None => abort("DB instance " + instance_id.to_string() + " not initialized")
+  }
+}
 
 ///|
-/// Initialize a VectorDB from existing data (or create empty).
-/// Called by JS after loading snapshot + WAL replay.
-pub fn async_init_db(dim : Int, capacity : Int) -> Unit {
+/// Initialize a VectorDB instance with a caller-specified ID.
+/// If an instance with this ID already exists, it is replaced.
+/// The caller (each DO shard) must provide a stable, unique ID.
+pub fn async_init_db(instance_id : Int, dim : Int, capacity : Int) -> Unit {
   let options : @types.DatabaseOptions = {
     dim,
     metric: @types.Cosine,
     capacity,
     strategy: @types.HNSW(@types.HNSWParams::default()),
   }
-  async_db_instance.val = Some(@vcdb.VectorDB::new(options))
+  async_instances[instance_id] = @vcdb.VectorDB::new(options)
 }
 
 ///|
-/// Initialize a VectorDB from a serialized snapshot.
-pub fn async_init_db_from_snapshot(data : Bytes) -> Unit {
-  async_db_instance.val = Some(@vcdb.VectorDB::deserialize(data))
+/// Initialize a VectorDB from a serialized snapshot with a caller-specified ID.
+pub fn async_init_db_from_snapshot(instance_id : Int, data : Bytes) -> Unit {
+  async_instances[instance_id] = @vcdb.VectorDB::deserialize(data)
 }
 
 ///|
 /// Initialize a VectorDB from a CoreStore (after WAL replay).
-fn async_init_db_from_store(
+fn set_db_from_store(
+  instance_id : Int,
   store : @store.CoreStore,
   dim : Int,
   capacity : Int,
@@ -63,13 +85,14 @@ fn async_init_db_from_store(
     capacity,
     strategy: @types.HNSW(@types.HNSWParams::default()),
   }
-  async_db_instance.val = Some(@vcdb.VectorDB::from_store(store, options))
+  async_instances[instance_id] = @vcdb.VectorDB::from_store(store, options)
 }
 
 ///|
 /// Replay WAL data onto a CoreStore, then initialize the DB.
 /// Returns the number of records applied.
 pub fn async_replay_wal_and_init(
+  instance_id : Int,
   wal_data : Bytes,
   snapshot_data : Bytes,
   dim : Int,
@@ -80,45 +103,17 @@ pub fn async_replay_wal_and_init(
     let store = db.store()
     let applied = @wal.replay_wal_data(wal_data, store)
     if applied > 0 {
-      async_init_db_from_store(store, dim, capacity)
+      set_db_from_store(instance_id, store, dim, capacity)
     } else {
-      async_db_instance.val = Some(db)
+      async_instances[instance_id] = db
     }
     applied
   } else {
     let store = @store.CoreStore::new(dim, @types.Cosine, capacity=capacity)
     let applied = @wal.replay_wal_data(wal_data, store)
-    async_init_db_from_store(store, dim, capacity)
+    set_db_from_store(instance_id, store, dim, capacity)
     applied
   }
-}
-
-///|
-/// Upsert points into the in-memory DB.
-/// payload_json is a JSON string for each point's attrs.
-/// Returns the WAL binary data that JS must persist.
-/// timestamp_ns: nanoseconds since Unix epoch. 0 = no timestamp.
-pub fn async_upsert(
-  points : Array[(Double, Array[Double], String)],
-  timestamp_ns : Int64,
-) -> Bytes {
-  let db = match async_db_instance.val {
-    Some(d) => d
-    None => abort("DB not initialized")
-  }
-  let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = []
-  for p in points {
-    let (id, vector, payload_json) = p
-    let vid = @types.VectorId(id.to_int64())
-    let attrs = parse_json_to_attrs(payload_json)
-    let _ = db.upsert(vid, vector, attrs)
-    typed_points.push((vid, vector, attrs))
-  }
-  let records : Array[@wal.WalRecord] = typed_points.map(fn(p) {
-    let (id, vector, attrs) = p
-    @wal.WalRecord::upsert(id, vector, attrs, timestamp=timestamp_ns)
-  })
-  @wal.encode_wal_segment(records)
 }
 
 ///|
@@ -134,24 +129,38 @@ fn parse_json_to_attrs(json : String) -> @types.Attrs {
 }
 
 ///|
-/// Search the in-memory DB with optional attribute filtering.
-/// filter_json: JSON string describing filter conditions, or empty for no filter.
-///
-/// Filter format (flat key-value match, AND logic):
-///   {"category": "科学", "status": "解決済み"}
-///   → must match both category=科学 AND status=解決済み
-///
-/// Returns array of (id, score, payload_json_or_empty).
+/// Upsert points into an instance. Returns WAL segment bytes.
+pub fn async_upsert(
+  instance_id : Int,
+  points : Array[(Double, Array[Double], String)],
+  timestamp_ns : Int64,
+) -> Bytes {
+  let db = get_db(instance_id)
+  let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = []
+  for p in points {
+    let (id, vector, payload_json) = p
+    let vid = vid_from_double(id)
+    let attrs = parse_json_to_attrs(payload_json)
+    let _ = db.upsert(vid, vector, attrs)
+    typed_points.push((vid, vector, attrs))
+  }
+  let records : Array[@wal.WalRecord] = typed_points.map(fn(p) {
+    let (id, vector, attrs) = p
+    @wal.WalRecord::upsert(id, vector, attrs, timestamp=timestamp_ns)
+  })
+  @wal.encode_wal_segment(records)
+}
+
+///|
+/// Search with optional attribute filtering.
 pub fn async_search(
+  instance_id : Int,
   query : Array[Double],
   k : Int,
   with_payload : Bool,
   filter_json : String,
 ) -> Array[(Double, Double, String)] {
-  let db = match async_db_instance.val {
-    Some(d) => d
-    None => abort("DB not initialized")
-  }
+  let db = get_db(instance_id)
   let filter = @filter.parse_filter_json(filter_json)
   let hits = db.search_with_expr(query, k, filter, None, @filter.Auto)
   let results : Array[(Double, Double, String)] = []
@@ -169,28 +178,20 @@ pub fn async_search(
   results
 }
 
-
 ///|
 /// Serialize the current DB state as a snapshot.
-/// JS calls this during checkpoint, then persists the returned bytes.
-pub fn async_serialize_snapshot() -> Bytes {
-  match async_db_instance.val {
-    Some(db) => db.serialize()
-    None => abort("DB not initialized")
-  }
+pub fn async_serialize_snapshot(instance_id : Int) -> Bytes {
+  get_db(instance_id).serialize()
 }
 
 ///|
 /// Build a fresh WAL header (for truncation).
-/// JS writes this to the WAL path to "truncate" it.
 pub fn async_wal_header() -> Bytes {
   @wal.encode_wal_header()
 }
 
 ///|
 /// Merge an existing WAL with a new WAL segment.
-/// Returns a valid WAL with correct CRC footer.
-/// This is the only correct way to accumulate WAL records.
 pub fn async_merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
   @wal.merge_wal(existing, new_segment)
 }
@@ -203,8 +204,9 @@ pub fn async_max_wal_timestamp(wal_data : Bytes) -> Int64 {
 
 ///|
 /// Replay WAL with timestamp cutoff (read-at-timestamp).
-/// Only applies records with timestamp <= cutoff_ts.
+/// Returns the number of records applied.
 pub fn async_replay_wal_at_timestamp(
+  instance_id : Int,
   wal_data : Bytes,
   snapshot_data : Bytes,
   dim : Int,
@@ -216,55 +218,39 @@ pub fn async_replay_wal_at_timestamp(
     let store = db.store()
     let applied = @wal.replay_wal_data(wal_data, store, cutoff_ts=cutoff_ts)
     if applied > 0 {
-      async_init_db_from_store(store, dim, capacity)
+      set_db_from_store(instance_id, store, dim, capacity)
     } else {
-      async_db_instance.val = Some(db)
+      async_instances[instance_id] = db
     }
     applied
   } else {
     let store = @store.CoreStore::new(dim, @types.Cosine, capacity=capacity)
     let applied = @wal.replay_wal_data(wal_data, store, cutoff_ts=cutoff_ts)
-    async_init_db_from_store(store, dim, capacity)
+    set_db_from_store(instance_id, store, dim, capacity)
     applied
   }
 }
 
 ///|
-/// Get the current DB size (excludes tombstoned vectors in HNSW).
-pub fn async_db_size() -> Int {
-  match async_db_instance.val {
-    Some(db) => db.size()
-    None => 0
-  }
+pub fn async_db_size(instance_id : Int) -> Int {
+  get_db(instance_id).size()
 }
 
 ///|
-/// Get the raw size including tombstoned vectors.
-pub fn async_db_raw_size() -> Int {
-  match async_db_instance.val {
-    Some(db) => db.raw_size()
-    None => 0
-  }
+pub fn async_db_raw_size(instance_id : Int) -> Int {
+  get_db(instance_id).raw_size()
 }
 
 ///|
-/// Get the vector dimension.
-pub fn async_db_dim() -> Int {
-  match async_db_instance.val {
-    Some(db) => db.dim()
-    None => 0
-  }
+pub fn async_db_dim(instance_id : Int) -> Int {
+  get_db(instance_id).dim()
 }
 
 ///|
-/// Remove a vector by ID. Returns WAL segment bytes for persistence.
-/// Returns empty bytes if ID not found.
-pub fn async_remove(id : Double, timestamp_ns : Int64) -> Bytes {
-  let db = match async_db_instance.val {
-    Some(d) => d
-    None => abort("DB not initialized")
-  }
-  let vid = @types.VectorId(id.to_int64())
+/// Remove a vector by ID. Returns WAL segment bytes.
+pub fn async_remove(instance_id : Int, id : Double, timestamp_ns : Int64) -> Bytes {
+  let db = get_db(instance_id)
+  let vid = vid_from_double(id)
   if db.remove(vid) {
     @wal.encode_wal_segment([@wal.WalRecord::remove(vid, timestamp=timestamp_ns)])
   } else {
@@ -274,13 +260,14 @@ pub fn async_remove(id : Double, timestamp_ns : Int64) -> Bytes {
 
 ///|
 /// Get a single vector and its payload by ID.
-/// Returns (found, payload_json). found=false if not found.
-pub fn async_get(id : Double, with_payload : Bool) -> (Bool, String) {
-  let db = match async_db_instance.val {
-    Some(d) => d
-    None => abort("DB not initialized")
-  }
-  let vid = @types.VectorId(id.to_int64())
+/// Returns (found, vector, payload_json).
+pub fn async_get(
+  instance_id : Int,
+  id : Double,
+  with_payload : Bool,
+) -> (Bool, Array[Double], String) {
+  let db = get_db(instance_id)
+  let vid = vid_from_double(id)
   match db.get(vid) {
     Some(record) => {
       let payload = if with_payload {
@@ -288,31 +275,27 @@ pub fn async_get(id : Double, with_payload : Bool) -> (Bool, String) {
       } else {
         ""
       }
-      (true, payload)
+      (true, record.vector, payload)
     }
-    None => (false, "")
+    None => (false, [], "")
   }
 }
 
 ///|
-/// Check if a vector exists by ID.
-pub fn async_has(id : Double) -> Bool {
-  match async_db_instance.val {
-    Some(db) => db.has(@types.VectorId(id.to_int64()))
-    None => false
-  }
+pub fn async_has(instance_id : Int, id : Double) -> Bool {
+  get_db(instance_id).has(vid_from_double(id))
 }
 
 ///|
-/// Update attributes of an existing vector without re-embedding.
-/// Returns WAL segment bytes for persistence.
-/// Returns empty bytes if ID not found.
-pub fn async_update_attrs(id : Double, attrs_json : String, timestamp_ns : Int64) -> Bytes {
-  let db = match async_db_instance.val {
-    Some(d) => d
-    None => abort("DB not initialized")
-  }
-  let vid = @types.VectorId(id.to_int64())
+/// Update attributes without re-embedding. Returns WAL segment bytes.
+pub fn async_update_attrs(
+  instance_id : Int,
+  id : Double,
+  attrs_json : String,
+  timestamp_ns : Int64,
+) -> Bytes {
+  let db = get_db(instance_id)
+  let vid = vid_from_double(id)
   if not(db.has(vid)) {
     return Bytes::new(0)
   }
@@ -322,17 +305,14 @@ pub fn async_update_attrs(id : Double, attrs_json : String, timestamp_ns : Int64
 }
 
 ///|
-/// Scroll through vectors in ascending ID order (cursor-based pagination).
-/// Returns array of (id, payload_json).
+/// Scroll through vectors in ascending ID order.
 pub fn async_scroll(
+  instance_id : Int,
   offset : Double?,
   limit : Int,
   with_payload : Bool,
 ) -> Array[(Double, String)] {
-  let db = match async_db_instance.val {
-    Some(d) => d
-    None => abort("DB not initialized")
-  }
+  let db = get_db(instance_id)
   let offset_i64 : Int64? = match offset {
     Some(o) => Some(o.to_int64())
     None => None
@@ -352,17 +332,59 @@ pub fn async_scroll(
 }
 
 ///|
-/// Compact the HNSW index by removing tombstoned vectors.
-/// Returns snapshot bytes for persistence (caller should checkpoint).
-/// Returns the number of tombstones removed.
-pub fn async_compact() -> (Bytes, Int) {
-  let db = match async_db_instance.val {
-    Some(d) => d
-    None => abort("DB not initialized")
+/// Scroll with optional filter expression.
+pub fn async_scroll_filtered(
+  instance_id : Int,
+  filter_json : String,
+  offset : Double?,
+  limit : Int,
+  with_payload : Bool,
+) -> Array[(Double, String)] {
+  let db = get_db(instance_id)
+  let offset_i64 : Int64? = match offset {
+    Some(o) => Some(o.to_int64())
+    None => None
   }
+  let entries = match @filter.parse_filter_json(filter_json) {
+    Some(e) => db.scroll_filtered(expr=Some(e), offset=offset_i64, limit=limit)
+    None => db.scroll_filtered(offset=offset_i64, limit=limit)
+  }
+  let results : Array[(Double, String)] = []
+  for entry in entries {
+    let (vid, record) = entry
+    let payload = if with_payload {
+      @codec.attrs_to_json(Some(record.attrs))
+    } else {
+      ""
+    }
+    results.push((vector_id_to_double(vid), payload))
+  }
+  results
+}
+
+///|
+/// Count vectors matching a filter expression.
+pub fn async_count_filtered(instance_id : Int, filter_json : String) -> Int {
+  let db = get_db(instance_id)
+  match @filter.parse_filter_json(filter_json) {
+    Some(e) => db.count_filtered(expr=Some(e))
+    None => db.count_filtered()
+  }
+}
+
+///|
+/// Compact HNSW index. Returns (snapshot_bytes, removed_count).
+pub fn async_compact(instance_id : Int) -> (Bytes, Int) {
+  let db = get_db(instance_id)
   let (new_db, removed) = db.compact()
-  async_db_instance.val = Some(new_db)
+  async_instances[instance_id] = new_db
   (new_db.serialize(), removed)
+}
+
+///|
+/// Destroy an instance and free its memory.
+pub fn async_destroy(instance_id : Int) -> Unit {
+  async_instances.remove(instance_id)
 }
 
 ///|

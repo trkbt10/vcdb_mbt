@@ -229,56 +229,111 @@ pub fn get_candidates_basic(
 }
 
 ///|
-/// Get candidate IDs from a B+ tree attribute index using a filter expression
-/// Returns None if pre-filtering is not possible (should use post-filter)
-pub fn get_candidates_bptree(
+/// Resolve candidate IDs from a B+ tree attribute index.
+/// Every FilterExpr variant is resolved through the index — there is no
+/// fallback to post-filtering. This guarantees a single execution path
+/// regardless of the expression shape.
+///
+/// - IsNull(key): complement of exists(key) against all indexed IDs
+/// - MustNot(exprs): complement of union(resolve(e)) against all IDs
+/// - Should(exprs, min>1): count per-ID and threshold
+pub fn resolve_candidates_bptree(
   expr : FilterExpr,
   index : @attr.BPTreeAttrIndex,
-) -> Array[@types.VectorId]? {
+) -> Array[@types.VectorId] {
   match expr {
-    Leaf(Match(key, value)) => Some(index.eq(key, value))
-    Leaf(Exists(key)) => Some(index.exists(key))
-    Leaf(Range(key, range)) => index.range(key, range)
-    Leaf(IsNull(_)) => None
-    Must(exprs) => {
-      let mut result : Array[@types.VectorId]? = None
-      for e in exprs {
-        match get_candidates_bptree(e, index) {
-          None => return None
-          Some(candidates) =>
-            match result {
-              None => result = Some(candidates)
-              Some(current) => result = Some(intersect_ids(current, candidates))
-            }
+    Leaf(Match(key, value)) => index.eq(key, value)
+    Leaf(Exists(key)) => index.exists(key)
+    Leaf(Range(key, range)) =>
+      match index.range(key, range) {
+        Some(ids) => ids
+        None => []
+      }
+    Leaf(IsNull(key)) => {
+      // All IDs minus those that have a non-null value for `key`
+      let present = id_set_from(index.exists(key))
+      let result : Array[@types.VectorId] = []
+      for id in index.all_ids() {
+        if not(present.contains(id.to_int64())) {
+          result.push(id)
         }
       }
       result
     }
-    MustNot(_) => None
-    Should(exprs, min) => {
-      if min <= 0 {
-        return None
-      }
-      if min > 1 {
-        return None
-      }
-      let all : Array[@types.VectorId] = []
-      let seen : Map[Int64, Bool] = {}
+    Must(exprs) => {
+      let mut result : Array[@types.VectorId] = index.all_ids()
       for e in exprs {
-        match get_candidates_bptree(e, index) {
-          None => return None
-          Some(candidates) =>
-            for id in candidates {
-              if not(seen.contains(id.to_int64())) {
-                seen.set(id.to_int64(), true)
-                all.push(id)
-              }
-            }
+        let candidates = resolve_candidates_bptree(e, index)
+        result = intersect_ids(result, candidates)
+      }
+      result
+    }
+    MustNot(exprs) => {
+      // All IDs minus the union of each sub-expression's candidates
+      let excluded : Map[Int64, Bool] = {}
+      for e in exprs {
+        for id in resolve_candidates_bptree(e, index) {
+          excluded.set(id.to_int64(), true)
         }
       }
-      Some(all)
+      let result : Array[@types.VectorId] = []
+      for id in index.all_ids() {
+        if not(excluded.contains(id.to_int64())) {
+          result.push(id)
+        }
+      }
+      result
+    }
+    Should(exprs, min) => {
+      if min <= 0 {
+        // min <= 0 means everything matches
+        return index.all_ids()
+      }
+      if min == 1 {
+        // OR: union of all sub-expressions
+        let all : Array[@types.VectorId] = []
+        let seen : Map[Int64, Bool] = {}
+        for e in exprs {
+          for id in resolve_candidates_bptree(e, index) {
+            if not(seen.contains(id.to_int64())) {
+              seen.set(id.to_int64(), true)
+              all.push(id)
+            }
+          }
+        }
+        all
+      } else {
+        // min > 1: count how many sub-expressions each ID satisfies
+        let counts : Map[Int64, Int] = {}
+        for e in exprs {
+          for id in resolve_candidates_bptree(e, index) {
+            let key = id.to_int64()
+            match counts.get(key) {
+              Some(c) => counts.set(key, c + 1)
+              None => counts.set(key, 1)
+            }
+          }
+        }
+        let result : Array[@types.VectorId] = []
+        for id_val, count in counts {
+          if count >= min {
+            result.push(@types.VectorId(id_val))
+          }
+        }
+        result
+      }
     }
   }
+}
+
+///|
+/// Build a set of Int64 from an ID array (for fast membership tests).
+fn id_set_from(ids : Array[@types.VectorId]) -> Map[Int64, Bool] {
+  let s : Map[Int64, Bool] = {}
+  for id in ids {
+    s.set(id.to_int64(), true)
+  }
+  s
 }
 
 ///|
