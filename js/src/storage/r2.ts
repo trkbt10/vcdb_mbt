@@ -12,6 +12,7 @@
  */
 import type { StorageAdapter, StorageKindType } from "./types.js";
 import { StorageKind } from "./types.js";
+import type { DOKeyValueStore } from "./do-kv.js";
 
 /**
  * Minimal R2 bucket interface — matches Cloudflare Workers R2Bucket type
@@ -96,6 +97,89 @@ export function createR2Storage(options: R2StorageOptions): StorageAdapter {
         });
         for (const obj of page.objects) {
           keys.push(obj.key.slice(baseLen));
+        }
+        cursor = page.truncated ? page.cursor : undefined;
+      } while (cursor);
+
+      return keys;
+    },
+  };
+}
+
+/* ── Kind-agnostic R2 adapter (DOKeyValueStore interface) ──── */
+
+export interface R2KeyValueStoreOptions {
+  /** R2 bucket binding (env.MY_BUCKET). */
+  bucket: R2BucketLike;
+  /**
+   * Optional key prefix for namespace isolation.
+   * Useful when multiple DO shards share one R2 bucket.
+   */
+  keyPrefix?: string;
+}
+
+/**
+ * Create a kind-agnostic R2 key-value store.
+ *
+ * Unlike createR2Storage which routes by StorageKind, this provides
+ * raw key-value access — suitable for the persistent_* API bridge
+ * where WAL/snapshot routing is handled at a higher level.
+ *
+ * No chunking needed — R2 supports objects up to 5GB.
+ */
+export function createR2KeyValueStore(
+  options: R2KeyValueStoreOptions,
+): DOKeyValueStore {
+  const { bucket, keyPrefix = "" } = options;
+  const key = (path: string): string => keyPrefix + path;
+
+  return {
+    async prefetch() {
+      // R2 doesn't need prefetch — no chunk index to maintain.
+    },
+
+    async read(path) {
+      const obj = await bucket.get(key(path));
+      if (!obj) return null;
+      const buf = await obj.arrayBuffer();
+      return new Uint8Array(buf);
+    },
+
+    async write(path, data) {
+      await bucket.put(key(path), data);
+    },
+
+    async writeAtomic(entries) {
+      // R2 has no multi-key atomicity — write sequentially.
+      // Callers relying on crash safety should write the more
+      // important entry first (the persistent_* API does this).
+      for (const { path, data } of entries) {
+        await bucket.put(key(path), data);
+      }
+    },
+
+    async delete(path) {
+      await bucket.delete(key(path));
+    },
+
+    async exists(path) {
+      const head = await bucket.head(key(path));
+      return head !== null;
+    },
+
+    async list(prefix) {
+      const fullPrefix = keyPrefix + (prefix ?? "");
+      const keys: string[] = [];
+      let cursor: string | undefined;
+
+      do {
+        const page = await bucket.list({
+          prefix: fullPrefix || undefined,
+          cursor,
+          limit: 1000,
+        });
+        for (const obj of page.objects) {
+          keys.push(obj.key.slice(keyPrefix.length));
         }
         cursor = page.truncated ? page.cursor : undefined;
       } while (cursor);

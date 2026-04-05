@@ -49,6 +49,14 @@
       "types": "./dist/storage/wasm-bridge.d.ts",
       "import": "./dist/storage/wasm-bridge.js"
     },
+    "./storage/persistent-bridge": {
+      "types": "./dist/storage/persistent-bridge.d.ts",
+      "import": "./dist/storage/persistent-bridge.js"
+    },
+    "./id": {
+      "types": "./dist/id.d.ts",
+      "import": "./dist/id.js"
+    },
     "./wasm": {
       "types": "./dist/wasm/index.d.ts",
       "import": "./dist/wasm/index.js"

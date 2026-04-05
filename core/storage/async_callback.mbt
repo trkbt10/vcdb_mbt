@@ -9,8 +9,10 @@
 /// the need for async fn in trait impl bodies.
 ///
 /// Supports multiple named instances for dual-backend patterns:
-///   - "wal" instance → Durable Object storage
-///   - "snapshot" instance → R2 storage
+///   - "wal-{instance_id}" → WAL storage (e.g., Durable Object storage)
+///   - "snapshot-{instance_id}" → Snapshot storage (e.g., R2)
+/// Name derivation is centralized in persistent_exports.mbt
+/// (wal_callback_name / snapshot_callback_name).
 ///
 /// JS target only (uses @js_async.Promise for JS interop).
 
@@ -52,13 +54,6 @@ pub fn register_js_async_callbacks(
 ///|
 pub fn clear_js_async_callbacks(name : String) -> Unit {
   js_async_callbacks.remove(name)
-}
-
-///|
-pub fn clear_all_js_async_callbacks() -> Unit {
-  js_async_callbacks.remove("wal")
-  js_async_callbacks.remove("snapshot")
-  js_async_callbacks.remove("default")
 }
 
 ///|

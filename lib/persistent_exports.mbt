@@ -24,6 +24,43 @@ let persistent_instances : @hashmap.HashMap[
   @col_persist.PersistentVectorDB[@storage.JsAsyncCallbackStorage, @storage.JsAsyncCallbackStorage],
 ] = @hashmap.new()
 
+// ── Callback name derivation (SoT) ──────────────────────────
+//
+// All callback names are derived from instance_id via these two
+// functions. register, init, and destroy MUST use these — never
+// inline the prefix strings.
+
+///|
+fn wal_callback_name(instance_id : Int) -> String {
+  "wal-" + instance_id.to_string()
+}
+
+///|
+fn snapshot_callback_name(instance_id : Int) -> String {
+  "snapshot-" + instance_id.to_string()
+}
+
+///|
+/// Create JsAsyncStorageCallbacks from raw JS callback functions.
+/// Adapts the Int-based kind parameter (JS side) to StorageKind (MoonBit side).
+fn make_storage_callbacks(
+  read : (String, Int) -> @js_async.Promise[Bytes],
+  write : (String, Bytes, Int) -> @js_async.Promise[Unit],
+  atomic_write : (String, Bytes, Int) -> @js_async.Promise[Unit],
+  del : (String, Int) -> @js_async.Promise[Unit],
+  exists : (String, Int) -> @js_async.Promise[Bool],
+  list : (Int) -> @js_async.Promise[Array[String]],
+) -> @storage.JsAsyncStorageCallbacks {
+  @storage.JsAsyncStorageCallbacks::new(
+    fn(path, kind) { read(path, kind_to_int(kind)) },
+    fn(path, data, kind) { write(path, data, kind_to_int(kind)) },
+    fn(path, data, kind) { atomic_write(path, data, kind_to_int(kind)) },
+    fn(path, kind) { del(path, kind_to_int(kind)) },
+    fn(path, kind) { exists(path, kind_to_int(kind)) },
+    fn(kind) { list(kind_to_int(kind)) },
+  )
+}
+
 ///|
 /// Register WAL storage callbacks for a specific instance.
 /// Must be called BEFORE persistent_init.
@@ -40,17 +77,9 @@ pub fn persistent_register_wal_storage(
   exists : (String, Int) -> @js_async.Promise[Bool],
   list : (Int) -> @js_async.Promise[Array[String]],
 ) -> Unit {
-  let name = "wal-" + instance_id.to_string()
   @storage.register_js_async_callbacks(
-    name,
-    @storage.JsAsyncStorageCallbacks::new(
-      fn(path, kind) { read(path, kind_to_int(kind)) },
-      fn(path, data, kind) { write(path, data, kind_to_int(kind)) },
-      fn(path, data, kind) { atomic_write(path, data, kind_to_int(kind)) },
-      fn(path, kind) { del(path, kind_to_int(kind)) },
-      fn(path, kind) { exists(path, kind_to_int(kind)) },
-      fn(kind) { list(kind_to_int(kind)) },
-    ),
+    wal_callback_name(instance_id),
+    make_storage_callbacks(read, write, atomic_write, del, exists, list),
   )
 }
 
@@ -66,17 +95,9 @@ pub fn persistent_register_snapshot_storage(
   exists : (String, Int) -> @js_async.Promise[Bool],
   list : (Int) -> @js_async.Promise[Array[String]],
 ) -> Unit {
-  let name = "snapshot-" + instance_id.to_string()
   @storage.register_js_async_callbacks(
-    name,
-    @storage.JsAsyncStorageCallbacks::new(
-      fn(path, kind) { read(path, kind_to_int(kind)) },
-      fn(path, data, kind) { write(path, data, kind_to_int(kind)) },
-      fn(path, data, kind) { atomic_write(path, data, kind_to_int(kind)) },
-      fn(path, kind) { del(path, kind_to_int(kind)) },
-      fn(path, kind) { exists(path, kind_to_int(kind)) },
-      fn(kind) { list(kind_to_int(kind)) },
-    ),
+    snapshot_callback_name(instance_id),
+    make_storage_callbacks(read, write, atomic_write, del, exists, list),
   )
 }
 
@@ -84,23 +105,35 @@ pub fn persistent_register_snapshot_storage(
 /// Initialize a persistent VectorDB instance.
 /// Loads WAL + snapshot from registered storage, replays, builds VectorDB.
 ///
+/// Parameters:
+///   instance_id — stable ID (same as used in register_*_storage calls)
+///   collection_name — determines WAL/snapshot file names
+///     (e.g., "questions" → "questions.vwal" + "questions.data.bin")
+///   base_path — optional prefix path (empty string for root)
+///   dim — vector dimension
+///   capacity — initial capacity hint
+///
 /// Returns a Promise that resolves when initialization is complete.
 /// The instance is then available for persistent_upsert, persistent_search, etc.
 pub fn persistent_init(
   instance_id : Int,
+  collection_name : String,
+  base_path : String,
   dim : Int,
   capacity : Int,
 ) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(async fn() {
-    let wal_name = "wal-" + instance_id.to_string()
-    let snapshot_name = "snapshot-" + instance_id.to_string()
-    let wal_storage = @storage.JsAsyncCallbackStorage::new(wal_name)
-    let snapshot_storage = @storage.JsAsyncCallbackStorage::new(snapshot_name)
+    let wal_storage = @storage.JsAsyncCallbackStorage::new(
+      wal_callback_name(instance_id),
+    )
+    let snapshot_storage = @storage.JsAsyncCallbackStorage::new(
+      snapshot_callback_name(instance_id),
+    )
     let pdb = @col_persist.PersistentVectorDB::init(
       wal_storage,
       snapshot_storage,
-      "",
-      "db",
+      base_path,
+      collection_name,
       dim,
       capacity,
     )
@@ -202,8 +235,8 @@ pub fn persistent_compact(instance_id : Int) -> @js_async.Promise[Int] {
 /// Destroy a persistent instance and clear its storage callbacks.
 pub fn persistent_destroy(instance_id : Int) -> Unit {
   persistent_instances.remove(instance_id)
-  @storage.clear_js_async_callbacks("wal-" + instance_id.to_string())
-  @storage.clear_js_async_callbacks("snapshot-" + instance_id.to_string())
+  @storage.clear_js_async_callbacks(wal_callback_name(instance_id))
+  @storage.clear_js_async_callbacks(snapshot_callback_name(instance_id))
 }
 
 // ── Synchronous read operations (no Promise needed) ──────────

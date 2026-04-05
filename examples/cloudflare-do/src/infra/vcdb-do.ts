@@ -4,26 +4,29 @@
  * Each DO shard gets its own vcdb instance_id — no global singleton.
  * Multiple shards sharing the same JS module are fully isolated.
  *
- * Responsibilities: vcdb operations (upsert, search) only.
- * WAL persistence is delegated to WalWriter.
- * Storage backends are injected via DOKeyValueStore / R2Adapter.
+ * Uses the persistent_* FFI API which handles WAL management,
+ * checkpointing, and crash recovery internally. This DO only needs
+ * to register storage backends and call the persistent operations.
  *
  * Based on production patterns from usbkr.
  */
 import { DurableObject } from "cloudflare:workers";
 import { createDOKeyValueStore } from "@vcdb/server/storage/do-kv";
-import { createR2Adapter } from "./r2-store.ts";
-import { createWalWriter, type WalWriter } from "./wal-writer.ts";
+import { createR2KeyValueStore } from "@vcdb/server/storage/r2";
+import {
+  registerPersistentStorage,
+  initPersistentDB,
+  destroyPersistentDB,
+  type PersistentFFI,
+} from "@vcdb/server/storage/persistent-bridge";
 import type { VcdbId, Bindings } from "../types.ts";
+import { fnvHash } from "../types.ts";
 
+const COLLECTION_NAME = "vectors";
 const DIMENSIONS = 1024;
 const INITIAL_CAPACITY = 1024;
-const COLLECTION_NAME = "vectors";
-const WAL_PATH = `${COLLECTION_NAME}.vwal`;
-const SNAPSHOT_PATH = `${COLLECTION_NAME}.data.bin`;
-const CHECKPOINT_THRESHOLD = 50;
 
-type VcdbLib = typeof import("@vcdb/server/wasm/lib.js");
+type VcdbLib = PersistentFFI;
 
 export type VcdbSearchHit = {
   readonly id: VcdbId;
@@ -40,7 +43,7 @@ const parsePayload = (json: string): Record<string, unknown> | null => {
   }
 };
 
-/** Current time as MoonBit Int64 (nanoseconds since epoch). */
+/** Current time as MoonBit Int64 (nanoseconds since epoch, hi/lo pair). */
 const nowNs = (): { hi: number; lo: number } => {
   const ms = Date.now();
   const ns = ms * 1_000_000;
@@ -51,37 +54,29 @@ export class VcdbStore extends DurableObject<Bindings> {
   private vcdb: VcdbLib | null = null;
   /** vcdb instance ID — derived from DO ID, stable across restarts. */
   private readonly instanceId: number;
-  private wal: WalWriter;
   private initPromise: Promise<void> | null = null;
 
   constructor(ctx: DurableObjectState, env: Bindings) {
     super(ctx, env);
 
     // Stable instance ID derived from DO ID — survives DO restarts.
-    // FNV-1a hash of the DO ID hex string.
-    const idStr = ctx.id.toString();
-    const h = { value: 0x811c9dc5 };
-    for (const byte of new TextEncoder().encode(idStr)) {
-      h.value ^= byte;
-      h.value = Math.imul(h.value, 0x01000193) | 0;
-    }
-    this.instanceId = h.value >>> 0;
+    this.instanceId = fnvHash(ctx.id.toString());
 
     // R2 keys are prefixed with the DO ID to isolate each shard's data.
-    const doPrefix = idStr + "/";
+    const doPrefix = ctx.id.toString() + "/";
     const walStore = createDOKeyValueStore(ctx.storage, "w:");
-    const dataStore = createR2Adapter(env.VCDB_DATA, doPrefix);
-    const legacyDataStore = createDOKeyValueStore(ctx.storage, "d:");
+    const snapshotStore = createR2KeyValueStore({
+      bucket: env.VCDB_DATA,
+      keyPrefix: doPrefix,
+    });
 
-    this.wal = createWalWriter(
-      walStore,
-      dataStore,
-      WAL_PATH,
-      SNAPSHOT_PATH,
-      CHECKPOINT_THRESHOLD,
-      legacyDataStore,
-    );
+    // Store references for lazy initialization.
+    this._walStore = walStore;
+    this._snapshotStore = snapshotStore;
   }
+
+  private _walStore;
+  private _snapshotStore;
 
   private ensureInitialized(): Promise<void> {
     this.initPromise ??= this.doInit();
@@ -92,26 +87,24 @@ export class VcdbStore extends DurableObject<Bindings> {
     const vcdbLib: VcdbLib = await import("@vcdb/server/wasm/lib.js");
     this.vcdb = vcdbLib;
 
-    const { walData, snapshotData } = await this.wal.load();
+    // Register storage backends with the persistent FFI.
+    // This prefetches chunk indexes and wires callbacks.
+    await registerPersistentStorage(
+      vcdbLib,
+      this.instanceId,
+      this._walStore,
+      this._snapshotStore,
+    );
 
-    if (snapshotData || walData) {
-      const applied = vcdbLib.async_replay_wal_and_init(
-        this.instanceId,
-        walData ?? new Uint8Array(0),
-        snapshotData ?? new Uint8Array(0),
-        DIMENSIONS,
-        INITIAL_CAPACITY,
-      );
-      const size = vcdbLib.async_db_size(this.instanceId);
-      console.log(
-        `[VcdbStore] instanceId=${this.instanceId} wal=${walData?.length ?? 0} snap=${snapshotData?.length ?? 0} applied=${applied} size=${size}`,
-      );
-    } else {
-      vcdbLib.async_init_db(this.instanceId, DIMENSIONS, INITIAL_CAPACITY);
-      console.log(
-        `[VcdbStore] instanceId=${this.instanceId} fresh (no WAL/snapshot)`,
-      );
-    }
+    // Initialize: loads WAL + snapshot, replays, builds VectorDB.
+    await initPersistentDB(vcdbLib, this.instanceId, DIMENSIONS, INITIAL_CAPACITY, {
+      collectionName: COLLECTION_NAME,
+    });
+
+    const size = vcdbLib.persistent_db_size(this.instanceId);
+    console.log(
+      `[VcdbStore] instanceId=${this.instanceId} initialized, size=${size}`,
+    );
   }
 
   async upsert(
@@ -129,17 +122,13 @@ export class VcdbStore extends DurableObject<Bindings> {
       _2: p.vector,
       _3: JSON.stringify(p.payload),
     }));
-    const walSegment = this.vcdb!.async_upsert(
+
+    // persistent_upsert handles WAL-before-state and auto-checkpoint.
+    await this.vcdb!.persistent_upsert(
       this.instanceId,
       vcdbPoints,
       nowNs(),
     );
-
-    await this.wal.append(this.vcdb!, walSegment, points.length);
-
-    if (this.wal.shouldCheckpoint) {
-      await this.wal.checkpoint(this.vcdb!, this.instanceId);
-    }
   }
 
   async search(
@@ -149,14 +138,15 @@ export class VcdbStore extends DurableObject<Bindings> {
   ): Promise<readonly VcdbSearchHit[]> {
     await this.ensureInitialized();
 
-    const results = this.vcdb!.async_search(
+    // persistent_search is synchronous (reads are in-memory).
+    const results = this.vcdb!.persistent_search(
       this.instanceId,
       vector,
       topK,
       true,
       filterJson,
     );
-    return results.map((r) => ({
+    return results.map((r: { _0: number; _1: number; _2: number; _3: string }) => ({
       id: { hi: r._0, lo: r._1 },
       score: r._2,
       payload: parsePayload(r._3),
@@ -165,18 +155,12 @@ export class VcdbStore extends DurableObject<Bindings> {
 
   async remove(id: VcdbId): Promise<void> {
     await this.ensureInitialized();
-    const walSegment = this.vcdb!.async_remove(
+    await this.vcdb!.persistent_remove(
       this.instanceId,
       id.hi,
       id.lo,
       nowNs(),
     );
-    if (walSegment.length > 0) {
-      await this.wal.append(this.vcdb!, walSegment, 1);
-      if (this.wal.shouldCheckpoint) {
-        await this.wal.checkpoint(this.vcdb!, this.instanceId);
-      }
-    }
   }
 
   async getById(
@@ -187,7 +171,8 @@ export class VcdbStore extends DurableObject<Bindings> {
     payload: Record<string, unknown> | null;
   }> {
     await this.ensureInitialized();
-    const result = this.vcdb!.async_get(this.instanceId, id.hi, id.lo, true);
+    const result: { _0: boolean; _1: number[]; _2: string } =
+      this.vcdb!.persistent_get(this.instanceId, id.hi, id.lo, true);
     return {
       found: result._0,
       vector: result._1,
@@ -197,7 +182,7 @@ export class VcdbStore extends DurableObject<Bindings> {
 
   async has(id: VcdbId): Promise<boolean> {
     await this.ensureInitialized();
-    return this.vcdb!.async_has(this.instanceId, id.hi, id.lo);
+    return this.vcdb!.persistent_has(this.instanceId, id.hi, id.lo);
   }
 
   async updateAttrs(
@@ -205,16 +190,13 @@ export class VcdbStore extends DurableObject<Bindings> {
     attrs: Record<string, unknown>,
   ): Promise<void> {
     await this.ensureInitialized();
-    const walSegment = this.vcdb!.async_update_attrs(
+    await this.vcdb!.persistent_update_attrs(
       this.instanceId,
       id.hi,
       id.lo,
       JSON.stringify(attrs),
       nowNs(),
     );
-    if (walSegment.length > 0) {
-      await this.wal.append(this.vcdb!, walSegment, 1);
-    }
   }
 
   async scroll(
@@ -225,7 +207,7 @@ export class VcdbStore extends DurableObject<Bindings> {
     const hasOffset = offset !== undefined;
     const offsetHi = offset?.hi ?? 0;
     const offsetLo = offset?.lo ?? 0;
-    const results = this.vcdb!.async_scroll(
+    const results = this.vcdb!.persistent_scroll(
       this.instanceId,
       offsetHi,
       offsetLo,
@@ -233,7 +215,7 @@ export class VcdbStore extends DurableObject<Bindings> {
       limit,
       true,
     );
-    return results.map((r) => ({
+    return results.map((r: { _0: number; _1: number; _2: string }) => ({
       id: { hi: r._0, lo: r._1 },
       payload: parsePayload(r._2),
     }));
@@ -248,7 +230,7 @@ export class VcdbStore extends DurableObject<Bindings> {
     const hasOffset = offset !== undefined;
     const offsetHi = offset?.hi ?? 0;
     const offsetLo = offset?.lo ?? 0;
-    const results = this.vcdb!.async_scroll_filtered(
+    const results = this.vcdb!.persistent_scroll_filtered(
       this.instanceId,
       filterJson,
       offsetHi,
@@ -257,7 +239,7 @@ export class VcdbStore extends DurableObject<Bindings> {
       limit,
       true,
     );
-    return results.map((r) => ({
+    return results.map((r: { _0: number; _1: number; _2: string }) => ({
       id: { hi: r._0, lo: r._1 },
       payload: parsePayload(r._2),
     }));
@@ -265,28 +247,24 @@ export class VcdbStore extends DurableObject<Bindings> {
 
   async countFiltered(filterJson: string): Promise<number> {
     await this.ensureInitialized();
-    return this.vcdb!.async_count_filtered(this.instanceId, filterJson);
+    return this.vcdb!.persistent_count_filtered(this.instanceId, filterJson);
   }
 
   async compact(): Promise<{ removed: number }> {
     await this.ensureInitialized();
-    const result = this.vcdb!.async_compact(this.instanceId);
-    const removed = result._1;
-    if (removed > 0) {
-      await this.wal.checkpoint(this.vcdb!, this.instanceId);
-    }
+    const removed = await this.vcdb!.persistent_compact(this.instanceId);
     return { removed };
   }
 
   size(): number {
-    return this.vcdb?.async_db_size(this.instanceId) ?? 0;
+    return this.vcdb?.persistent_db_size(this.instanceId) ?? 0;
   }
 
   rawSize(): number {
-    return this.vcdb?.async_db_raw_size(this.instanceId) ?? 0;
+    return this.vcdb?.persistent_db_raw_size(this.instanceId) ?? 0;
   }
 
   dim(): number {
-    return this.vcdb?.async_db_dim(this.instanceId) ?? 0;
+    return this.vcdb?.persistent_db_dim(this.instanceId) ?? 0;
   }
 }
