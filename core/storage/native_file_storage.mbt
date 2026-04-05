@@ -235,3 +235,70 @@ pub impl Storage for NativeFileStorage with exists(self, path, kind) {
 pub impl Storage for NativeFileStorage with list(self, kind) {
   self.list(kind)
 }
+
+///|
+fn io_error_message(e : IOError) -> String {
+  match e {
+    NotFound(s) => "Not found: " + s
+    PermissionDenied(s) => "Permission denied: " + s
+    IoFailed(s) => "IO failed: " + s
+  }
+}
+
+///|
+/// AsyncStorage implementation for NativeFileStorage.
+/// Wraps synchronous filesystem I/O — resolve is called immediately.
+/// This enables NativeFileStorage to be used with PersistentVectorDB
+/// and all async persistence infrastructure on native targets.
+pub impl AsyncStorage for NativeFileStorage with async_read(self, path, kind, resolve, reject) {
+  let data = self.read(path, kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve(data)
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_write(self, path, data, kind, resolve, reject) {
+  self.write(path, data, kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_atomic_write(self, path, data, kind, resolve, reject) {
+  self.atomic_write(path, data, kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_del(self, path, kind, resolve, reject) {
+  self.del(path, kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_exists(self, path, kind, resolve, _reject) {
+  resolve(self.exists(path, kind))
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_list(self, kind, resolve, _reject) {
+  resolve(self.list(kind))
+}

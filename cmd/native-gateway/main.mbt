@@ -5,6 +5,9 @@
 /// requests without the JavaScript runtime adapter.
 
 ///|
+fn run_async_main(f : async () -> Unit noraise) -> Unit = "%async.run"
+
+///|
 pub struct NativeGateway {
   manager : @gateway.CollectionManager[@storage.MemoryStorage]
 }
@@ -16,7 +19,7 @@ pub fn NativeGateway::new() -> NativeGateway {
 }
 
 ///|
-pub fn NativeGateway::execute(
+pub async fn NativeGateway::execute(
   self : NativeGateway,
   args : Array[String],
 ) -> @gateway.ApiResponse {
@@ -49,7 +52,7 @@ pub fn NativeGateway::execute(
 }
 
 ///|
-pub fn NativeGateway::run(self : NativeGateway, args : Array[String]) -> String {
+pub async fn NativeGateway::run(self : NativeGateway, args : Array[String]) -> String {
   if args.length() == 0 {
     return @cli.print_help()
   }
@@ -65,7 +68,12 @@ pub fn NativeGateway::run(self : NativeGateway, args : Array[String]) -> String 
 ///|
 fn main {
   let app = NativeGateway::new()
-  println(app.run(command_args()))
+  run_async_main(async fn() noraise {
+    let result = try app.run(command_args()) catch {
+      _ => "error"
+    }
+    println(result)
+  })
 }
 
 ///|
@@ -182,7 +190,7 @@ fn build_collection_body(
 }
 
 ///|
-fn NativeGateway::request(
+async fn NativeGateway::request(
   self : NativeGateway,
   http_method : String,
   path : String,
@@ -192,7 +200,7 @@ fn NativeGateway::request(
 }
 
 ///|
-fn NativeGateway::create_collection(
+async fn NativeGateway::create_collection(
   self : NativeGateway,
   parsed : @cli.ParsedArgs,
 ) -> @gateway.ApiResponse {
@@ -222,7 +230,7 @@ fn NativeGateway::create_collection(
 }
 
 ///|
-fn NativeGateway::upsert_point(
+async fn NativeGateway::upsert_point(
   self : NativeGateway,
   parsed : @cli.ParsedArgs,
 ) -> @gateway.ApiResponse {
@@ -251,7 +259,7 @@ fn NativeGateway::upsert_point(
 }
 
 ///|
-fn NativeGateway::get_point(
+async fn NativeGateway::get_point(
   self : NativeGateway,
   parsed : @cli.ParsedArgs,
 ) -> @gateway.ApiResponse {
@@ -267,7 +275,7 @@ fn NativeGateway::get_point(
 }
 
 ///|
-fn NativeGateway::delete_point(
+async fn NativeGateway::delete_point(
   self : NativeGateway,
   parsed : @cli.ParsedArgs,
 ) -> @gateway.ApiResponse {
@@ -283,7 +291,7 @@ fn NativeGateway::delete_point(
 }
 
 ///|
-fn NativeGateway::search_points(
+async fn NativeGateway::search_points(
   self : NativeGateway,
   parsed : @cli.ParsedArgs,
 ) -> @gateway.ApiResponse {
@@ -305,7 +313,7 @@ fn NativeGateway::search_points(
 }
 
 ///|
-fn NativeGateway::execute_raw_request(
+async fn NativeGateway::execute_raw_request(
   self : NativeGateway,
   parsed : @cli.ParsedArgs,
 ) -> @gateway.ApiResponse {

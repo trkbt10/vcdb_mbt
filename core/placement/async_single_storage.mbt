@@ -1,9 +1,8 @@
 ///|
-/// Async segmented save/load for JS environments.
+/// Async segmented save/load — target-independent.
 ///
 /// Segment construction (CRUSH placement, binary encoding) is done synchronously
-/// in memory. Only the actual storage writes/reads are async, ensuring each
-/// segment, index, and manifest is durably persisted before proceeding.
+/// in memory. Only the actual storage writes/reads are async via AsyncStorage trait.
 
 ///|
 /// Save a CoreStore to async storage using segments.
@@ -22,9 +21,12 @@ pub async fn[S : @storage.AsyncStorage] async_save_segmented(
 
   // Write each segment to storage (async, awaited)
   for seg in result.segments {
-    storage
-      .atomic_write(seg.name + @codec.ext_segment, seg.data, @storage.Data)
-      .wait()
+    @storage.async_atomic_write(
+      storage,
+      seg.name + @codec.ext_segment,
+      seg.data,
+      @storage.Data,
+    )
   }
 
   // Write index file
@@ -35,19 +37,21 @@ pub async fn[S : @storage.AsyncStorage] async_save_segmented(
     has_ann,
   )
   let index_bytes = @segment.encode_index_file(header, result.entries, None)
-  storage
-    .atomic_write(base_name + @codec.ext_index, index_bytes, @storage.Index)
-    .wait()
+  @storage.async_atomic_write(
+    storage,
+    base_name + @codec.ext_index,
+    index_bytes,
+    @storage.Index,
+  )
 
   // Write manifest
   let manifest_bytes = serialize_manifest(result.manifest)
-  storage
-    .atomic_write(
-      base_name + @codec.ext_manifest,
-      manifest_bytes,
-      @storage.Index,
-    )
-    .wait()
+  @storage.async_atomic_write(
+    storage,
+    base_name + @codec.ext_manifest,
+    manifest_bytes,
+    @storage.Index,
+  )
 }
 
 ///|
@@ -58,18 +62,20 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
 ) -> @store.CoreStore {
   // Try fast path: load from index file
   let index_path = base_name + @codec.ext_index
-  let has_index = storage.exists(index_path, @storage.Index).wait()
+  let has_index = @storage.async_exists(storage, index_path, @storage.Index)
 
   if has_index {
-    let index_bytes = storage.read(index_path, @storage.Index).wait()
+    let index_bytes = @storage.async_read(storage, index_path, @storage.Index)
     let decoded = match @segment.decode_index_file(index_bytes) {
       None => abort("Invalid index file")
       Some(d) => d
     }
 
-    let manifest_bytes = storage
-      .read(base_name + @codec.ext_manifest, @storage.Index)
-      .wait()
+    let manifest_bytes = @storage.async_read(
+      storage,
+      base_name + @codec.ext_manifest,
+      @storage.Index,
+    )
     let manifest = match deserialize_manifest(manifest_bytes) {
       None => abort("Invalid manifest")
       Some(m) => m
@@ -88,9 +94,11 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
       let reader = match seg_readers.get(entry.ptr.segment) {
         Some(r) => r
         None => {
-          let data = storage
-            .read(entry.ptr.segment + @codec.ext_segment, @storage.Data)
-            .wait()
+          let data = @storage.async_read(
+            storage,
+            entry.ptr.segment + @codec.ext_segment,
+            @storage.Data,
+          )
           let r = match @segment.SegmentReader::from_bytes(
             entry.ptr.segment,
             data,
@@ -113,9 +121,11 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
   }
 
   // Slow path: read from manifest
-  let manifest_bytes = storage
-    .read(base_name + @codec.ext_manifest, @storage.Index)
-    .wait()
+  let manifest_bytes = @storage.async_read(
+    storage,
+    base_name + @codec.ext_manifest,
+    @storage.Index,
+  )
   let manifest = match deserialize_manifest(manifest_bytes) {
     None => abort("Invalid manifest")
     Some(m) => m
@@ -127,9 +137,11 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
 
   // Determine dimension from first segment
   let first_seg = manifest.segments[0]
-  let first_data = storage
-    .read(first_seg.name + @codec.ext_segment, @storage.Data)
-    .wait()
+  let first_data = @storage.async_read(
+    storage,
+    first_seg.name + @codec.ext_segment,
+    @storage.Data,
+  )
   let first_reader = match @segment.SegmentReader::from_bytes(
     first_seg.name,
     first_data,
@@ -151,9 +163,11 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
 
   // Load all segments
   for seg in manifest.segments {
-    let data = storage
-      .read(seg.name + @codec.ext_segment, @storage.Data)
-      .wait()
+    let data = @storage.async_read(
+      storage,
+      seg.name + @codec.ext_segment,
+      @storage.Data,
+    )
     let reader = match @segment.SegmentReader::from_bytes(seg.name, data) {
       None => continue
       Some(r) => r
@@ -183,7 +197,6 @@ struct MemorySegment {
 
 ///|
 /// Build segments in memory without writing to storage.
-/// Used by async_save_segmented to separate computation from I/O.
 fn write_segments_in_memory(
   store : @store.CoreStore,
   opts : SegmentOptions,

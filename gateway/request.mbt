@@ -41,7 +41,7 @@ pub fn parse_request_path(path : String) -> Array[String] {
 
 ///|
 /// Execute a request using a raw path such as `/collections/demo?foo=bar`.
-pub fn[S : @storage.Storage] execute_path_request(
+pub async fn[S : @storage.AsyncStorage] execute_path_request(
   manager : CollectionManager[S],
   http_method : String,
   target : String,

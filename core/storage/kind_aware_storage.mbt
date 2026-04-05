@@ -80,3 +80,45 @@ pub impl Storage for KindAwareStorage with exists(self, path, kind) {
 pub impl Storage for KindAwareStorage with list(self, kind) {
   self.map_for(kind).keys().collect()
 }
+
+///|
+/// AsyncStorage implementation for KindAwareStorage.
+/// Like MemoryStorage, resolve is called synchronously.
+pub impl AsyncStorage for KindAwareStorage with async_read(self, path, kind, resolve, reject) {
+  match self.map_for(kind).get(path) {
+    None => reject("Not found: " + path)
+    Some(data) => resolve(data)
+  }
+}
+
+///|
+pub impl AsyncStorage for KindAwareStorage with async_write(self, path, data, kind, resolve, _reject) {
+  self.map_for(kind).set(path, data)
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for KindAwareStorage with async_atomic_write(self, path, data, kind, resolve, _reject) {
+  self.map_for(kind).set(path, data)
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for KindAwareStorage with async_del(self, path, kind, resolve, reject) {
+  if self.map_for(kind).contains(path) {
+    self.map_for(kind).remove(path)
+    resolve()
+  } else {
+    reject("Not found: " + path)
+  }
+}
+
+///|
+pub impl AsyncStorage for KindAwareStorage with async_exists(self, path, kind, resolve, _reject) {
+  resolve(self.map_for(kind).contains(path))
+}
+
+///|
+pub impl AsyncStorage for KindAwareStorage with async_list(self, kind, resolve, _reject) {
+  resolve(self.map_for(kind).keys().collect())
+}

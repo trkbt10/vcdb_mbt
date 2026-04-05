@@ -9,6 +9,8 @@
  * - `@vcdb/server/storage/opfs` - Browser OPFS
  * - `@vcdb/server/storage/local-storage` - Browser localStorage
  * - `@vcdb/server/storage/cache` - Browser Cache API
+ * - `@vcdb/server/storage/r2` - Cloudflare R2
+ * - `@vcdb/server/storage/do-kv` - Cloudflare Durable Object storage
  * - `@vcdb/server/wasm` - MoonBit WASM VectorDB
  */
 

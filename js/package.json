@@ -37,6 +37,14 @@
       "types": "./dist/storage/service-worker.d.ts",
       "import": "./dist/storage/service-worker.js"
     },
+    "./storage/r2": {
+      "types": "./dist/storage/r2.d.ts",
+      "import": "./dist/storage/r2.js"
+    },
+    "./storage/do-kv": {
+      "types": "./dist/storage/do-kv.d.ts",
+      "import": "./dist/storage/do-kv.js"
+    },
     "./storage/wasm-bridge": {
       "types": "./dist/storage/wasm-bridge.d.ts",
       "import": "./dist/storage/wasm-bridge.js"

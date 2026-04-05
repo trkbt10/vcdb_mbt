@@ -360,6 +360,90 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
 }
 
 ///|
+/// Get safe copy length - up to the last decodable record boundary
+/// Returns header length (12) if no records are decodable
+fn get_safe_copy_length(data : Bytes) -> Int {
+  if data.length() < @codec.header_size {
+    return 0
+  }
+  let r = @binary.BinaryReader::new(data)
+  // Verify header first
+  if !verify_wal_header(r) {
+    return 0
+  }
+  // Calculate body length (without footer)
+  let body_len = wal_body_length(data)
+  // Track position after last successful decode
+  let mut last_valid_pos = @codec.header_size // After header
+  while r.position() < body_len {
+    match decode_wal_record(r) {
+      None => break // Stop at first malformed record
+      Some(_) => last_valid_pos = r.position()
+    }
+  }
+  last_valid_pos
+}
+
+///|
+/// Replay WAL binary data into a CoreStore (no Storage dependency).
+/// This is the SoT for WAL replay logic. Used by:
+/// - AsyncWalRuntime::replay_into (reads from AsyncStorage, then delegates here)
+/// - JS persistent exports (passes WAL bytes directly)
+///
+/// Returns the number of records applied. Returns 0 for empty/invalid data.
+pub fn replay_wal_data(
+  data : Bytes,
+  store : @store.CoreStore,
+  cutoff_ts? : Int64 = 0L,
+) -> Int {
+  if data.length() < @codec.header_size {
+    return 0
+  }
+  let header_reader = @binary.BinaryReader::new(data)
+  if !verify_wal_header(header_reader) {
+    return 0
+  }
+  if !verify_wal_checksum(data) {
+    return 0
+  }
+  let records = if cutoff_ts > 0L {
+    filter_wal_by_timestamp(data, cutoff_ts)
+  } else {
+    decode_wal_records(data)
+  }
+  let mut applied = 0
+  for record in records {
+    match record.record_type {
+      Upsert =>
+        match record.vector {
+          None => ()
+          Some(vector) => {
+            let attrs = match record.attrs {
+              None => @types.empty_attrs()
+              Some(a) => a
+            }
+            let _ = store.add_or_update(record.id, vector, attrs, upsert=true)
+            applied = applied + 1
+          }
+        }
+      Remove => {
+        let _ = store.remove_by_id(record.id)
+        applied = applied + 1
+      }
+      SetAttrs =>
+        match record.attrs {
+          None => ()
+          Some(attrs) => {
+            let _ = store.update_attrs(record.id, attrs)
+            applied = applied + 1
+          }
+        }
+    }
+  }
+  applied
+}
+
+///|
 /// Filter WAL records by timestamp — returns only records with timestamp <= cutoff.
 /// Used for read-at-timestamp (consistent cross-shard reads).
 pub fn filter_wal_by_timestamp(

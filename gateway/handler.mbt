@@ -1,9 +1,12 @@
 ///|
 /// Command handlers for gateway API
 /// These handlers implement the business logic for CLI and HTTP operations
+///
+/// Write operations are async (WAL-before-state via PersistentVectorDB).
+/// Read operations are sync (in-memory VectorDB).
 
 ///|
-/// Handle search in a collection
+/// Handle search in a collection (sync — reads from in-memory VectorDB)
 pub fn handle_search(
   db : @vcdb.VectorDB,
   req : SearchRequest,
@@ -12,7 +15,6 @@ pub fn handle_search(
   if req.vector.length() != dim {
     return Err(DimensionMismatch(expected=dim, got=req.vector.length()))
   }
-  // Note: filter is not yet implemented (would need to parse JSON filter to FilterExpr)
   let hits = db.search(req.vector, req.limit, None)
   let results : Array[SearchHitResponse] = []
   for hit in hits {
@@ -31,7 +33,7 @@ pub fn handle_search(
 }
 
 ///|
-/// Handle get point by ID
+/// Handle get point by ID (sync)
 pub fn handle_get_point(
   db : @vcdb.VectorDB,
   id : Int64,
@@ -44,7 +46,7 @@ pub fn handle_get_point(
 }
 
 ///|
-/// Handle scrolling points in a collection.
+/// Handle scrolling points in a collection (sync).
 pub fn handle_scroll(
   db : @vcdb.VectorDB,
   req : ScrollRequest,
@@ -80,8 +82,8 @@ pub fn handle_scroll(
 }
 
 ///|
-/// Handle collection creation
-pub fn[S : @storage.Storage] handle_create_collection(
+/// Handle collection creation (async — writes to storage)
+pub async fn[S : @storage.AsyncStorage] handle_create_collection(
   manager : CollectionManager[S],
   config : CollectionConfig,
 ) -> Result[Unit, GatewayError] {
@@ -89,8 +91,8 @@ pub fn[S : @storage.Storage] handle_create_collection(
 }
 
 ///|
-/// Handle collection deletion
-pub fn[S : @storage.Storage] handle_delete_collection(
+/// Handle collection deletion (async — writes to storage)
+pub async fn[S : @storage.AsyncStorage] handle_delete_collection(
   manager : CollectionManager[S],
   name : String,
 ) -> Result[Unit, GatewayError] {
@@ -98,16 +100,16 @@ pub fn[S : @storage.Storage] handle_delete_collection(
 }
 
 ///|
-/// Handle list collections
-pub fn[S : @storage.Storage] handle_list_collections(
+/// Handle list collections (async — may load from storage)
+pub async fn[S : @storage.AsyncStorage] handle_list_collections(
   manager : CollectionManager[S],
 ) -> CollectionsResponse {
   { collections: manager.list_info() }
 }
 
 ///|
-/// Handle get collection info
-pub fn[S : @storage.Storage] handle_get_collection(
+/// Handle get collection info (async — may load from storage)
+pub async fn[S : @storage.AsyncStorage] handle_get_collection(
   manager : CollectionManager[S],
   name : String,
 ) -> Result[CollectionInfo, GatewayError] {
@@ -118,8 +120,8 @@ pub fn[S : @storage.Storage] handle_get_collection(
 }
 
 ///|
-/// Convenience: Handle request with collection name
-pub fn[S : @storage.Storage, T] with_collection(
+/// Convenience: Handle request with collection name (async)
+pub async fn[S : @storage.AsyncStorage, T] with_collection(
   manager : CollectionManager[S],
   name : String,
   handler : (@vcdb.VectorDB) -> Result[T, GatewayError],
@@ -164,8 +166,9 @@ fn error_to_string(e : GatewayError) -> String {
 }
 
 ///|
-/// Parse and execute an API request, returning JSON response
-pub fn[S : @storage.Storage] execute_request(
+/// Parse and execute an API request, returning JSON response.
+/// All operations are now async since collection loading and writes require I/O.
+pub async fn[S : @storage.AsyncStorage] execute_request(
   manager : CollectionManager[S],
   http_method : String,
   path : Array[String],
@@ -184,7 +187,6 @@ pub fn[S : @storage.Storage] execute_request(
           let base = CollectionConfig::from_json(json).unwrap_or(
             CollectionConfig::default(name, 128),
           )
-          // Create new config with the URL name
           { ..base, name, }
         }
         None => CollectionConfig::default(name, 128)

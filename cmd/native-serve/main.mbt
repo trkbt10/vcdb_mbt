@@ -116,7 +116,7 @@ async fn run_server(options : ServerOptions) -> Unit {
 }
 
 ///|
-async fn[S : @storage.Storage] run_server_with_router(
+async fn[S : @storage.AsyncStorage] run_server_with_router(
   options : ServerOptions,
   router : @http.Router[S],
 ) -> Unit {
