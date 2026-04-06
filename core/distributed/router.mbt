@@ -53,3 +53,54 @@ pub fn all_shards(crush_map : @placement.CrushMap) -> Array[Int] {
   }
   shards
 }
+
+///|
+/// List only non-Failed shard indices for fan-out operations.
+///
+/// Excludes shards that the health tracker has marked as Failed.
+/// Degraded shards are still included (they may be slow but are reachable).
+pub fn healthy_shards_for_fanout(
+  crush_map : @placement.CrushMap,
+  tracker : ShardHealthTracker,
+) -> Array[Int] {
+  let shards : Array[Int] = []
+  for i in 0..<crush_map.pgs {
+    if tracker.get_status(i) != Failed {
+      shards.push(i)
+    }
+  }
+  shards
+}
+
+///|
+/// Determine which shard owns a vector ID, with health awareness.
+///
+/// Returns None if the owning shard is Failed, indicating the
+/// caller should handle the unavailability (e.g., try a replica).
+pub fn shard_for_id_with_health(
+  id : @types.VectorId,
+  crush_map : @placement.CrushMap,
+  tracker : ShardHealthTracker,
+) -> Int? {
+  let result = @placement.crush_locate(id, crush_map)
+  let pg = result.pg
+  if tracker.get_status(pg) == Failed {
+    None
+  } else {
+    Some(pg)
+  }
+}
+
+///|
+/// Get all replica target keys for a given vector ID.
+///
+/// Returns the ordered list of target keys from CRUSH placement.
+/// The first key is the primary; subsequent keys are replicas.
+/// Used by quorum logic to determine where to send reads/writes.
+pub fn replicas_for_id(
+  id : @types.VectorId,
+  crush_map : @placement.CrushMap,
+) -> Array[String] {
+  let result = @placement.crush_locate(id, crush_map)
+  result.primaries
+}

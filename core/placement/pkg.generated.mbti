@@ -13,9 +13,17 @@ pub fn[S : @storage.Storage] apply_rebalance(Array[MovePlan], Map[String, S]) ->
 
 pub fn apply_rebalance_memory(Array[MovePlan], Map[String, @storage.MemoryStorage]) -> Unit raise @storage.IOError
 
+pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(AsyncRebalanceState, Map[String, S]) -> PlacementManifest raise @storage.AsyncIOError
+
+pub async fn[S : @storage.AsyncStorage] async_load_segmented(String, S) -> @store.CoreStore
+
+pub async fn[S : @storage.AsyncStorage] async_save_segmented(@store.CoreStore, String, Int, S) -> Unit
+
 pub fn crush_locate(@types.VectorId, CrushMap) -> LocateResult
 
 pub fn crush_primary(@types.VectorId, CrushMap) -> String?
+
+pub fn[S : @storage.Storage] load_segmented(String, S) -> @store.CoreStore raise @storage.IOError
 
 pub fn[S : @storage.Storage] load_store_distributed(String, Map[String, S], S) -> @store.CoreStore raise @storage.IOError
 
@@ -25,6 +33,12 @@ pub fn plan_rebalance(PlacementManifest, CrushMap) -> Array[MovePlan]
 
 pub fn[S : @storage.Storage] read_segments_from_manifest(PlacementManifest, Map[String, S]) -> Array[(@types.VectorId, Array[Double], @types.Attrs)] raise @storage.IOError
 
+pub fn reconstruct_from_index(Bytes, Bytes, Map[String, Bytes]) -> LoadDistributedResult?
+
+pub fn reconstruct_from_segments(Bytes, Map[String, Bytes]) -> LoadDistributedResult?
+
+pub fn[S : @storage.Storage] save_segmented(@store.CoreStore, String, Int, S) -> Unit raise @storage.IOError
+
 pub fn[S : @storage.Storage] save_store_distributed(@store.CoreStore, SegmentOptions, Map[String, S], S) -> PlacementManifest raise @storage.IOError
 
 pub fn[S : @storage.Storage] save_store_distributed_with_ann(@store.CoreStore, SegmentOptions, Map[String, S], S, @types.Strategy, Bytes?) -> PlacementManifest raise @storage.IOError
@@ -33,26 +47,42 @@ pub fn update_manifest_after_rebalance(PlacementManifest, Array[MovePlan], Crush
 
 pub fn[S : @storage.Storage] write_segments_from_store(@store.CoreStore, SegmentOptions, Map[String, S]) -> SegmentResult raise @storage.IOError
 
+pub fn write_segments_in_memory(@store.CoreStore, SegmentOptions) -> MemorySegmentResult
+
 // Errors
 
 // Types and methods
+pub struct AsyncRebalanceState {
+  plan : Array[MovePlan]
+  mut moves_completed : Int
+  mut bytes_moved : Int64
+  mut phase : RebalancePhase
+  manifest : PlacementManifest
+  new_crush : CrushMap
+  new_epoch : Int
+  new_ts : Int64
+}
+pub fn AsyncRebalanceState::from_plan(Array[MovePlan], PlacementManifest, CrushMap, Int, Int64) -> Self
+pub fn AsyncRebalanceState::is_complete(Self) -> Bool
+pub fn AsyncRebalanceState::new(PlacementManifest, CrushMap, Int, Int64) -> Self
+pub fn AsyncRebalanceState::progress(Self) -> RebalanceProgress
+pub fn AsyncRebalanceState::remaining_moves(Self) -> Array[MovePlan]
+
 pub struct CrushMap {
   pgs : Int
   replicas : Int
   targets : Array[CrushTarget]
-}
+} derive(Show)
 pub fn CrushMap::new(Int, Int, Array[CrushTarget]) -> Self
-pub impl Show for CrushMap
 
 pub struct CrushTarget {
   key : String
   weight : Double
   zone : String?
-}
+} derive(Show)
 pub fn CrushTarget::new(String) -> Self
 pub fn CrushTarget::with_weight(String, Double) -> Self
 pub fn CrushTarget::with_zone(String, Double, String) -> Self
-pub impl Show for CrushTarget
 
 pub struct LoadDistributedResult {
   store : @store.CoreStore
@@ -63,15 +93,25 @@ pub struct LoadDistributedResult {
 pub struct LocateResult {
   pg : Int
   primaries : Array[String]
+} derive(Show)
+
+pub(all) struct MemorySegment {
+  name : String
+  target_key : String
+  data : Bytes
 }
-pub impl Show for LocateResult
+
+pub(all) struct MemorySegmentResult {
+  segments : Array[MemorySegment]
+  entries : Array[@segment.IndexEntry]
+  manifest : PlacementManifest
+}
 
 pub(all) struct MovePlan {
   name : String
   from : String
   to : String
-}
-pub impl Show for MovePlan
+} derive(Show)
 
 pub(all) struct PlacementManifest {
   base : String
@@ -79,8 +119,22 @@ pub(all) struct PlacementManifest {
   crush : CrushMap
   epoch : Int
   commit_ts : Int64
-}
-pub impl Show for PlacementManifest
+} derive(Show)
+
+pub(all) enum RebalancePhase {
+  Planning
+  Copying(Int, Int)
+  Updating
+  Complete
+  Failed(String)
+} derive(Eq, Show)
+
+pub(all) struct RebalanceProgress {
+  phase : RebalancePhase
+  moves_total : Int
+  moves_completed : Int
+  bytes_moved : Int64
+} derive(Show)
 
 pub struct SaveDistributedOptions {
   segment_opts : SegmentOptions
@@ -93,8 +147,7 @@ pub fn SaveDistributedOptions::default(String, CrushMap) -> Self
 pub(all) struct SegmentEntry {
   name : String
   target_key : String
-}
-pub impl Show for SegmentEntry
+} derive(Show)
 
 pub struct SegmentOptions {
   base_name : String
@@ -103,6 +156,7 @@ pub struct SegmentOptions {
   segment_bytes : Int
 }
 pub fn SegmentOptions::default(String, CrushMap) -> Self
+pub fn SegmentOptions::segmented(String, CrushMap, Int) -> Self
 
 pub struct SegmentResult {
   entries : Array[@segment.IndexEntry]

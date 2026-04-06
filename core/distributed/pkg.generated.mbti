@@ -1,0 +1,217 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/core/distributed"
+
+import {
+  "trkbt10/vcdb/core/persistence/wal",
+  "trkbt10/vcdb/core/placement",
+  "trkbt10/vcdb/core/types",
+}
+
+// Values
+pub fn all_shards(@placement.CrushMap) -> Array[Int]
+
+pub fn apply_wal_shipment(Bytes, WalShipment) -> Bytes
+
+pub fn evaluate_read_quorum(Array[ReplicaReadResult], QuorumConfig) -> QuorumReadResult
+
+pub fn evaluate_write_quorum(Array[ReplicaWriteResult], QuorumConfig) -> QuorumWriteResult
+
+pub fn extract_wal_since(Bytes, Int64, Int) -> WalShipment
+
+pub fn group_by_shard(Array[(@types.VectorId, Array[Double], @types.Attrs)], @placement.CrushMap) -> Map[Int, Array[(@types.VectorId, Array[Double], @types.Attrs)]]
+
+pub fn healthy_shards_for_fanout(@placement.CrushMap, ShardHealthTracker) -> Array[Int]
+
+pub fn merge_count(Array[ShardCountResult]) -> MergedCountResult
+
+pub fn merge_divergent_wals(Bytes, Bytes, Int64) -> (Bytes, Array[ConflictRecord])
+
+pub fn merge_scroll(Array[ShardScrollResult], Int) -> MergedScrollResult
+
+pub fn merge_search(Array[ShardSearchResult], Int) -> MergedSearchResult
+
+pub fn recovery_plan(PartitionState, ReplicationState, Array[Int]) -> Array[(Int, Int64)]
+
+pub fn replicas_for_id(@types.VectorId, @placement.CrushMap) -> Array[String]
+
+pub fn resolve_conflicts_lww(Array[@wal.WalRecord], Array[@wal.WalRecord]) -> (Array[@wal.WalRecord], Array[ConflictRecord])
+
+pub fn select_read_replicas(@types.VectorId, @placement.CrushMap, Array[String]) -> Array[String]
+
+pub fn select_write_replicas(@types.VectorId, @placement.CrushMap) -> Array[String]
+
+pub fn shard_for_id(@types.VectorId, @placement.CrushMap) -> Int
+
+pub fn shard_for_id_with_health(@types.VectorId, @placement.CrushMap, ShardHealthTracker) -> Int?
+
+// Errors
+
+// Types and methods
+pub(all) struct ConflictRecord {
+  id : @types.VectorId
+  local_ts : Int64
+  remote_ts : Int64
+  resolution : ConflictResolution
+}
+
+pub(all) enum ConflictResolution {
+  KeepLocal
+  KeepRemote
+  TieBreakById
+} derive(Eq, Show)
+
+pub(all) struct MergedCountResult {
+  count : Int
+  succeeded : Array[Int]
+  failed : Array[(Int, String)]
+}
+
+pub(all) struct MergedScrollResult {
+  entries : Array[ShardScrollEntry]
+  succeeded : Array[Int]
+  failed : Array[(Int, String)]
+}
+
+pub(all) struct MergedSearchResult {
+  hits : Array[@types.SearchHit]
+  succeeded : Array[Int]
+  failed : Array[(Int, String)]
+}
+
+pub(all) struct PartitionState {
+  statuses : Map[Int, PartitionStatus]
+}
+pub fn PartitionState::detect_partition(Self, Int, Int64) -> Unit
+pub fn PartitionState::get_status(Self, Int) -> PartitionStatus
+pub fn PartitionState::is_partitioned(Self, Int) -> Bool
+pub fn PartitionState::new(Int) -> Self
+pub fn PartitionState::partitioned_shards(Self) -> Array[(Int, Int64)]
+pub fn PartitionState::resolve_partition(Self, Int) -> Unit
+
+pub(all) enum PartitionStatus {
+  Connected
+  Partitioned(Int64)
+} derive(Eq, Show)
+
+pub(all) struct QuorumConfig {
+  n : Int
+  w : Int
+  r : Int
+}
+pub fn QuorumConfig::is_strongly_consistent(Self) -> Bool
+pub fn QuorumConfig::new(Int, Int, Int) -> Self
+
+pub(all) struct QuorumReadResult {
+  quorum_met : Bool
+  value : Bytes?
+  achieved : Int
+  required : Int
+  consistent : Bool
+}
+
+pub(all) struct QuorumWriteResult {
+  quorum_met : Bool
+  achieved : Int
+  required : Int
+  succeeded : Array[String]
+  failed : Array[(String, String)]
+}
+
+pub(all) struct ReplicaPosition {
+  replica_key : String
+  last_applied_ts : Int64
+}
+
+pub(all) struct ReplicaReadResult {
+  replica_key : String
+  value : Bytes?
+  error : String?
+}
+
+pub(all) struct ReplicaWriteResult {
+  replica_key : String
+  success : Bool
+  error : String?
+}
+
+pub(all) struct ReplicationLag {
+  replica_key : String
+  lag_ns : Int64
+  lag_records : Int
+}
+
+pub(all) struct ReplicationState {
+  positions : Map[String, ReplicaPosition]
+  mut primary_max_ts : Int64
+}
+pub fn ReplicationState::compute_replication_lag(Self) -> Array[ReplicationLag]
+pub fn ReplicationState::is_replica_caught_up(Self, String, Int64) -> Bool
+pub fn ReplicationState::new(Array[String]) -> Self
+pub fn ReplicationState::replica_position(Self, String) -> Int64
+pub fn ReplicationState::update_primary_ts(Self, Bytes) -> Unit
+pub fn ReplicationState::update_replica_position(Self, String, Int64) -> Unit
+
+pub(all) struct ShardCountResult {
+  shard_id : Int
+  count : Int
+  error : String?
+}
+
+pub(all) struct ShardHealth {
+  shard_id : Int
+  status : ShardStatus
+  last_success_ts : Int64
+  last_failure_ts : Int64
+  consecutive_failures : Int
+  last_error : String?
+}
+
+pub(all) struct ShardHealthTracker {
+  shards : Map[Int, ShardHealth]
+  failure_threshold : Int
+}
+pub fn ShardHealthTracker::all_health(Self) -> Array[ShardHealth]
+pub fn ShardHealthTracker::failed_shards(Self) -> Array[Int]
+pub fn ShardHealthTracker::get_health(Self, Int) -> ShardHealth?
+pub fn ShardHealthTracker::get_status(Self, Int) -> ShardStatus
+pub fn ShardHealthTracker::healthy_shards(Self) -> Array[Int]
+pub fn ShardHealthTracker::new(Int, failure_threshold? : Int) -> Self
+pub fn ShardHealthTracker::report_failure(Self, Int, Int64, String) -> Unit
+pub fn ShardHealthTracker::report_success(Self, Int, Int64) -> Unit
+pub fn ShardHealthTracker::shard_count(Self) -> Int
+
+pub(all) struct ShardScrollEntry {
+  id : @types.VectorId
+  attrs : @types.Attrs
+}
+
+pub(all) struct ShardScrollResult {
+  shard_id : Int
+  entries : Array[ShardScrollEntry]
+  error : String?
+}
+
+pub(all) struct ShardSearchResult {
+  shard_id : Int
+  hits : Array[@types.SearchHit]
+  error : String?
+}
+
+pub(all) enum ShardStatus {
+  Healthy
+  Degraded
+  Failed
+} derive(Eq, Show)
+
+pub(all) struct WalShipment {
+  source_shard : Int
+  from_ts : Int64
+  to_ts : Int64
+  data : Bytes
+  record_count : Int
+}
+
+// Type aliases
+
+// Traits
+
