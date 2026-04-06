@@ -291,7 +291,7 @@ export function createDOStorage(options: DOStorageOptions): StorageAdapter {
 /* ── Lower-level utilities for advanced use (WAL writer, etc.) ── */
 
 /**
- * Kind-agnostic key-value store — same interface as usbkr's DOKeyValueStore.
+ * Kind-agnostic key-value store for advanced use cases.
  * For advanced patterns like direct WAL management where StorageKind
  * routing is handled at a higher level.
  */

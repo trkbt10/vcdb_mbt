@@ -1,99 +1,94 @@
 /**
- * @file Shard router for distributing vectors across multiple VcdbStore DOs.
+ * @file Shard router — scatter-gather across multiple VcdbStore DOs.
  *
- * Each DO shard holds a partial index (~thousands of vectors each).
- * Upsert routes by vector ID hash. Search queries all shards in parallel
- * and merges results by score (scatter-gather).
+ * Uses vcdb core's CRUSH placement (crush_placement_group via FFI)
+ * as the single source of truth for vector-to-shard mapping.
+ * This ensures data placement and request routing use the same hash.
  *
- * This enables scaling beyond a single DO's 128MB memory limit.
- *
- * Based on production patterns from usbkr (v5 shard format).
+ * This router exists because Cloudflare DO requires per-instance RPC
+ * dispatch: we need to know which DO stub to call, not just which
+ * storage to write to.
  */
-import type { VcdbStore, VcdbSearchHit } from "./vcdb-do.ts";
-import type { VcdbId, Bindings } from "../types.ts";
-import { idToNumeric } from "../types.ts";
+import type { VcdbStore } from "./vcdb-do.ts";
+import type { SearchHit } from "@vcdb/server/persistent";
+import type { MbInt64 } from "@vcdb/server/storage/persistent-bridge";
+import type { Bindings } from "../types.ts";
 
-const DEFAULT_SHARD_COUNT = 8;
-
-/** Determine shard index from a VcdbId. */
-const shardFor = (id: VcdbId, shardCount: number): number =>
-  Math.abs(idToNumeric(id) | 0) % shardCount;
+/** Reconstruct a JS number from hi/lo pair (for sort comparisons). */
+const idToNumeric = (id: MbInt64): number =>
+  (id.hi >>> 0) * 0x100000000 + (id.lo >>> 0);
 
 /**
- * Shard name version — increment when storage format or API breaks.
- * v5: IDs clamped to i32 (vcdb WAL replay loses IDs > 2^31-1 on JS target)
+ * Placement function — maps a MbInt64 to a shard index in [0, shardCount).
+ * Must be crush_placement_group from the WASM module.
  */
-const SHARD_VERSION = "v5";
+type PlacementFn = (id_hi: number, id_lo: number, pg_count: number) => number;
 
 /** Get a DO stub for a specific shard. */
 const getShardStub = (
   env: Bindings,
   shardIndex: number,
 ): DurableObjectStub<VcdbStore> => {
-  const doId = env.VCDB_STORE.idFromName(
-    `${SHARD_VERSION}-shard-${shardIndex}`,
-  );
+  const doId = env.VCDB_STORE.idFromName(`shard-${shardIndex}`);
   return env.VCDB_STORE.get(doId);
 };
 
 export type ShardRouter = {
-  /** Upsert points — routes each point to its shard by ID hash. */
   upsert(
     env: Bindings,
     points: readonly {
-      id: VcdbId;
+      id: MbInt64;
       vector: number[];
       payload: Record<string, unknown>;
     }[],
   ): Promise<void>;
 
-  /** Search all shards in parallel, merge by score, return top K. */
   search(
     env: Bindings,
     vector: number[],
     topK: number,
     filterJson?: string,
-  ): Promise<readonly VcdbSearchHit[]>;
+  ): Promise<readonly SearchHit[]>;
 
-  /** Get a single vector + payload by VcdbId. */
   get(
     env: Bindings,
-    id: VcdbId,
+    id: MbInt64,
   ): Promise<{
     vector: number[];
     payload: Record<string, unknown>;
   } | null>;
 
-  /** Count vectors matching a filter across all shards. */
   countFiltered(env: Bindings, filterJson: string): Promise<number>;
 
-  /** Scroll all shards with a filter, merge by ID ascending, return up to limit. */
   scrollFiltered(
     env: Bindings,
     filterJson: string,
-    offset: VcdbId | undefined,
+    offset: MbInt64 | undefined,
     limit: number,
   ): Promise<
-    readonly { id: VcdbId; payload: Record<string, unknown> | null }[]
+    readonly { id: MbInt64; payload: Record<string, unknown> | null }[]
   >;
 
   readonly shardCount: number;
 };
 
 export function createShardRouter(
-  shardCount: number = DEFAULT_SHARD_COUNT,
+  shardCount: number,
+  placementGroup: PlacementFn,
 ): ShardRouter {
+  const shardFor = (id: MbInt64): number =>
+    placementGroup(id.hi, id.lo, shardCount);
+
   return {
     shardCount,
 
     async upsert(env, points) {
-      // Group points by shard
       const buckets = new Map<
         number,
-        { id: VcdbId; vector: number[]; payload: Record<string, unknown> }[]
+        { id: MbInt64; vector: number[]; payload: Record<string, unknown> }[]
       >();
       for (const point of points) {
-        const shard = shardFor(point.id, shardCount);
+        const shard = shardFor(point.id);
         const bucket = buckets.get(shard);
         if (bucket) {
           bucket.push(point);
@@ -102,7 +97,6 @@ export function createShardRouter(
         }
       }
 
-      // Write to each shard in parallel
       const writes: Promise<void>[] = [];
       for (const [shardIndex, shardPoints] of buckets) {
         const stub = getShardStub(env, shardIndex);
@@ -112,8 +106,7 @@ export function createShardRouter(
     },
 
     async get(env, id) {
-      const shard = shardFor(id, shardCount);
-      const stub = getShardStub(env, shard);
+      const stub = getShardStub(env, shardFor(id));
       const result: {
         found: boolean;
         vector: number[];
@@ -127,27 +120,24 @@ export function createShardRouter(
     async countFiltered(env, filterJson) {
       const counts: Promise<number>[] = [];
       for (let i = 0; i < shardCount; i++) {
-        const stub = getShardStub(env, i);
-        counts.push(stub.countFiltered(filterJson));
+        counts.push(getShardStub(env, i).countFiltered(filterJson));
       }
       const shardCounts = await Promise.all(counts);
       return shardCounts.reduce((sum, n) => sum + n, 0);
     },
 
     async scrollFiltered(env, filterJson, offset, limit) {
-      // Each shard returns its own filtered+sorted results.
-      // Over-fetch from each shard (limit entries each), then merge globally.
       const fetches: Promise<
-        readonly { id: VcdbId; payload: Record<string, unknown> | null }[]
+        readonly { id: MbInt64; payload: Record<string, unknown> | null }[]
       >[] = [];
       for (let i = 0; i < shardCount; i++) {
-        const stub = getShardStub(env, i);
-        fetches.push(stub.scrollFiltered(filterJson, offset, limit));
+        fetches.push(
+          getShardStub(env, i).scrollFiltered(filterJson, offset, limit),
+        );
       }
       const shardResults = await Promise.all(fetches);
 
-      // Merge all shard results, sort by ID ascending, take top `limit`
-      const all: { id: VcdbId; payload: Record<string, unknown> | null }[] = [];
+      const all: { id: MbInt64; payload: Record<string, unknown> | null }[] = [];
       for (const results of shardResults) {
         for (const entry of results) {
           all.push(entry);
@@ -158,16 +148,13 @@ export function createShardRouter(
     },
 
     async search(env, vector, topK, filterJson = "") {
-      // Query all shards in parallel
-      const searches: Promise<readonly VcdbSearchHit[]>[] = [];
+      const searches: Promise<readonly SearchHit[]>[] = [];
       for (let i = 0; i < shardCount; i++) {
-        const stub = getShardStub(env, i);
-        searches.push(stub.search(vector, topK, filterJson));
+        searches.push(getShardStub(env, i).search(vector, topK, filterJson));
       }
       const shardResults = await Promise.all(searches);
 
-      // Merge and sort by score descending, take top K
-      const all: VcdbSearchHit[] = [];
+      const all: SearchHit[] = [];
       for (const results of shardResults) {
         for (const hit of results) {
           all.push(hit);

@@ -223,6 +223,27 @@ fn kind_to_int(kind : @storage.StorageKind) -> Int {
 }
 
 // ============================================================================
+// CRUSH placement — deterministic vector-to-shard mapping
+// ============================================================================
+
+///|
+/// Compute placement group for a vector ID.
+/// This is the SoT for shard routing — JS consumers MUST use this
+/// instead of implementing their own hash function.
+///
+/// Returns a placement group number in [0, pg_count).
+pub fn crush_placement_group(
+  id_hi : Int,
+  id_lo : Int,
+  pg_count : Int,
+) -> Int {
+  let vid = vid_from_pair(id_hi, id_lo)
+  let map = @placement.CrushMap::new(pg_count, 1, [])
+  let result = @placement.crush_locate(vid, map)
+  result.pg
+}
+
+// ============================================================================
 // Gateway API — JS exports are in gateway_exports.mbt (JS-only)
 // ============================================================================
 

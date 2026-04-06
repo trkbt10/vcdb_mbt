@@ -1,8 +1,6 @@
 # vcdb on Cloudflare Durable Objects + R2
 
-Production-grade vcdb deployment using Durable Objects for sharded vector storage with R2 snapshot persistence.
-
-Based on production patterns from [usbkr](https://github.com/trkbt10/usbkr).
+Sharded vcdb deployment using Durable Objects for horizontal scaling with R2 snapshot persistence.
 
 ## Architecture
 
@@ -18,9 +16,9 @@ Based on production patterns from [usbkr](https://github.com/trkbt10/usbkr).
 ```
 
 Each Durable Object shard:
-- Hosts an isolated vcdb WASM instance
-- Manages its own WAL (Write-Ahead Log) in DO storage
-- Snapshots to R2 on checkpoint (every 50 mutations or 100KB WAL)
+- Hosts a vcdb instance via the `persistent_*` FFI API
+- WAL management, checkpointing, and crash recovery are handled by vcdb core
+- DO storage holds WAL data, R2 holds snapshots
 - Recovers via WAL replay on cold start
 
 ## Files
@@ -29,13 +27,10 @@ Each Durable Object shard:
 examples/cloudflare-do/
 ├── src/
 │   ├── worker.ts           # Worker entry point + HTTP API
-│   ├── types.ts            # Shared types, ID conversion
-│   ├── vcdb-lib.d.ts       # WASM FFI type declarations
+│   ├── types.ts            # Shared types, ID utilities
 │   └── infra/
 │       ├── vcdb-do.ts      # Durable Object — single vcdb shard
-│       ├── shard-router.ts # Scatter-gather across DO shards
-│       ├── wal-writer.ts   # WAL buffer + checkpoint management
-│       └── r2-store.ts     # R2 adapter (DOKeyValueStore interface)
+│       └── shard-router.ts # Scatter-gather across DO shards
 ├── wrangler.jsonc
 ├── package.json
 └── tsconfig.json
@@ -48,10 +43,10 @@ examples/cloudflare-do/
 - Search queries all shards in parallel, merges by score descending
 - Upsert groups points by shard, writes each bucket in parallel
 
-### WAL Persistence
-- **DO storage**: WAL segments (write coalescing for atomicity)
+### Persistence (via persistent_* API)
+- **DO storage**: WAL (write coalescing for atomicity, 120KB chunking)
 - **R2 storage**: Snapshots (5GB objects, no chunking needed)
-- **DO storage chunking**: 120KB chunks for values exceeding 128KB limit
+- **Auto-checkpoint**: Triggered by record count or WAL byte size threshold
 - **Crash safety**: Snapshot written before WAL truncation — replay is idempotent
 
 ### Instance ID Stability

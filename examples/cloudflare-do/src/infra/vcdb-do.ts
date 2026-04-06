@@ -4,11 +4,12 @@
  * Each DO shard gets its own vcdb instance_id — no global singleton.
  * Multiple shards sharing the same JS module are fully isolated.
  *
- * Uses the persistent_* FFI API which handles WAL management,
- * checkpointing, and crash recovery internally. This DO only needs
- * to register storage backends and call the persistent operations.
+ * This DO exists solely to satisfy Cloudflare's RPC constraint:
+ * each cross-DO method call requires a class method on the DO itself.
+ * It initializes PersistentDB on first access, then delegates all
+ * operations to it.
  *
- * Based on production patterns from usbkr.
+ * Based on production deployment patterns.
  */
 import { DurableObject } from "cloudflare:workers";
 import { createDOKeyValueStore } from "@vcdb/server/storage/do-kv";
@@ -16,67 +17,49 @@ import { createR2KeyValueStore } from "@vcdb/server/storage/r2";
 import {
   registerPersistentStorage,
   initPersistentDB,
-  destroyPersistentDB,
   type PersistentFFI,
 } from "@vcdb/server/storage/persistent-bridge";
-import type { VcdbId, Bindings } from "../types.ts";
-import { fnvHash } from "../types.ts";
+import { PersistentDB } from "@vcdb/server/persistent";
+import type { Bindings } from "../types.ts";
 
 const COLLECTION_NAME = "vectors";
 const DIMENSIONS = 1024;
 const INITIAL_CAPACITY = 1024;
 
-type VcdbLib = PersistentFFI;
-
-export type VcdbSearchHit = {
-  readonly id: VcdbId;
-  readonly score: number;
-  readonly payload: Record<string, unknown> | null;
-};
-
-const parsePayload = (json: string): Record<string, unknown> | null => {
-  if (!json) return null;
-  try {
-    return JSON.parse(json) as Record<string, unknown>;
-  } catch {
-    return null;
+/**
+ * Derive a stable u32 from a string via FNV-1a hash.
+ * DO IDs are hex strings (UUID-based); persistent_* API needs an Int
+ * instance_id. FNV-1a gives a deterministic mapping that survives
+ * DO restarts without requiring external state.
+ */
+const fnvHash = (key: string): number => {
+  let h = 0x811c9dc5;
+  for (const byte of new TextEncoder().encode(key)) {
+    h ^= byte;
+    h = Math.imul(h, 0x01000193) | 0;
   }
-};
-
-/** Current time as MoonBit Int64 (nanoseconds since epoch, hi/lo pair). */
-const nowNs = (): { hi: number; lo: number } => {
-  const ms = Date.now();
-  const ns = ms * 1_000_000;
-  return { hi: Math.floor(ns / 0x100000000), lo: ns >>> 0 };
+  return h >>> 0;
 };
 
 export class VcdbStore extends DurableObject<Bindings> {
-  private vcdb: VcdbLib | null = null;
-  /** vcdb instance ID — derived from DO ID, stable across restarts. */
+  private db: PersistentDB | null = null;
   private readonly instanceId: number;
   private initPromise: Promise<void> | null = null;
+  private _walStore;
+  private _snapshotStore;
 
   constructor(ctx: DurableObjectState, env: Bindings) {
     super(ctx, env);
 
-    // Stable instance ID derived from DO ID — survives DO restarts.
     this.instanceId = fnvHash(ctx.id.toString());
 
-    // R2 keys are prefixed with the DO ID to isolate each shard's data.
     const doPrefix = ctx.id.toString() + "/";
-    const walStore = createDOKeyValueStore(ctx.storage, "w:");
-    const snapshotStore = createR2KeyValueStore({
+    this._walStore = createDOKeyValueStore(ctx.storage, "w:");
+    this._snapshotStore = createR2KeyValueStore({
       bucket: env.VCDB_DATA,
       keyPrefix: doPrefix,
     });
-
-    // Store references for lazy initialization.
-    this._walStore = walStore;
-    this._snapshotStore = snapshotStore;
   }
-
-  private _walStore;
-  private _snapshotStore;
 
   private ensureInitialized(): Promise<void> {
     this.initPromise ??= this.doInit();
@@ -84,187 +67,70 @@ export class VcdbStore extends DurableObject<Bindings> {
   }
 
   private async doInit(): Promise<void> {
-    const vcdbLib: VcdbLib = await import("@vcdb/server/wasm/lib.js");
-    this.vcdb = vcdbLib;
+    const ffi: PersistentFFI = await import("@vcdb/server/wasm/lib.js");
 
-    // Register storage backends with the persistent FFI.
-    // This prefetches chunk indexes and wires callbacks.
     await registerPersistentStorage(
-      vcdbLib,
+      ffi,
       this.instanceId,
       this._walStore,
       this._snapshotStore,
     );
 
-    // Initialize: loads WAL + snapshot, replays, builds VectorDB.
-    await initPersistentDB(vcdbLib, this.instanceId, DIMENSIONS, INITIAL_CAPACITY, {
+    await initPersistentDB(ffi, this.instanceId, DIMENSIONS, INITIAL_CAPACITY, {
       collectionName: COLLECTION_NAME,
     });
 
-    const size = vcdbLib.persistent_db_size(this.instanceId);
+    this.db = new PersistentDB(ffi, this.instanceId);
+
     console.log(
-      `[VcdbStore] instanceId=${this.instanceId} initialized, size=${size}`,
+      `[VcdbStore] instanceId=${this.instanceId} initialized, size=${this.db.size()}`,
     );
   }
 
+  // ── DO RPC methods ────────────────────────────────────────
+  //
+  // Cloudflare DO RPC requires each operation to be a method on the
+  // DO class itself — we cannot return PersistentDB and let callers
+  // invoke methods on it. These thin methods exist solely for that
+  // constraint. Add methods here only when shard-router needs them.
+
+  /** @internal Used by shard-router */
   async upsert(
-    points: readonly {
-      id: VcdbId;
-      vector: number[];
-      payload: Record<string, unknown>;
-    }[],
+    points: Parameters<PersistentDB["upsert"]>[0],
   ): Promise<void> {
     await this.ensureInitialized();
-
-    const vcdbPoints = points.map((p) => ({
-      _0: p.id.hi,
-      _1: p.id.lo,
-      _2: p.vector,
-      _3: JSON.stringify(p.payload),
-    }));
-
-    // persistent_upsert handles WAL-before-state and auto-checkpoint.
-    await this.vcdb!.persistent_upsert(
-      this.instanceId,
-      vcdbPoints,
-      nowNs(),
-    );
+    await this.db!.upsert(points);
   }
 
+  /** @internal Used by shard-router */
   async search(
-    vector: number[],
-    topK: number,
-    filterJson: string = "",
-  ): Promise<readonly VcdbSearchHit[]> {
+    ...args: Parameters<PersistentDB["search"]>
+  ): Promise<ReturnType<PersistentDB["search"]>> {
     await this.ensureInitialized();
-
-    // persistent_search is synchronous (reads are in-memory).
-    const results = this.vcdb!.persistent_search(
-      this.instanceId,
-      vector,
-      topK,
-      true,
-      filterJson,
-    );
-    return results.map((r: { _0: number; _1: number; _2: number; _3: string }) => ({
-      id: { hi: r._0, lo: r._1 },
-      score: r._2,
-      payload: parsePayload(r._3),
-    }));
+    return this.db!.search(...args);
   }
 
-  async remove(id: VcdbId): Promise<void> {
-    await this.ensureInitialized();
-    await this.vcdb!.persistent_remove(
-      this.instanceId,
-      id.hi,
-      id.lo,
-      nowNs(),
-    );
-  }
-
+  /** @internal Used by shard-router */
   async getById(
-    id: VcdbId,
-  ): Promise<{
-    found: boolean;
-    vector: number[];
-    payload: Record<string, unknown> | null;
-  }> {
+    ...args: Parameters<PersistentDB["get"]>
+  ): Promise<ReturnType<PersistentDB["get"]>> {
     await this.ensureInitialized();
-    const result: { _0: boolean; _1: number[]; _2: string } =
-      this.vcdb!.persistent_get(this.instanceId, id.hi, id.lo, true);
-    return {
-      found: result._0,
-      vector: result._1,
-      payload: result._0 ? parsePayload(result._2) : null,
-    };
+    return this.db!.get(...args);
   }
 
-  async has(id: VcdbId): Promise<boolean> {
-    await this.ensureInitialized();
-    return this.vcdb!.persistent_has(this.instanceId, id.hi, id.lo);
-  }
-
-  async updateAttrs(
-    id: VcdbId,
-    attrs: Record<string, unknown>,
-  ): Promise<void> {
-    await this.ensureInitialized();
-    await this.vcdb!.persistent_update_attrs(
-      this.instanceId,
-      id.hi,
-      id.lo,
-      JSON.stringify(attrs),
-      nowNs(),
-    );
-  }
-
-  async scroll(
-    offset: VcdbId | undefined,
-    limit: number,
-  ): Promise<readonly { id: VcdbId; payload: Record<string, unknown> | null }[]> {
-    await this.ensureInitialized();
-    const hasOffset = offset !== undefined;
-    const offsetHi = offset?.hi ?? 0;
-    const offsetLo = offset?.lo ?? 0;
-    const results = this.vcdb!.persistent_scroll(
-      this.instanceId,
-      offsetHi,
-      offsetLo,
-      hasOffset,
-      limit,
-      true,
-    );
-    return results.map((r: { _0: number; _1: number; _2: string }) => ({
-      id: { hi: r._0, lo: r._1 },
-      payload: parsePayload(r._2),
-    }));
-  }
-
+  /** @internal Used by shard-router */
   async scrollFiltered(
-    filterJson: string,
-    offset: VcdbId | undefined,
-    limit: number,
-  ): Promise<readonly { id: VcdbId; payload: Record<string, unknown> | null }[]> {
+    ...args: Parameters<PersistentDB["scrollFiltered"]>
+  ): Promise<ReturnType<PersistentDB["scrollFiltered"]>> {
     await this.ensureInitialized();
-    const hasOffset = offset !== undefined;
-    const offsetHi = offset?.hi ?? 0;
-    const offsetLo = offset?.lo ?? 0;
-    const results = this.vcdb!.persistent_scroll_filtered(
-      this.instanceId,
-      filterJson,
-      offsetHi,
-      offsetLo,
-      hasOffset,
-      limit,
-      true,
-    );
-    return results.map((r: { _0: number; _1: number; _2: string }) => ({
-      id: { hi: r._0, lo: r._1 },
-      payload: parsePayload(r._2),
-    }));
+    return this.db!.scrollFiltered(...args);
   }
 
-  async countFiltered(filterJson: string): Promise<number> {
+  /** @internal Used by shard-router */
+  async countFiltered(
+    ...args: Parameters<PersistentDB["countFiltered"]>
+  ): Promise<ReturnType<PersistentDB["countFiltered"]>> {
     await this.ensureInitialized();
-    return this.vcdb!.persistent_count_filtered(this.instanceId, filterJson);
-  }
-
-  async compact(): Promise<{ removed: number }> {
-    await this.ensureInitialized();
-    const removed = await this.vcdb!.persistent_compact(this.instanceId);
-    return { removed };
-  }
-
-  size(): number {
-    return this.vcdb?.persistent_db_size(this.instanceId) ?? 0;
-  }
-
-  rawSize(): number {
-    return this.vcdb?.persistent_db_raw_size(this.instanceId) ?? 0;
-  }
-
-  dim(): number {
-    return this.vcdb?.persistent_db_dim(this.instanceId) ?? 0;
+    return this.db!.countFiltered(...args);
   }
 }

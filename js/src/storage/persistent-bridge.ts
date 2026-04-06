@@ -27,6 +27,13 @@ import type { DOKeyValueStore } from "./do-kv.js";
  * These functions are exported from @vcdb/server/wasm/lib.js.
  */
 /**
+ * MoonBit Int64 as hi/lo i32 pair — the JS target encoding.
+ * Used for vector IDs, timestamps, and any Int64 across FFI boundaries.
+ * Not vcdb-specific; this is how MoonBit's JS target represents Int64.
+ */
+export type MbInt64 = { readonly hi: number; readonly lo: number };
+
+/**
  * MoonBit tuple representation in JS target.
  * Tuples like (A, B, C) become { _0: A, _1: B, _2: C } objects.
  */
@@ -75,14 +82,14 @@ interface PersistentFFI {
   persistent_upsert(
     instance_id: number,
     points: Array<Tuple4<number, number, number[], string>>,
-    timestamp_ns: { hi: number; lo: number },
+    timestamp_ns: MbInt64,
   ): Promise<void>;
 
   persistent_remove(
     instance_id: number,
     id_hi: number,
     id_lo: number,
-    timestamp_ns: { hi: number; lo: number },
+    timestamp_ns: MbInt64,
   ): Promise<boolean>;
 
   persistent_update_attrs(
@@ -90,7 +97,7 @@ interface PersistentFFI {
     id_hi: number,
     id_lo: number,
     attrs_json: string,
-    timestamp_ns: { hi: number; lo: number },
+    timestamp_ns: MbInt64,
   ): Promise<boolean>;
 
   persistent_checkpoint(instance_id: number): Promise<void>;
@@ -149,6 +156,16 @@ interface PersistentFFI {
   persistent_db_size(instance_id: number): number;
   persistent_db_raw_size(instance_id: number): number;
   persistent_db_dim(instance_id: number): number;
+
+  /**
+   * CRUSH placement group for a vector ID.
+   * Returns a number in [0, pg_count) — the SoT for shard routing.
+   */
+  crush_placement_group(
+    id_hi: number,
+    id_lo: number,
+    pg_count: number,
+  ): number;
 }
 
 /**
@@ -287,7 +304,7 @@ export interface PersistentInitOptions {
  *
  * @param collectionName - Determines file paths (default: "db").
  *   Must match the names used by existing data to avoid data loss.
- *   e.g., usbkr uses "questions" → "questions.vwal" + "questions.data.bin"
+ *   e.g., "questions" → "questions.vwal" + "questions.data.bin"
  */
 export async function initPersistentDB(
   vcdb: PersistentFFI,
