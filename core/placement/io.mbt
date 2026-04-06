@@ -48,14 +48,35 @@ priv struct SegState {
   target_key : String
 }
 
+// ── In-memory segment construction (SoT) ────────────────────
+//
+// All segment building happens here with zero I/O. Both the sync
+// and async write paths call this, then persist the result using
+// their respective storage traits.
+
 ///|
-/// Write vectors to segments using CRUSH placement
-/// Returns index entries and manifest for index building
-pub fn[S : @storage.Storage] write_segments_from_store(
+/// Result of in-memory segment construction.
+pub(all) struct MemorySegmentResult {
+  segments : Array[MemorySegment]
+  entries : Array[@segment.IndexEntry]
+  manifest : PlacementManifest
+}
+
+///|
+pub(all) struct MemorySegment {
+  name : String
+  target_key : String
+  data : Bytes
+}
+
+///|
+/// Build segments in memory without writing to storage.
+/// This is the SoT for segment construction — sync and async
+/// write paths both call this, then persist the resulting bytes.
+pub fn write_segments_in_memory(
   store : @store.CoreStore,
   opts : SegmentOptions,
-  storages : Map[String, S],
-) -> SegmentResult raise @storage.IOError {
+) -> MemorySegmentResult {
   let base = opts.base_name
   let seg_limit = if opts.segment_bytes > 0 {
     opts.segment_bytes
@@ -63,20 +84,18 @@ pub fn[S : @storage.Storage] write_segments_from_store(
     64 * 1024 * 1024
   }
 
-  // Track writers per placement group
   let writers : Map[Int, SegState] = {}
   let entries : Array[@segment.IndexEntry] = []
+  let segments : Array[MemorySegment] = []
   let dim = store.dim
   let count = store.size()
 
-  // Process each vector
   for i in 0..<count {
     let id = store.ids[i]
     let result = crush_locate(id, opts.crush)
     let pg = result.pg
     let target_key = first_string_or(result.primaries, "local")
 
-    // Get or create segment writer for this PG
     let seg = match writers.get(pg) {
       Some(s) => s
       None => {
@@ -92,54 +111,39 @@ pub fn[S : @storage.Storage] write_segments_from_store(
       }
     }
 
-    // Get vector data
     let vector : Array[Double] = []
     let base_idx = i * dim
     for j in 0..<dim {
       vector.push(store.data[base_idx + j])
     }
     let attrs = store.attrs[i]
-
-    // Estimate record size
     let attrs_size = estimate_attrs_size(attrs)
     let rec_size = 16 + attrs_size + vector.length() * 4
 
-    // Check if we need a new segment part
     if opts.segmented && seg.size + rec_size > seg_limit {
-      // Flush current segment
       let seg_data = seg.writer.to_bytes()
-      let storage = require_storage(storages, seg.target_key)
-      storage.atomic_write(
-        seg.writer.get_name() + @codec.ext_segment,
-        seg_data,
-        @storage.Data,
+      segments.push(
+        { name: seg.writer.get_name(), target_key: seg.target_key, data: seg_data },
       )
-
-      // Start new part
       seg.part = seg.part + 1
       let new_name = "\{base}.pg\{pg}.part\{seg.part}"
       seg.writer = @segment.SegmentWriter::new(new_name)
       seg.size = 8
     }
 
-    // Append record
     let ptr = seg.writer.append(id, vector, attrs)
     seg.size = seg.size + ptr.length
     entries.push({ id, ptr })
   }
 
-  // Flush all remaining segments
   let segment_entries : Array[SegmentEntry] = []
   for pg in writers.keys() {
     match writers.get(pg) {
       None => continue
       Some(seg) => {
         let seg_data = seg.writer.to_bytes()
-        let storage = require_storage(storages, seg.target_key)
-        storage.atomic_write(
-          seg.writer.get_name() + @codec.ext_segment,
-          seg_data,
-          @storage.Data,
+        segments.push(
+          { name: seg.writer.get_name(), target_key: seg.target_key, data: seg_data },
         )
         segment_entries.push({
           name: seg.writer.get_name(),
@@ -157,7 +161,37 @@ pub fn[S : @storage.Storage] write_segments_from_store(
     commit_ts: 0L,
   }
 
-  { entries, manifest, dim, count }
+  { segments, entries, manifest }
+}
+
+// ── Sync write path ─────────────────────────────────────────
+
+///|
+/// Write vectors to segments using CRUSH placement (sync Storage).
+/// Builds segments in memory, then writes each to its target storage.
+pub fn[S : @storage.Storage] write_segments_from_store(
+  store : @store.CoreStore,
+  opts : SegmentOptions,
+  storages : Map[String, S],
+) -> SegmentResult raise @storage.IOError {
+  let mem = write_segments_in_memory(store, opts)
+
+  // Persist segments to their target storages
+  for seg in mem.segments {
+    let storage = require_storage(storages, seg.target_key)
+    storage.atomic_write(
+      seg.name + @codec.ext_segment,
+      seg.data,
+      @storage.Data,
+    )
+  }
+
+  {
+    entries: mem.entries,
+    manifest: mem.manifest,
+    dim: store.dim,
+    count: store.size(),
+  }
 }
 
 ///|
@@ -291,10 +325,146 @@ pub struct LoadDistributedResult {
   ann_bytes : Bytes?
 }
 
+// ── In-memory store reconstruction (SoT) ────────────────────
+//
+// Reconstruct a CoreStore from already-fetched bytes. No I/O.
+// Both sync and async load paths fetch bytes their own way,
+// then call these to rebuild the store.
+
+///|
+/// Reconstruct CoreStore from index file + segment bytes (fast path).
+///
+/// segment_data maps segment name → bytes (already fetched by caller).
+/// This is the SoT for index-based reconstruction.
+pub fn reconstruct_from_index(
+  index_bytes : Bytes,
+  manifest_bytes : Bytes,
+  segment_data : Map[String, Bytes],
+) -> LoadDistributedResult? {
+  let decoded = match @segment.decode_index_file(index_bytes) {
+    Some(d) => d
+    None => return None
+  }
+  let manifest = match deserialize_manifest(manifest_bytes) {
+    Some(m) => m
+    None => return None
+  }
+
+  let seg_targets : Map[String, String] = {}
+  for seg in manifest.segments {
+    seg_targets.set(seg.name, seg.target_key)
+  }
+
+  let metric = @segment.decode_metric(decoded.header.metric_code)
+  let store = @store.CoreStore::new(
+    decoded.header.dim,
+    metric,
+    capacity=decoded.header.count + 100,
+  )
+
+  let seg_readers : Map[String, @segment.SegmentReader] = {}
+  for entry in decoded.entries {
+    let reader = match seg_readers.get(entry.ptr.segment) {
+      Some(r) => r
+      None => {
+        let data = match segment_data.get(entry.ptr.segment) {
+          Some(d) => d
+          None => return None
+        }
+        let r = match @segment.SegmentReader::from_bytes(
+          entry.ptr.segment,
+          data,
+        ) {
+          Some(r) => r
+          None => return None
+        }
+        seg_readers.set(entry.ptr.segment, r)
+        r
+      }
+    }
+    match reader.read_at(entry.ptr.offset, entry.ptr.length) {
+      Some((id, vec, attrs)) => {
+        let _ = store.add_or_update(id, vec, attrs, upsert=true)
+      }
+      None => return None
+    }
+  }
+
+  Some({ store, header: decoded.header, ann_bytes: decoded.ann })
+}
+
+///|
+/// Reconstruct CoreStore from manifest + segment bytes (slow path).
+///
+/// Used when no index file exists. Scans all segments sequentially.
+pub fn reconstruct_from_segments(
+  manifest_bytes : Bytes,
+  segment_data : Map[String, Bytes],
+) -> LoadDistributedResult? {
+  let manifest = match deserialize_manifest(manifest_bytes) {
+    Some(m) => m
+    None => return None
+  }
+  if manifest.segments.is_empty() {
+    return None
+  }
+
+  let first_name = manifest.segments[0].name
+  let first_data = match segment_data.get(first_name) {
+    Some(d) => d
+    None => return None
+  }
+  let first_reader = match @segment.SegmentReader::from_bytes(
+    first_name,
+    first_data,
+  ) {
+    Some(r) => r
+    None => return None
+  }
+
+  let mut dim = 0
+  for record in first_reader.iter() {
+    dim = record.1.length()
+    break
+  }
+  if dim == 0 {
+    return None
+  }
+
+  let store = @store.CoreStore::new(dim, @types.Cosine, capacity=1024)
+
+  for seg_entry in manifest.segments {
+    let data = match segment_data.get(seg_entry.name) {
+      Some(d) => d
+      None => return None
+    }
+    match @segment.SegmentReader::from_bytes(seg_entry.name, data) {
+      Some(reader) =>
+        for record in reader.iter() {
+          let (id, vec, attrs) = record
+          let _ = store.add_or_update(id, vec, attrs, upsert=true)
+        }
+      None => return None
+    }
+  }
+
+  Some({
+    store,
+    header: {
+      metric_code: @segment.encode_metric(@types.Cosine),
+      dim,
+      count: store.size(),
+      strategy_code: 0,
+      has_ann: false,
+    },
+    ann_bytes: None,
+  })
+}
+
+// ── Sync load path ──────────────────────────────────────────
+
 ///|
 /// Load CoreStore from distributed storage using index file
-/// Fast path: use .index file with entry pointers
-/// Slow path: scan segments from manifest
 pub fn[S : @storage.Storage] load_store_distributed(
   base_name : String,
   storages : Map[String, S],
@@ -311,18 +481,12 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
   storages : Map[String, S],
   index_storage : S,
 ) -> LoadDistributedResult raise @storage.IOError {
-  // Try to load from index file (fast path with pointers)
+  // Fast path: index file exists
   if index_storage.exists(base_name + @codec.ext_index, @storage.Index) {
     let index_bytes = index_storage.read(
       base_name + @codec.ext_index,
       @storage.Index,
     )
-    let decoded = match @segment.decode_index_file(index_bytes) {
-      None => raise @storage.IoFailed("Invalid index file")
-      Some(d) => d
-    }
-
-    // Load manifest for segment locations
     let manifest_bytes = index_storage.read(
       base_name + @codec.ext_manifest,
       @storage.Index,
@@ -332,65 +496,41 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
       Some(m) => m
     }
 
-    // Build segment target lookup
+    // Fetch all segment data
+    let segment_data : Map[String, Bytes] = {}
     let seg_targets : Map[String, String] = {}
     for seg in manifest.segments {
       seg_targets.set(seg.name, seg.target_key)
     }
-
-    // Create store with correct metric
-    let metric = @segment.decode_metric(decoded.header.metric_code)
-    let store = @store.CoreStore::new(
-      decoded.header.dim,
-      metric,
-      capacity=decoded.header.count + 100,
-    )
-
-    // Load vectors using index entries (pointer-based access)
-    let seg_readers : Map[String, @segment.SegmentReader] = {}
+    // Collect unique segment names from index
+    let decoded = match @segment.decode_index_file(index_bytes) {
+      None => raise @storage.IoFailed("Invalid index file")
+      Some(d) => d
+    }
+    let needed : Map[String, Bool] = {}
     for entry in decoded.entries {
-      let target_key = match seg_targets.get(entry.ptr.segment) {
+      needed.set(entry.ptr.segment, true)
+    }
+    for seg_name in needed.keys() {
+      let target_key = match seg_targets.get(seg_name) {
         Some(t) => t
         None => {
-          // Fall back to CRUSH placement
-          let result = crush_locate(entry.id, manifest.crush)
-          first_string_or(result.primaries, "local")
+          // Fall back to first available storage
+          "local"
         }
       }
-
-      // Get or create segment reader
-      let reader = match seg_readers.get(entry.ptr.segment) {
-        Some(r) => r
-        None => {
-          let storage = require_storage(storages, target_key)
-          let data = storage.read(
-            entry.ptr.segment + @codec.ext_segment,
-            @storage.Data,
-          )
-          let r = match
-            @segment.SegmentReader::from_bytes(entry.ptr.segment, data) {
-            None =>
-              raise @storage.IoFailed("Invalid segment: " + entry.ptr.segment)
-            Some(r) => r
-          }
-          seg_readers.set(entry.ptr.segment, r)
-          r
-        }
-      }
-
-      // Read record at pointer
-      match reader.read_at(entry.ptr.offset, entry.ptr.length) {
-        Some((id, vec, attrs)) => {
-          let _ = store.add_or_update(id, vec, attrs, upsert=true)
-        }
-        None => raise @storage.IoFailed("Failed to read entry at offset")
-      }
+      let storage = require_storage(storages, target_key)
+      let data = storage.read(seg_name + @codec.ext_segment, @storage.Data)
+      segment_data.set(seg_name, data)
     }
 
-    return { store, header: decoded.header, ann_bytes: decoded.ann }
+    match reconstruct_from_index(index_bytes, manifest_bytes, segment_data) {
+      Some(result) => return result
+      None => raise @storage.IoFailed("Failed to reconstruct from index")
+    }
   }
 
-  // Fall back to reading from segments (slow path - no index file)
+  // Slow path: no index file
   let manifest_bytes = index_storage.read(
     base_name + @codec.ext_manifest,
     @storage.Index,
@@ -400,51 +540,16 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
     Some(m) => m
   }
 
-  if manifest.segments.is_empty() {
-    raise @storage.IoFailed("Empty manifest")
+  let segment_data : Map[String, Bytes] = {}
+  for seg in manifest.segments {
+    let storage = require_storage(storages, seg.target_key)
+    let data = storage.read(seg.name + @codec.ext_segment, @storage.Data)
+    segment_data.set(seg.name, data)
   }
 
-  // Determine dimension from first segment
-  let first_segment = manifest.segments[0]
-  let storage = require_storage(storages, first_segment.target_key)
-  let data = storage.read(
-    first_segment.name + @codec.ext_segment,
-    @storage.Data,
-  )
-  let reader = match
-    @segment.SegmentReader::from_bytes(first_segment.name, data) {
-    None => raise @storage.IoFailed("Invalid segment")
-    Some(r) => r
-  }
-
-  let mut dim = 0
-  for record in reader.iter() {
-    dim = record.1.length()
-    break
-  }
-
-  if dim == 0 {
-    raise @storage.IoFailed("Empty segments")
-  }
-
-  // Create store and load all records
-  let store = @store.CoreStore::new(dim, @types.Cosine, capacity=1024)
-  let records = read_segments_from_manifest(manifest, storages)
-  for record in records {
-    let (id, vec, attrs) = record
-    let _ = store.add_or_update(id, vec, attrs, upsert=true)
-  }
-
-  {
-    store,
-    header: {
-      metric_code: @segment.encode_metric(@types.Cosine),
-      dim,
-      count: store.size(),
-      strategy_code: 0,
-      has_ann: false,
-    },
-    ann_bytes: None,
+  match reconstruct_from_segments(manifest_bytes, segment_data) {
+    Some(result) => result
+    None => raise @storage.IoFailed("Failed to reconstruct from segments")
   }
 }
 

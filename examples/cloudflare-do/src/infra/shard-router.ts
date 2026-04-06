@@ -1,28 +1,14 @@
 /**
  * @file Shard router — scatter-gather across multiple VcdbStore DOs.
  *
- * Uses vcdb core's CRUSH placement (crush_placement_group via FFI)
- * as the single source of truth for vector-to-shard mapping.
- * This ensures data placement and request routing use the same hash.
- *
- * This router exists because Cloudflare DO requires per-instance RPC
- * dispatch: we need to know which DO stub to call, not just which
- * storage to write to.
+ * All merge logic, routing, and ID handling is delegated to vcdb core
+ * FFI (distributed_merge_*, crush_placement_group). This file only
+ * handles Cloudflare DO RPC dispatch and result collection.
  */
 import type { VcdbStore } from "./vcdb-do.ts";
-import type { SearchHit } from "@vcdb/server/persistent";
-import type { MbInt64 } from "@vcdb/server/storage/persistent-bridge";
+import type { SearchHit, ScrollEntry } from "@vcdb/server/persistent";
+import type { MbInt64, PersistentFFI } from "@vcdb/server/storage/persistent-bridge";
 import type { Bindings } from "../types.ts";
-
-/** Reconstruct a JS number from hi/lo pair (for sort comparisons). */
-const idToNumeric = (id: MbInt64): number =>
-  (id.hi >>> 0) * 0x100000000 + (id.lo >>> 0);
-
-/**
- * Placement function — maps a MbInt64 to a shard index in [0, shardCount).
- * Must be crush_placement_group from the WASM module.
- */
-type PlacementFn = (id_hi: number, id_lo: number, pg_count: number) => number;
 
 /** Get a DO stub for a specific shard. */
 const getShardStub = (
@@ -65,42 +51,40 @@ export type ShardRouter = {
     filterJson: string,
     offset: MbInt64 | undefined,
     limit: number,
-  ): Promise<
-    readonly { id: MbInt64; payload: Record<string, unknown> | null }[]
-  >;
+  ): Promise<readonly ScrollEntry[]>;
 
   readonly shardCount: number;
 };
 
 export function createShardRouter(
   shardCount: number,
-  placementGroup: PlacementFn,
+  ffi: PersistentFFI,
 ): ShardRouter {
   const shardFor = (id: MbInt64): number =>
-    placementGroup(id.hi, id.lo, shardCount);
+    ffi.crush_placement_group(id.hi, id.lo, shardCount);
 
   return {
     shardCount,
 
     async upsert(env, points) {
-      const buckets = new Map<
-        number,
-        { id: MbInt64; vector: number[]; payload: Record<string, unknown> }[]
-      >();
-      for (const point of points) {
-        const shard = shardFor(point.id);
-        const bucket = buckets.get(shard);
-        if (bucket) {
-          bucket.push(point);
-        } else {
-          buckets.set(shard, [point]);
-        }
-      }
+      // Group by shard using CRUSH (SoT)
+      const ffiPoints = points.map((p) => ({
+        _0: p.id.hi,
+        _1: p.id.lo,
+        _2: p.vector,
+        _3: JSON.stringify(p.payload),
+      }));
+      const groups = ffi.distributed_group_upsert(ffiPoints, shardCount);
 
       const writes: Promise<void>[] = [];
-      for (const [shardIndex, shardPoints] of buckets) {
-        const stub = getShardStub(env, shardIndex);
-        writes.push(stub.upsert(shardPoints));
+      for (const group of groups) {
+        const shardIndex = group._0;
+        const shardPoints = group._1.map((p) => ({
+          id: { hi: p._0, lo: p._1 } as MbInt64,
+          vector: p._2,
+          payload: JSON.parse(p._3) as Record<string, unknown>,
+        }));
+        writes.push(getShardStub(env, shardIndex).upsert(shardPoints));
       }
       await Promise.all(writes);
     },
@@ -118,50 +102,76 @@ export function createShardRouter(
     },
 
     async countFiltered(env, filterJson) {
-      const counts: Promise<number>[] = [];
-      for (let i = 0; i < shardCount; i++) {
-        counts.push(getShardStub(env, i).countFiltered(filterJson));
-      }
-      const shardCounts = await Promise.all(counts);
-      return shardCounts.reduce((sum, n) => sum + n, 0);
+      const shardResults: Array<{ _0: number; _1: number; _2: string }> = [];
+      const tasks = Array.from({ length: shardCount }, (_, i) =>
+        (async () => {
+          try {
+            const count = await getShardStub(env, i).countFiltered(filterJson);
+            shardResults.push({ _0: i, _1: count, _2: "" });
+          } catch (e) {
+            shardResults.push({ _0: i, _1: 0, _2: String(e) });
+          }
+        })(),
+      );
+      await Promise.all(tasks);
+      return ffi.distributed_merge_count(shardResults)._0;
     },
 
     async scrollFiltered(env, filterJson, offset, limit) {
-      const fetches: Promise<
-        readonly { id: MbInt64; payload: Record<string, unknown> | null }[]
-      >[] = [];
-      for (let i = 0; i < shardCount; i++) {
-        fetches.push(
-          getShardStub(env, i).scrollFiltered(filterJson, offset, limit),
-        );
-      }
-      const shardResults = await Promise.all(fetches);
+      type RawEntry = { _0: number; _1: number; _2: string };
+      const shardResults: Array<{ _0: number; _1: RawEntry[]; _2: string }> = [];
+      const tasks = Array.from({ length: shardCount }, (_, i) =>
+        (async () => {
+          try {
+            const entries = await getShardStub(env, i).scrollFiltered(filterJson, offset, limit);
+            shardResults.push({
+              _0: i,
+              _1: (entries as readonly ScrollEntry[]).map((e) => ({
+                _0: e.id.hi, _1: e.id.lo, _2: JSON.stringify(e.payload ?? {}),
+              })),
+              _2: "",
+            });
+          } catch (e) {
+            shardResults.push({ _0: i, _1: [], _2: String(e) });
+          }
+        })(),
+      );
+      await Promise.all(tasks);
 
-      const all: { id: MbInt64; payload: Record<string, unknown> | null }[] = [];
-      for (const results of shardResults) {
-        for (const entry of results) {
-          all.push(entry);
-        }
-      }
-      all.sort((a, b) => idToNumeric(a.id) - idToNumeric(b.id));
-      return all.slice(0, limit);
+      const merged = ffi.distributed_merge_scroll(shardResults, limit);
+      return merged._0.map((r) => ({
+        id: { hi: r._0, lo: r._1 } as MbInt64,
+        payload: r._2 ? (JSON.parse(r._2) as Record<string, unknown>) : null,
+      }));
     },
 
     async search(env, vector, topK, filterJson = "") {
-      const searches: Promise<readonly SearchHit[]>[] = [];
-      for (let i = 0; i < shardCount; i++) {
-        searches.push(getShardStub(env, i).search(vector, topK, filterJson));
-      }
-      const shardResults = await Promise.all(searches);
+      type RawHit = { _0: number; _1: number; _2: number; _3: string };
+      const shardResults: Array<{ _0: number; _1: RawHit[]; _2: string }> = [];
+      const tasks = Array.from({ length: shardCount }, (_, i) =>
+        (async () => {
+          try {
+            const hits = await getShardStub(env, i).search(vector, topK, filterJson);
+            shardResults.push({
+              _0: i,
+              _1: (hits as readonly SearchHit[]).map((h) => ({
+                _0: h.id.hi, _1: h.id.lo, _2: h.score, _3: JSON.stringify(h.payload ?? {}),
+              })),
+              _2: "",
+            });
+          } catch (e) {
+            shardResults.push({ _0: i, _1: [], _2: String(e) });
+          }
+        })(),
+      );
+      await Promise.all(tasks);
 
-      const all: SearchHit[] = [];
-      for (const results of shardResults) {
-        for (const hit of results) {
-          all.push(hit);
-        }
-      }
-      all.sort((a, b) => b.score - a.score);
-      return all.slice(0, topK);
+      const merged = ffi.distributed_merge_search(shardResults, topK);
+      return merged._0.map((r) => ({
+        id: { hi: r._0, lo: r._1 } as MbInt64,
+        score: r._2,
+        payload: r._3 ? (JSON.parse(r._3) as Record<string, unknown>) : null,
+      }));
     },
   };
 }

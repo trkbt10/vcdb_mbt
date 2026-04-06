@@ -37,6 +37,7 @@ export type MbInt64 = { readonly hi: number; readonly lo: number };
  * MoonBit tuple representation in JS target.
  * Tuples like (A, B, C) become { _0: A, _1: B, _2: C } objects.
  */
+type Tuple2<A, B> = { _0: A; _1: B };
 type Tuple3<A, B, C> = { _0: A; _1: B; _2: C };
 type Tuple4<A, B, C, D> = { _0: A; _1: B; _2: C; _3: D };
 
@@ -166,6 +167,39 @@ interface PersistentFFI {
     id_lo: number,
     pg_count: number,
   ): number;
+
+  // ── Distributed merge & routing ─────────────────────────────
+
+  /** Merge search results from multiple shards. */
+  distributed_merge_search(
+    shard_results: Array<Tuple3<number, Array<Tuple4<number, number, number, string>>, string>>,
+    top_k: number,
+  ): Tuple3<Array<Tuple4<number, number, number, string>>, number[], Array<Tuple2<number, string>>>;
+
+  /** Merge scroll results from multiple shards. */
+  distributed_merge_scroll(
+    shard_results: Array<Tuple3<number, Array<Tuple3<number, number, string>>, string>>,
+    limit: number,
+  ): Tuple3<Array<Tuple3<number, number, string>>, number[], Array<Tuple2<number, string>>>;
+
+  /** Merge count results from multiple shards. */
+  distributed_merge_count(
+    shard_results: Array<Tuple3<number, number, string>>,
+  ): Tuple3<number, number[], Array<Tuple2<number, string>>>;
+
+  /** Group upsert points by shard. Returns array of (shard_id, points). */
+  distributed_group_upsert(
+    points: Array<Tuple4<number, number, number[], string>>,
+    pg_count: number,
+  ): Array<Tuple2<number, Array<Tuple4<number, number, number[], string>>>>;
+
+  // ── MbInt64 utilities ───────────────────────────────────────
+
+  /** Parse decimal string to MbInt64. Returns (success, hi, lo). */
+  parse_int64(input: string): Tuple3<boolean, number, number>;
+
+  /** Format MbInt64 as decimal string. */
+  format_int64(hi: number, lo: number): string;
 }
 
 /**
