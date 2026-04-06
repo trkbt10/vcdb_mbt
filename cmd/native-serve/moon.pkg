@@ -11,5 +11,9 @@ import {
 
 options(
   "is-main": true,
-  targets: { "main.mbt": [ "native" ], "wbtest.mbt": [ "native" ] },
+  targets: {
+    "main.mbt": [ "native" ],
+    "main_stub.mbt": [ "wasm", "wasm-gc", "js" ],
+    "wbtest.mbt": [ "native" ],
+  },
 )

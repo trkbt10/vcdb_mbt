@@ -71,7 +71,7 @@ pub struct JsAsyncCallbackStorage {
 
 ///|
 pub fn JsAsyncCallbackStorage::new(name : String) -> JsAsyncCallbackStorage {
-  { name }
+  { name, }
 }
 
 ///|

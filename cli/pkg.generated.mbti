@@ -25,7 +25,7 @@ pub struct ParsedArgs {
   positional : Array[String]
   flags : Map[String, String]
   bool_flags : Map[String, Bool]
-}
+} derive(Show)
 pub fn ParsedArgs::empty() -> Self
 pub fn ParsedArgs::get_flag(Self, String) -> String?
 pub fn ParsedArgs::get_flag_or(Self, String, String) -> String
@@ -33,7 +33,6 @@ pub fn ParsedArgs::get_int_flag(Self, String) -> Int?
 pub fn ParsedArgs::get_int_flag_or(Self, String, Int) -> Int
 pub fn ParsedArgs::get_positional(Self, Int) -> String?
 pub fn ParsedArgs::has_flag(Self, String) -> Bool
-pub impl Show for ParsedArgs
 
 // Type aliases
 

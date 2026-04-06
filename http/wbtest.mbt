@@ -4,7 +4,7 @@ fn run_async_blocking(f : async () -> Unit noraise) -> Unit = "%async.run"
 ///|
 fn run_async_test(f : async () -> Unit) -> Unit {
   run_async_blocking(async fn() noraise {
-    try f() catch {
+    f() catch {
       e => abort("async test failed: " + e.to_string())
     }
   })

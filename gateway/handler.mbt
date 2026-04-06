@@ -215,11 +215,12 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
           }
         None => return ApiResponse::err("Invalid JSON")
       }
-      let points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = req
-        .points
-        .map(fn(p) {
+      let points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = req.points.map(fn(
+          p,
+        ) {
           (@types.VectorId::from_int64(p.id), p.vector, p.payload)
-        })
+        },
+      )
       match manager.upsert_points(name, points) {
         Ok(count) =>
           ApiResponse::ok(

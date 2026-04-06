@@ -11,9 +11,13 @@ pub fn compile_filter(FilterExpr) -> (@types.VectorId, @types.Attrs) -> Bool
 
 pub fn eval_filter(FilterExpr, @types.Attrs) -> Bool
 
+pub fn filter_to_json(FilterExpr) -> String
+
 pub fn get_candidates_basic(FilterExpr, @attr.BasicAttrIndex) -> Array[@types.VectorId]?
 
-pub fn get_candidates_bptree(FilterExpr, @attr.BPTreeAttrIndex) -> Array[@types.VectorId]?
+pub fn parse_filter_json(String) -> FilterExpr?
+
+pub fn resolve_candidates_bptree(FilterExpr, @attr.BPTreeAttrIndex) -> Array[@types.VectorId]
 
 // Errors
 
@@ -23,7 +27,7 @@ pub(all) enum FilterExpr {
   Must(Array[FilterExpr])
   MustNot(Array[FilterExpr])
   Should(Array[FilterExpr], Int)
-}
+} derive(Show)
 pub fn FilterExpr::exists(String) -> Self
 pub fn FilterExpr::is_null(String) -> Self
 pub fn FilterExpr::match_(String, @types.AttrValue) -> Self
@@ -31,22 +35,19 @@ pub fn FilterExpr::must(Array[Self]) -> Self
 pub fn FilterExpr::must_not(Array[Self]) -> Self
 pub fn FilterExpr::range(String, @types.NumericRange) -> Self
 pub fn FilterExpr::should(Array[Self], min? : Int) -> Self
-pub impl Show for FilterExpr
 
 pub(all) enum FilterStrategy {
   PreFilter
   PostFilter
   Auto
-}
-pub impl Show for FilterStrategy
+} derive(Show)
 
 pub(all) enum LeafExpr {
   Match(String, @types.AttrValue)
   Range(String, @types.NumericRange)
   Exists(String)
   IsNull(String)
-}
-pub impl Show for LeafExpr
+} derive(Show)
 
 // Type aliases
 

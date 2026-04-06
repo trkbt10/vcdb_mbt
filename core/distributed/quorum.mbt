@@ -24,11 +24,7 @@ pub(all) struct QuorumConfig {
 /// Create a quorum config with validation.
 ///
 /// Panics if parameters are invalid (w > n, r > n, or any <= 0).
-pub fn QuorumConfig::new(
-  n : Int,
-  w : Int,
-  r : Int,
-) -> QuorumConfig {
+pub fn QuorumConfig::new(n : Int, w : Int, r : Int) -> QuorumConfig {
   if n <= 0 || w <= 0 || r <= 0 {
     abort("QuorumConfig: n, w, r must all be > 0")
   }

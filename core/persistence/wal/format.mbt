@@ -79,7 +79,13 @@ pub fn WalRecord::upsert(
   attrs : @types.Attrs,
   timestamp? : Int64 = 0L,
 ) -> WalRecord {
-  { record_type: Upsert, id, attrs: Some(attrs), vector: Some(vector), timestamp }
+  {
+    record_type: Upsert,
+    id,
+    attrs: Some(attrs),
+    vector: Some(vector),
+    timestamp,
+  }
 }
 
 ///|

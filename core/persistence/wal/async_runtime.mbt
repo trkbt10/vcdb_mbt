@@ -107,17 +107,13 @@ pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::truncate(
 
 ///|
 /// Number of records in the current WAL buffer (since last truncate).
-pub fn[S] AsyncWalRuntime::record_count(
-  self : AsyncWalRuntime[S],
-) -> Int {
+pub fn[S] AsyncWalRuntime::record_count(self : AsyncWalRuntime[S]) -> Int {
   self.record_count
 }
 
 ///|
 /// Current WAL data size in bytes (for byte-size checkpoint decisions).
-pub fn[S] AsyncWalRuntime::byte_size(
-  self : AsyncWalRuntime[S],
-) -> Int {
+pub fn[S] AsyncWalRuntime::byte_size(self : AsyncWalRuntime[S]) -> Int {
   self.data.length()
 }
 

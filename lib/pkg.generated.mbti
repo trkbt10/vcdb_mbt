@@ -2,23 +2,21 @@
 package "trkbt10/vcdb/lib"
 
 // Values
-pub fn gateway_clear_storage_callbacks() -> Unit
+pub fn crush_placement_group(Int, Int, Int) -> Int
 
-pub fn gateway_has_storage_callbacks() -> Bool
+pub fn distributed_group_upsert(Array[(Int, Int, Array[Double], String)], Int) -> Array[(Int, Array[(Int, Int, Array[Double], String)])]
 
-pub fn gateway_register_storage((String, Int) -> Bytes, (String, Bytes, Int) -> Unit, (String, Int) -> Bool, (String, Int) -> Unit, (Int) -> Array[String]) -> Unit
+pub fn distributed_merge_count(Array[(Int, Int, String)]) -> (Int, Array[Int], Array[(Int, String)])
 
-pub fn gateway_request(String, Array[String], String) -> String
+pub fn distributed_merge_scroll(Array[(Int, Array[(Int, Int, String)], String)], Int) -> (Array[(Int, Int, String)], Array[Int], Array[(Int, String)])
 
-pub fn gateway_storage_exists(String, Int) -> Bool
+pub fn distributed_merge_search(Array[(Int, Array[(Int, Int, Double, String)], String)], Int) -> (Array[(Int, Int, Double, String)], Array[Int], Array[(Int, String)])
 
-pub fn gateway_storage_list(Int) -> Array[String]
+pub fn format_int64(Int, Int) -> String
 
-pub fn gateway_storage_read(String, Int) -> Bytes
+pub fn parse_int64(String) -> (Bool, Int, Int)
 
-pub fn gateway_storage_write(String, Bytes, Int) -> Unit
-
-pub fn vcdb_add(Int, Int, Array[Double]) -> Int
+pub fn vcdb_add(Int, Int, Int, Array[Double]) -> Int
 
 pub fn vcdb_create(Int) -> Int
 
@@ -32,19 +30,19 @@ pub fn vcdb_destroy(Int) -> Unit
 
 pub fn vcdb_dim(Int) -> Int
 
-pub fn vcdb_get(Int, Int) -> (Array[Double], Int)
+pub fn vcdb_get(Int, Int, Int) -> (Array[Double], Int)
 
-pub fn vcdb_has(Int, Int) -> Int
+pub fn vcdb_has(Int, Int, Int) -> Int
 
-pub fn vcdb_remove(Int, Int) -> Int
+pub fn vcdb_remove(Int, Int, Int) -> Int
 
-pub fn vcdb_search(Int, Array[Double], Int) -> Array[(Int, Double)]
+pub fn vcdb_search(Int, Array[Double], Int) -> Array[(Int, Int, Double)]
 
 pub fn vcdb_serialize(Int) -> Bytes
 
 pub fn vcdb_size(Int) -> Int
 
-pub fn vcdb_upsert(Int, Int, Array[Double]) -> Int
+pub fn vcdb_upsert(Int, Int, Int, Array[Double]) -> Int
 
 // Errors
 

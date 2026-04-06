@@ -151,10 +151,7 @@ pub fn ShardHealthTracker::healthy_shards(
   let result : Array[Int] = []
   for shard_id in self.shards.keys() {
     match self.shards.get(shard_id) {
-      Some(health) =>
-        if health.status != Failed {
-          result.push(shard_id)
-        }
+      Some(health) => if health.status != Failed { result.push(shard_id) }
       None => ()
     }
   }
@@ -170,10 +167,7 @@ pub fn ShardHealthTracker::failed_shards(
   let result : Array[Int] = []
   for shard_id in self.shards.keys() {
     match self.shards.get(shard_id) {
-      Some(health) =>
-        if health.status == Failed {
-          result.push(shard_id)
-        }
+      Some(health) => if health.status == Failed { result.push(shard_id) }
       None => ()
     }
   }
@@ -200,8 +194,6 @@ pub fn ShardHealthTracker::all_health(
 
 ///|
 /// Total number of tracked shards.
-pub fn ShardHealthTracker::shard_count(
-  self : ShardHealthTracker,
-) -> Int {
+pub fn ShardHealthTracker::shard_count(self : ShardHealthTracker) -> Int {
   self.shards.length()
 }

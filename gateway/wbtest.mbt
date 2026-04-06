@@ -143,7 +143,7 @@ fn run_async_blocking(f : async () -> Unit noraise) -> Unit = "%async.run"
 ///|
 fn run_async_test(f : async () -> Unit) -> Unit {
   run_async_blocking(async fn() noraise {
-    try f() catch {
+    f() catch {
       e => abort("async test failed: " + e.to_string())
     }
   })
@@ -180,10 +180,7 @@ test "wal/upsert_creates_wal" {
     )
     assert_eq(create.status, "ok")
     let upsert = execute_path_request(
-      manager,
-      "PUT",
-      "/collections/test/points",
-      "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{}}]}",
+      manager, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{}}]}",
     )
     assert_eq(upsert.status, "ok")
     // WAL file should exist
@@ -200,16 +197,10 @@ test "wal/delete_persists_via_wal" {
       storage,
     )
     let _ = execute_path_request(
-      manager1,
-      "POST",
-      "/collections/test",
-      "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+      manager1, "POST", "/collections/test", "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
     )
     let _ = execute_path_request(
-      manager1,
-      "PUT",
-      "/collections/test/points",
-      "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}},{\"id\":2,\"vector\":[0,1],\"payload\":{}}]}",
+      manager1, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}},{\"id\":2,\"vector\":[0,1],\"payload\":{}}]}",
     )
     manager1.checkpoint("test")
     let del = execute_path_request(
@@ -239,16 +230,10 @@ test "wal/checkpoint_snapshot_is_current" {
       storage,
     )
     let _ = execute_path_request(
-      manager1,
-      "POST",
-      "/collections/test",
-      "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+      manager1, "POST", "/collections/test", "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
     )
     let _ = execute_path_request(
-      manager1,
-      "PUT",
-      "/collections/test/points",
-      "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
+      manager1, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
     )
     manager1.checkpoint("test")
     // After checkpoint, reload should see the data without WAL
@@ -274,25 +259,16 @@ test "wal/reload_replays_wal" {
       storage,
     )
     let _ = execute_path_request(
-      manager1,
-      "POST",
-      "/collections/test",
-      "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+      manager1, "POST", "/collections/test", "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
     )
     // Add initial points and checkpoint (snapshot includes these)
     let _ = execute_path_request(
-      manager1,
-      "PUT",
-      "/collections/test/points",
-      "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{\"tag\":\"a\"}}]}",
+      manager1, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{\"tag\":\"a\"}}]}",
     )
     manager1.checkpoint("test")
     // Add more points (only in WAL, not in snapshot)
     let _ = execute_path_request(
-      manager1,
-      "PUT",
-      "/collections/test/points",
-      "{\"points\":[{\"id\":2,\"vector\":[0,1],\"payload\":{\"tag\":\"b\"}}]}",
+      manager1, "PUT", "/collections/test/points", "{\"points\":[{\"id\":2,\"vector\":[0,1],\"payload\":{\"tag\":\"b\"}}]}",
     )
 
     // Phase 2: create new manager from same storage - should replay WAL
@@ -322,17 +298,11 @@ test "wal/auto_checkpoint_on_threshold" {
       checkpoint_threshold=3,
     )
     let _ = execute_path_request(
-      manager1,
-      "POST",
-      "/collections/test",
-      "{\"dim\":1,\"strategy\":\"Bruteforce\"}",
+      manager1, "POST", "/collections/test", "{\"dim\":1,\"strategy\":\"Bruteforce\"}",
     )
     // Add 3 points in one batch → reaches threshold → auto-checkpoint
     let _ = execute_path_request(
-      manager1,
-      "PUT",
-      "/collections/test/points",
-      "{\"points\":[{\"id\":1,\"vector\":[1],\"payload\":{}},{\"id\":2,\"vector\":[2],\"payload\":{}},{\"id\":3,\"vector\":[3],\"payload\":{}}]}",
+      manager1, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1],\"payload\":{}},{\"id\":2,\"vector\":[2],\"payload\":{}},{\"id\":3,\"vector\":[3],\"payload\":{}}]}",
     )
     // Data should be accessible
     match manager1.get("test") {
@@ -362,15 +332,10 @@ test "wal/delete_collection_removes_wal" {
       manager, "POST", "/collections/test", "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
     )
     let _ = execute_path_request(
-      manager,
-      "PUT",
-      "/collections/test/points",
-      "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
+      manager, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
     )
     // Delete collection
-    let del = execute_path_request(
-      manager, "DELETE", "/collections/test", "",
-    )
+    let del = execute_path_request(manager, "DELETE", "/collections/test", "")
     assert_eq(del.status, "ok")
     // WAL file should be gone
     let wal_path = @storage.collection_wal_path("test")

@@ -38,12 +38,7 @@ pub fn[S] CollectionManager::with_storage(
   base_path? : String = "",
   checkpoint_threshold? : Int = 1000,
 ) -> CollectionManager[S] {
-  {
-    collections: {},
-    storage: Some(storage),
-    base_path,
-    checkpoint_threshold,
-  }
+  { collections: {}, storage: Some(storage), base_path, checkpoint_threshold }
 }
 
 ///|
@@ -77,7 +72,12 @@ async fn[S : @storage.AsyncStorage] CollectionManager::persist_config(
   let config_bytes = Bytes::from_array(
     config_json.to_array().map(fn(c) { c.to_int().to_byte() }),
   )
-  @storage.async_atomic_write(storage, config_path, config_bytes, @storage.Config)
+  @storage.async_atomic_write(
+    storage,
+    config_path,
+    config_bytes,
+    @storage.Config,
+  )
 }
 
 ///|
@@ -144,11 +144,10 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::create(
 ) -> Result[Unit, GatewayError] {
   let storage = match self.storage {
     Some(s) => s
-    None => {
+    None =>
       // In-memory only — create a PersistentVectorDB with no-op persistence
       // This case is not supported; storage is required for PersistentVectorDB.
       return Err(StorageError("Storage backend required"))
-    }
   }
   let config_path = make_path(
     self.base_path,
@@ -271,19 +270,13 @@ async fn[S : @storage.AsyncStorage] CollectionManager::remove_persisted_collecti
   }
 
   // Remove data
-  let data_path = make_path(
-    self.base_path,
-    @storage.collection_data_path(name),
-  )
+  let data_path = make_path(self.base_path, @storage.collection_data_path(name))
   if @storage.async_exists(storage, data_path, @storage.Data) {
     @storage.async_del(storage, data_path, @storage.Data)
   }
 
   // Remove WAL
-  let wal_path = make_path(
-    self.base_path,
-    @storage.collection_wal_path(name),
-  )
+  let wal_path = make_path(self.base_path, @storage.collection_wal_path(name))
   if @storage.async_exists(storage, wal_path, @storage.Data) {
     @storage.async_del(storage, wal_path, @storage.Data)
   }
@@ -451,10 +444,7 @@ pub fn[S] CollectionManager::load_collection(
     return Err(CollectionExists(config.name))
   }
   let db = @vcdb.VectorDB::deserialize(data)
-  let wal_path = make_path(
-    base_path,
-    @storage.collection_wal_path(config.name),
-  )
+  let wal_path = make_path(base_path, @storage.collection_wal_path(config.name))
   let wal = @wal.AsyncWalRuntime::new(storage, wal_path)
   let pdb = @col_persist.PersistentVectorDB::new(
     db,

@@ -250,7 +250,13 @@ fn io_error_message(e : IOError) -> String {
 /// Wraps synchronous filesystem I/O — resolve is called immediately.
 /// This enables NativeFileStorage to be used with PersistentVectorDB
 /// and all async persistence infrastructure on native targets.
-pub impl AsyncStorage for NativeFileStorage with async_read(self, path, kind, resolve, reject) {
+pub impl AsyncStorage for NativeFileStorage with async_read(
+  self,
+  path,
+  kind,
+  resolve,
+  reject,
+) {
   let data = self.read(path, kind) catch {
     e => {
       reject(io_error_message(e))
@@ -261,7 +267,14 @@ pub impl AsyncStorage for NativeFileStorage with async_read(self, path, kind, re
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_write(self, path, data, kind, resolve, reject) {
+pub impl AsyncStorage for NativeFileStorage with async_write(
+  self,
+  path,
+  data,
+  kind,
+  resolve,
+  reject,
+) {
   self.write(path, data, kind) catch {
     e => {
       reject(io_error_message(e))
@@ -272,7 +285,14 @@ pub impl AsyncStorage for NativeFileStorage with async_write(self, path, data, k
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_atomic_write(self, path, data, kind, resolve, reject) {
+pub impl AsyncStorage for NativeFileStorage with async_atomic_write(
+  self,
+  path,
+  data,
+  kind,
+  resolve,
+  reject,
+) {
   self.atomic_write(path, data, kind) catch {
     e => {
       reject(io_error_message(e))
@@ -283,7 +303,13 @@ pub impl AsyncStorage for NativeFileStorage with async_atomic_write(self, path, 
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_del(self, path, kind, resolve, reject) {
+pub impl AsyncStorage for NativeFileStorage with async_del(
+  self,
+  path,
+  kind,
+  resolve,
+  reject,
+) {
   self.del(path, kind) catch {
     e => {
       reject(io_error_message(e))
@@ -294,11 +320,22 @@ pub impl AsyncStorage for NativeFileStorage with async_del(self, path, kind, res
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_exists(self, path, kind, resolve, _reject) {
+pub impl AsyncStorage for NativeFileStorage with async_exists(
+  self,
+  path,
+  kind,
+  resolve,
+  _reject,
+) {
   resolve(self.exists(path, kind))
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_list(self, kind, resolve, _reject) {
+pub impl AsyncStorage for NativeFileStorage with async_list(
+  self,
+  kind,
+  resolve,
+  _reject,
+) {
   resolve(self.list(kind))
 }

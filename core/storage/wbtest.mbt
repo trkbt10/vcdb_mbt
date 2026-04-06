@@ -1,6 +1,49 @@
 // Whitebox tests for storage module
 
 ///|
+fn run_async_blocking(f : async () -> Unit noraise) -> Unit = "%async.run"
+
+///|
+test "storage/async_read_not_found_rejects" {
+  let storage = MemoryStorage::new()
+  let mut caught = false
+  let mut err_msg = ""
+  run_async_blocking(async fn() noraise {
+    try {
+      let _ = async_read(storage, "nonexistent.txt", Data)
+    } catch {
+      AsyncIOFailed(msg) => {
+        caught = true
+        err_msg = msg
+      }
+      _ => ()
+    }
+  })
+  inspect(caught, content="true")
+  inspect(err_msg, content="Not found: nonexistent.txt")
+}
+
+///|
+test "storage/kind_aware_async_read_not_found_rejects" {
+  let storage = KindAwareStorage::new()
+  let mut caught = false
+  let mut err_msg = ""
+  run_async_blocking(async fn() noraise {
+    try {
+      let _ = async_read(storage, "missing.bin", Data)
+    } catch {
+      AsyncIOFailed(msg) => {
+        caught = true
+        err_msg = msg
+      }
+      _ => ()
+    }
+  })
+  inspect(caught, content="true")
+  inspect(err_msg, content="Not found: missing.bin")
+}
+
+///|
 test "storage/memory_readwrite" {
   let storage = MemoryStorage::new()
   let data = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'][:])
@@ -169,4 +212,3 @@ test "storage/trait_append" {
   }
   inspect(data.length(), content="2")
 }
-

@@ -9,8 +9,8 @@ import {
 
 options(
   targets: {
+    "async_callback.mbt": [ "js" ],
     "native_file_storage.mbt": [ "native" ],
     "native_file_storage_wbtest.mbt": [ "native" ],
-    "async_callback.mbt": [ "js" ],
   },
 )

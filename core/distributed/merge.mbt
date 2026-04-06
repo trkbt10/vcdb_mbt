@@ -85,9 +85,7 @@ pub fn merge_scroll(
   }
 
   // Sort by ID ascending
-  all_entries.sort_by(fn(a, b) {
-    a.id.to_int64().compare(b.id.to_int64())
-  })
+  all_entries.sort_by(fn(a, b) { a.id.to_int64().compare(b.id.to_int64()) })
 
   let entries = if limit >= all_entries.length() {
     all_entries

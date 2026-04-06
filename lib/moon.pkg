@@ -14,10 +14,6 @@ import {
 }
 
 options(
-  targets: {
-    "persistent_exports.mbt": [ "js" ],
-    "gateway_exports.mbt": [ "js" ],
-  },
   link: {
     "js": {
       "exports": [
@@ -69,5 +65,9 @@ options(
         "format_int64",
       ],
     },
+  },
+  targets: {
+    "gateway_exports.mbt": [ "js" ],
+    "persistent_exports.mbt": [ "js" ],
   },
 )

@@ -24,6 +24,8 @@ pub struct VectorDB {
   ivf : @ann.IVFState?
 }
 pub fn VectorDB::add(Self, @types.VectorId, Array[Double], @types.Attrs) -> Unit
+pub fn VectorDB::compact(Self) -> (Self, Int)
+pub fn VectorDB::count_filtered(Self, expr? : @filter.FilterExpr?) -> Int
 pub fn VectorDB::deserialize(Bytes) -> Self
 pub fn VectorDB::dim(Self) -> Int
 pub fn VectorDB::find(Self, Array[Double], ((@types.VectorId, @types.Attrs) -> Bool)?) -> @types.SearchHit?
@@ -35,6 +37,7 @@ pub fn VectorDB::new(@types.DatabaseOptions) -> Self
 pub fn VectorDB::raw_size(Self) -> Int
 pub fn VectorDB::remove(Self, @types.VectorId) -> Bool
 pub fn VectorDB::scroll(Self, offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
+pub fn VectorDB::scroll_filtered(Self, expr? : @filter.FilterExpr?, offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
 pub fn VectorDB::search(Self, Array[Double], Int, ((@types.VectorId, @types.Attrs) -> Bool)?) -> Array[@types.SearchHit]
 pub fn VectorDB::search_with_expr(Self, Array[Double], Int, @filter.FilterExpr?, @attr.BPTreeAttrIndex?, @filter.FilterStrategy) -> Array[@types.SearchHit]
 pub fn VectorDB::serialize(Self) -> Bytes

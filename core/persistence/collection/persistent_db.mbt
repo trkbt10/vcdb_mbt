@@ -91,7 +91,11 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVec
   let wal_data = wal.load()
 
   let data_path = join_path(base_path, @storage.collection_data_path(name))
-  let has_snapshot = @storage.async_exists(snapshot_storage, data_path, @storage.Data)
+  let has_snapshot = @storage.async_exists(
+    snapshot_storage,
+    data_path,
+    @storage.Data,
+  )
   let snapshot_data : Bytes? = if has_snapshot {
     Some(@storage.async_read(snapshot_storage, data_path, @storage.Data))
   } else {
@@ -120,15 +124,14 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVec
         existing
       }
     }
-    None => {
+    None =>
       if wal_data.length() > 0 {
-        let store = @store.CoreStore::new(dim, @types.Cosine, capacity=capacity)
+        let store = @store.CoreStore::new(dim, @types.Cosine, capacity~)
         let _ = @wal.replay_wal_data(wal_data, store)
         @vcdb.VectorDB::from_store(store, options)
       } else {
         @vcdb.VectorDB::new(options)
       }
-    }
   }
 
   PersistentVectorDB::new(
@@ -137,8 +140,8 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVec
     snapshot_storage,
     base_path,
     name,
-    checkpoint_threshold=checkpoint_threshold,
-    checkpoint_bytes=checkpoint_bytes,
+    checkpoint_threshold~,
+    checkpoint_bytes~,
   )
 }
 
@@ -270,7 +273,7 @@ pub fn[W, S] PersistentVectorDB::scroll(
   offset? : Int64? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
-  self.db.scroll(offset=offset, limit=limit)
+  self.db.scroll(offset~, limit~)
 }
 
 ///|
@@ -281,7 +284,7 @@ pub fn[W, S] PersistentVectorDB::scroll_filtered(
   offset? : Int64? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
-  self.db.scroll_filtered(expr=expr, offset=offset, limit=limit)
+  self.db.scroll_filtered(expr~, offset~, limit~)
 }
 
 ///|
@@ -290,14 +293,12 @@ pub fn[W, S] PersistentVectorDB::count_filtered(
   self : PersistentVectorDB[W, S],
   expr? : @filter.FilterExpr? = None,
 ) -> Int {
-  self.db.count_filtered(expr=expr)
+  self.db.count_filtered(expr~)
 }
 
 ///|
 /// Database size (excluding tombstones).
-pub fn[W, S] PersistentVectorDB::size(
-  self : PersistentVectorDB[W, S],
-) -> Int {
+pub fn[W, S] PersistentVectorDB::size(self : PersistentVectorDB[W, S]) -> Int {
   self.db.size()
 }
 
@@ -311,9 +312,7 @@ pub fn[W, S] PersistentVectorDB::raw_size(
 
 ///|
 /// Vector dimension.
-pub fn[W, S] PersistentVectorDB::dim(
-  self : PersistentVectorDB[W, S],
-) -> Int {
+pub fn[W, S] PersistentVectorDB::dim(self : PersistentVectorDB[W, S]) -> Int {
   self.db.dim()
 }
 
@@ -364,7 +363,12 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVec
     self.base_path,
     @storage.collection_data_path(self.name),
   )
-  @storage.async_atomic_write(self.snapshot_storage, data_path, data, @storage.Data)
+  @storage.async_atomic_write(
+    self.snapshot_storage,
+    data_path,
+    data,
+    @storage.Data,
+  )
 
   // Step 2: Truncate WAL (only after snapshot is confirmed durable)
   self.wal.truncate()

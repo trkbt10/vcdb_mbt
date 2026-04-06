@@ -2,7 +2,17 @@
 package "trkbt10/vcdb/core/storage"
 
 // Values
-pub fn clear_callbacks() -> Unit
+pub async fn[S : AsyncStorage] async_atomic_write(S, String, Bytes, StorageKind) -> Unit
+
+pub async fn[S : AsyncStorage] async_del(S, String, StorageKind) -> Unit
+
+pub async fn[S : AsyncStorage] async_exists(S, String, StorageKind) -> Bool
+
+pub async fn[S : AsyncStorage] async_list(S, StorageKind) -> Array[String]
+
+pub async fn[S : AsyncStorage] async_read(S, String, StorageKind) -> Bytes
+
+pub async fn[S : AsyncStorage] async_write(S, String, Bytes, StorageKind) -> Unit
 
 pub fn collection_config_path(String) -> String
 
@@ -12,13 +22,21 @@ pub fn collection_index_path(String) -> String
 
 pub fn collection_manifest_path(String) -> String
 
-pub fn has_callbacks() -> Bool
+pub fn collection_wal_path(String) -> String
 
-pub fn register_callbacks(StorageCallbacks) -> Unit
+pub let ext_config : String
+
+pub let ext_data : String
+
+pub fn is_segment_path(String, String) -> Bool
 
 pub fn segment_data_path(String, Int, Int) -> String
 
 // Errors
+pub(all) suberror AsyncIOError {
+  AsyncIOFailed(String)
+}
+
 pub(all) suberror IOError {
   NotFound(String)
   PermissionDenied(String)
@@ -26,18 +44,15 @@ pub(all) suberror IOError {
 }
 
 // Types and methods
-pub struct CallbackStorage {
-  // private fields
+pub struct KindAwareStorage {
+  config : Map[String, Bytes]
+  index : Map[String, Bytes]
+  data : Map[String, Bytes]
 }
-pub fn CallbackStorage::append(Self, String, Bytes, StorageKind) -> Unit
-pub fn CallbackStorage::atomic_write(Self, String, Bytes, StorageKind) -> Unit
-pub fn CallbackStorage::del(Self, String, StorageKind) -> Unit raise IOError
-pub fn CallbackStorage::exists(Self, String, StorageKind) -> Bool
-pub fn CallbackStorage::list(Self, StorageKind) -> Array[String]
-pub fn CallbackStorage::new() -> Self
-pub fn CallbackStorage::read(Self, String, StorageKind) -> Bytes raise IOError
-pub fn CallbackStorage::write(Self, String, Bytes, StorageKind) -> Unit
-pub impl Storage for CallbackStorage
+pub fn KindAwareStorage::list_kind(Self, StorageKind) -> Array[String]
+pub fn KindAwareStorage::new() -> Self
+pub impl AsyncStorage for KindAwareStorage
+pub impl Storage for KindAwareStorage
 
 pub struct MemoryStorage {
   data : Map[String, Bytes]
@@ -51,29 +66,8 @@ pub fn MemoryStorage::list(Self) -> Array[String]
 pub fn MemoryStorage::new() -> Self
 pub fn MemoryStorage::read(Self, String) -> Bytes raise IOError
 pub fn MemoryStorage::write(Self, String, Bytes) -> Unit
+pub impl AsyncStorage for MemoryStorage
 pub impl Storage for MemoryStorage
-
-pub struct NativeFileStorage {
-  root_dir : String
-}
-pub fn NativeFileStorage::append(Self, String, Bytes, StorageKind) -> Unit raise IOError
-pub fn NativeFileStorage::atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
-pub fn NativeFileStorage::del(Self, String, StorageKind) -> Unit raise IOError
-pub fn NativeFileStorage::exists(Self, String, StorageKind) -> Bool
-pub fn NativeFileStorage::list(Self, StorageKind) -> Array[String]
-pub fn NativeFileStorage::new(String) -> Self
-pub fn NativeFileStorage::read(Self, String, StorageKind) -> Bytes raise IOError
-pub fn NativeFileStorage::write(Self, String, Bytes, StorageKind) -> Unit raise IOError
-pub impl Storage for NativeFileStorage
-
-pub struct StorageCallbacks {
-  read : (String, StorageKind) -> Bytes
-  write : (String, Bytes, StorageKind) -> Unit
-  exists : (String, StorageKind) -> Bool
-  del : (String, StorageKind) -> Unit
-  list : (StorageKind) -> Array[String]
-}
-pub fn StorageCallbacks::new((String, StorageKind) -> Bytes, (String, Bytes, StorageKind) -> Unit, (String, StorageKind) -> Bool, (String, StorageKind) -> Unit, (StorageKind) -> Array[String]) -> Self
 
 pub(all) enum StorageKind {
   Config
@@ -84,6 +78,15 @@ pub(all) enum StorageKind {
 // Type aliases
 
 // Traits
+pub(open) trait AsyncStorage {
+  async_read(Self, String, StorageKind, (Bytes) -> Unit, (String) -> Unit) -> Unit
+  async_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  async_atomic_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  async_del(Self, String, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  async_exists(Self, String, StorageKind, (Bool) -> Unit, (String) -> Unit) -> Unit
+  async_list(Self, StorageKind, (Array[String]) -> Unit, (String) -> Unit) -> Unit
+}
+
 pub trait Storage {
   read(Self, String, StorageKind) -> Bytes raise IOError
   write(Self, String, Bytes, StorageKind) -> Unit raise IOError

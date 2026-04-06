@@ -29,12 +29,19 @@ async fn[T, E : Error] suspend(
 /// Implementors must call the provided continuation when I/O completes.
 pub(open) trait AsyncStorage {
   /// Read file contents. Calls resolve with data, or reject on error.
-  /// Returns empty Bytes (not error) if file doesn't exist.
+  /// Missing files must reject rather than resolving empty Bytes.
   async_read(Self, String, StorageKind, (Bytes) -> Unit, (String) -> Unit) -> Unit
   /// Write data to file (overwrites existing).
   async_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
   /// Atomic write (same as write for most backends, but guarantees atomicity).
-  async_atomic_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  async_atomic_write(
+    Self,
+    String,
+    Bytes,
+    StorageKind,
+    () -> Unit,
+    (String) -> Unit,
+  ) -> Unit
   /// Delete file.
   async_del(Self, String, StorageKind, () -> Unit, (String) -> Unit) -> Unit
   /// Check if file exists.
@@ -60,7 +67,9 @@ pub async fn[S : AsyncStorage] async_read(
   kind : StorageKind,
 ) -> Bytes {
   suspend(fn(resolve, reject) {
-    storage.async_read(path, kind, resolve, fn(err) { reject(AsyncIOFailed(err)) })
+    storage.async_read(path, kind, resolve, fn(err) {
+      reject(AsyncIOFailed(err))
+    })
   })
 }
 
@@ -112,7 +121,9 @@ pub async fn[S : AsyncStorage] async_exists(
   kind : StorageKind,
 ) -> Bool {
   suspend(fn(resolve, reject) {
-    storage.async_exists(path, kind, resolve, fn(err) { reject(AsyncIOFailed(err)) })
+    storage.async_exists(path, kind, resolve, fn(err) {
+      reject(AsyncIOFailed(err))
+    })
   })
 }
 

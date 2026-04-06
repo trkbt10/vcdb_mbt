@@ -50,12 +50,10 @@ pub(all) enum FileType {
   Wal
   Segment
   Index
-}
+} derive(Eq, Show)
 pub fn FileType::extension(Self) -> String
 pub fn FileType::from_byte(Byte) -> Self?
 pub fn FileType::to_byte(Self) -> Byte
-pub impl Eq for FileType
-pub impl Show for FileType
 
 // Type aliases
 

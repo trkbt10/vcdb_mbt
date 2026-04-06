@@ -41,8 +41,7 @@ pub struct MoveInfo {
   moved_id : @types.VectorId?
   moved_from : Int?
   moved_to : Int?
-}
-pub impl Show for MoveInfo
+} derive(Show)
 
 // Type aliases
 

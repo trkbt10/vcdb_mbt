@@ -14,9 +14,9 @@ import {
 pub struct NativeGateway {
   manager : @gateway.CollectionManager[@storage.MemoryStorage]
 }
-pub fn NativeGateway::execute(Self, Array[String]) -> @gateway.ApiResponse
+pub async fn NativeGateway::execute(Self, Array[String]) -> @gateway.ApiResponse
 pub fn NativeGateway::new() -> Self
-pub fn NativeGateway::run(Self, Array[String]) -> String
+pub async fn NativeGateway::run(Self, Array[String]) -> String
 
 // Type aliases
 

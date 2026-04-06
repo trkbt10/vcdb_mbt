@@ -111,9 +111,7 @@ pub fn AsyncRebalanceState::progress(
 
 ///|
 /// Whether the rebalance is complete (all moves executed).
-pub fn AsyncRebalanceState::is_complete(
-  self : AsyncRebalanceState,
-) -> Bool {
+pub fn AsyncRebalanceState::is_complete(self : AsyncRebalanceState) -> Bool {
   self.moves_completed >= self.plan.length()
 }
 
@@ -181,30 +179,18 @@ pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(
 
     // Read from source (async)
     let segment_path = mv.name + @codec.ext_segment
-    let data = try {
-      @storage.async_read(from_storage, segment_path, @storage.Data)
-    } catch {
+    let data = @storage.async_read(from_storage, segment_path, @storage.Data) catch {
       _ => {
-        let err = "Failed to read " +
-          segment_path +
-          " from " +
-          mv.from
+        let err = "Failed to read " + segment_path + " from " + mv.from
         state.phase = Failed(err)
         raise @storage.AsyncIOFailed(err)
       }
     }
 
     // Write to destination (async)
-    try {
-      @storage.async_atomic_write(
-        to_storage, segment_path, data, @storage.Data,
-      )
-    } catch {
+    @storage.async_atomic_write(to_storage, segment_path, data, @storage.Data) catch {
       _ => {
-        let err = "Failed to write " +
-          segment_path +
-          " to " +
-          mv.to
+        let err = "Failed to write " + segment_path + " to " + mv.to
         state.phase = Failed(err)
         raise @storage.AsyncIOFailed(err)
       }

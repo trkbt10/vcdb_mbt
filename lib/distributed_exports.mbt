@@ -24,18 +24,22 @@ pub fn distributed_merge_search(
   shard_results : Array[(Int, Array[(Int, Int, Double, String)], String)],
   top_k : Int,
 ) -> (Array[(Int, Int, Double, String)], Array[Int], Array[(Int, String)]) {
-  let inputs : Array[@distributed.ShardSearchResult] = shard_results.map(
-    fn(sr) {
-      let (shard_id, raw_hits, error) = sr
-      let hits = raw_hits.map(fn(h) {
-        let (hi, lo, score, payload_json) = h
-        let attrs = parse_json_to_attrs(payload_json)
-        @types.SearchHit::{ id: vid_from_pair(hi, lo), score, attrs }
-      })
-      let error_opt : String? = if error.length() > 0 { Some(error) } else { None }
-      { shard_id, hits, error: error_opt }
-    },
-  )
+  let inputs : Array[@distributed.ShardSearchResult] = shard_results.map(fn(
+    sr,
+  ) {
+    let (shard_id, raw_hits, error) = sr
+    let hits = raw_hits.map(fn(h) {
+      let (hi, lo, score, payload_json) = h
+      let attrs = parse_json_to_attrs(payload_json)
+      @types.SearchHit::{ id: vid_from_pair(hi, lo), score, attrs }
+    })
+    let error_opt : String? = if error.length() > 0 {
+      Some(error)
+    } else {
+      None
+    }
+    { shard_id, hits, error: error_opt }
+  })
   let merged = @distributed.merge_search(inputs, top_k)
   let out_hits = merged.hits.map(fn(hit) {
     let (hi, lo) = vid_to_pair(hit.id)
@@ -57,18 +61,22 @@ pub fn distributed_merge_scroll(
   shard_results : Array[(Int, Array[(Int, Int, String)], String)],
   limit : Int,
 ) -> (Array[(Int, Int, String)], Array[Int], Array[(Int, String)]) {
-  let inputs : Array[@distributed.ShardScrollResult] = shard_results.map(
-    fn(sr) {
-      let (shard_id, raw_entries, error) = sr
-      let entries = raw_entries.map(fn(e) {
-        let (hi, lo, attrs_json) = e
-        let attrs = parse_json_to_attrs(attrs_json)
-        @distributed.ShardScrollEntry::{ id: vid_from_pair(hi, lo), attrs }
-      })
-      let error_opt : String? = if error.length() > 0 { Some(error) } else { None }
-      { shard_id, entries, error: error_opt }
-    },
-  )
+  let inputs : Array[@distributed.ShardScrollResult] = shard_results.map(fn(
+    sr,
+  ) {
+    let (shard_id, raw_entries, error) = sr
+    let entries = raw_entries.map(fn(e) {
+      let (hi, lo, attrs_json) = e
+      let attrs = parse_json_to_attrs(attrs_json)
+      @distributed.ShardScrollEntry::{ id: vid_from_pair(hi, lo), attrs }
+    })
+    let error_opt : String? = if error.length() > 0 {
+      Some(error)
+    } else {
+      None
+    }
+    { shard_id, entries, error: error_opt }
+  })
   let merged = @distributed.merge_scroll(inputs, limit)
   let out_entries = merged.entries.map(fn(entry) {
     let (hi, lo) = vid_to_pair(entry.id)
@@ -88,13 +96,15 @@ pub fn distributed_merge_scroll(
 pub fn distributed_merge_count(
   shard_results : Array[(Int, Int, String)],
 ) -> (Int, Array[Int], Array[(Int, String)]) {
-  let inputs : Array[@distributed.ShardCountResult] = shard_results.map(
-    fn(sr) {
-      let (shard_id, count, error) = sr
-      let error_opt : String? = if error.length() > 0 { Some(error) } else { None }
-      { shard_id, count, error: error_opt }
-    },
-  )
+  let inputs : Array[@distributed.ShardCountResult] = shard_results.map(fn(sr) {
+    let (shard_id, count, error) = sr
+    let error_opt : String? = if error.length() > 0 {
+      Some(error)
+    } else {
+      None
+    }
+    { shard_id, count, error: error_opt }
+  })
   let merged = @distributed.merge_count(inputs)
   (merged.count, merged.succeeded, merged.failed)
 }
@@ -111,8 +121,9 @@ pub fn distributed_group_upsert(
   pg_count : Int,
 ) -> Array[(Int, Array[(Int, Int, Array[Double], String)])] {
   let crush_map = @placement.CrushMap::new(pg_count, 1, [])
-  let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = points.map(
-    fn(p) {
+  let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = points.map(fn(
+      p,
+    ) {
       let (hi, lo, vector, payload_json) = p
       (vid_from_pair(hi, lo), vector, parse_json_to_attrs(payload_json))
     },
@@ -166,4 +177,3 @@ pub fn format_int64(hi : Int, lo : Int) -> String {
   let vid = vid_from_pair(hi, lo)
   vid.to_int64().to_string()
 }
-

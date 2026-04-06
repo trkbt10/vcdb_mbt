@@ -127,4 +127,3 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
     None => abort("Failed to reconstruct from segments")
   }
 }
-

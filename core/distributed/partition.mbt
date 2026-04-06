@@ -34,7 +34,7 @@ pub fn PartitionState::new(shard_count : Int) -> PartitionState {
   for i in 0..<shard_count {
     statuses[i] = Connected
   }
-  { statuses }
+  { statuses, }
 }
 
 ///|
@@ -171,7 +171,7 @@ pub fn resolve_conflicts_lww(
       Some(local_rec) => {
         seen[id_key] = true
         match remote_by_id.get(id_key) {
-          Some(remote_rec) => {
+          Some(remote_rec) =>
             // Conflict: both sides have this ID
             if local_rec.timestamp > remote_rec.timestamp {
               merged.push(local_rec)
@@ -199,7 +199,6 @@ pub fn resolve_conflicts_lww(
                 resolution: TieBreakById,
               })
             }
-          }
           None => merged.push(local_rec) // Only local has this ID
         }
       }
@@ -254,8 +253,7 @@ pub fn merge_divergent_wals(
 
   // Resolve conflicts
   let (merged_records, conflicts) = resolve_conflicts_lww(
-    local_diverged,
-    remote_diverged,
+    local_diverged, remote_diverged,
   )
 
   // Build shared base (records ≤ diverge_ts from local — should be same on both)

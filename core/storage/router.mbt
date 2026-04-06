@@ -45,7 +45,12 @@ pub fn collection_manifest_path(collection_name : String) -> String {
 ///|
 /// Path for data segment file
 pub fn segment_data_path(base : String, pg : Int, part : Int) -> String {
-  base + ".pg" + pg.to_string() + ".part" + part.to_string() + @codec.ext_segment
+  base +
+  ".pg" +
+  pg.to_string() +
+  ".part" +
+  part.to_string() +
+  @codec.ext_segment
 }
 
 ///|

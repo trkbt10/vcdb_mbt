@@ -122,9 +122,11 @@ pub fn write_segments_in_memory(
 
     if opts.segmented && seg.size + rec_size > seg_limit {
       let seg_data = seg.writer.to_bytes()
-      segments.push(
-        { name: seg.writer.get_name(), target_key: seg.target_key, data: seg_data },
-      )
+      segments.push({
+        name: seg.writer.get_name(),
+        target_key: seg.target_key,
+        data: seg_data,
+      })
       seg.part = seg.part + 1
       let new_name = "\{base}.pg\{pg}.part\{seg.part}"
       seg.writer = @segment.SegmentWriter::new(new_name)
@@ -142,9 +144,11 @@ pub fn write_segments_in_memory(
       None => continue
       Some(seg) => {
         let seg_data = seg.writer.to_bytes()
-        segments.push(
-          { name: seg.writer.get_name(), target_key: seg.target_key, data: seg_data },
-        )
+        segments.push({
+          name: seg.writer.get_name(),
+          target_key: seg.target_key,
+          data: seg_data,
+        })
         segment_entries.push({
           name: seg.writer.get_name(),
           target_key: seg.target_key,
@@ -179,11 +183,7 @@ pub fn[S : @storage.Storage] write_segments_from_store(
   // Persist segments to their target storages
   for seg in mem.segments {
     let storage = require_storage(storages, seg.target_key)
-    storage.atomic_write(
-      seg.name + @codec.ext_segment,
-      seg.data,
-      @storage.Data,
-    )
+    storage.atomic_write(seg.name + @codec.ext_segment, seg.data, @storage.Data)
   }
 
   {
@@ -371,10 +371,8 @@ pub fn reconstruct_from_index(
           Some(d) => d
           None => return None
         }
-        let r = match @segment.SegmentReader::from_bytes(
-          entry.ptr.segment,
-          data,
-        ) {
+        let r = match
+          @segment.SegmentReader::from_bytes(entry.ptr.segment, data) {
           Some(r) => r
           None => return None
         }
@@ -414,10 +412,8 @@ pub fn reconstruct_from_segments(
     Some(d) => d
     None => return None
   }
-  let first_reader = match @segment.SegmentReader::from_bytes(
-    first_name,
-    first_data,
-  ) {
+  let first_reader = match
+    @segment.SegmentReader::from_bytes(first_name, first_data) {
     Some(r) => r
     None => return None
   }
@@ -514,10 +510,9 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
     for seg_name in needed.keys() {
       let target_key = match seg_targets.get(seg_name) {
         Some(t) => t
-        None => {
+        None =>
           // Fall back to first available storage
           "local"
-        }
       }
       let storage = require_storage(storages, target_key)
       let data = storage.read(seg_name + @codec.ext_segment, @storage.Data)

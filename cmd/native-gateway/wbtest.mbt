@@ -4,7 +4,7 @@ fn run_async_blocking(f : async () -> Unit noraise) -> Unit = "%async.run"
 ///|
 fn run_async_test(f : async () -> Unit) -> Unit {
   run_async_blocking(async fn() noraise {
-    try f() catch {
+    f() catch {
       e => abort("async test failed: " + e.to_string())
     }
   })
@@ -35,7 +35,8 @@ test "native gateway collection lifecycle" {
     assert_eq(list.status, "ok")
 
     let upsert = app.execute([
-      "points", "upsert", "demo", "--id", "1", "--vector", "1,0,0", "--payload", "label=test",
+      "points", "upsert", "demo", "--id", "1", "--vector", "1,0,0", "--payload",
+      "label=test",
     ])
     assert_eq(upsert.status, "ok")
 

@@ -738,7 +738,11 @@ test "vectordb/scroll_filtered_pagination" {
   let (last_id, _) = page1[1]
   inspect(last_id.to_int64(), content="2")
   // Page 2: next 2 (offset = last seen ID)
-  let page2 = db.scroll_filtered(expr=Some(expr), offset=Some(last_id.to_int64()), limit=2)
+  let page2 = db.scroll_filtered(
+    expr=Some(expr),
+    offset=Some(last_id.to_int64()),
+    limit=2,
+  )
   inspect(page2.length(), content="2")
   let (p2_first, _) = page2[0]
   let (p2_last, _) = page2[1]
@@ -779,9 +783,9 @@ test "vectordb/scroll_filtered_must_not" {
   db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
   db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
   // "NOT top" should return questions only
-  let expr = @filter.FilterExpr::must_not(
-    [@filter.FilterExpr::match_("_type", @types.String("top"))],
-  )
+  let expr = @filter.FilterExpr::must_not([
+    @filter.FilterExpr::match_("_type", @types.String("top")),
+  ])
   let results = db.scroll_filtered(expr=Some(expr), limit=10)
   inspect(results.length(), content="2")
   let (id0, _) = results[0]

@@ -18,7 +18,9 @@ test "filter_json/shorthand_single" {
 
 ///|
 test "filter_json/shorthand_multiple" {
-  let f = parse_filter_json("{\"category\":\"科学\",\"status\":\"解決済み\"}")
+  let f = parse_filter_json(
+    "{\"category\":\"科学\",\"status\":\"解決済み\"}",
+  )
   match f {
     Some(Must(exprs)) => inspect(exprs.length(), content="2")
     _ => inspect(false, content="true")
@@ -27,7 +29,9 @@ test "filter_json/shorthand_multiple" {
 
 ///|
 test "filter_json/match_structured" {
-  let f = parse_filter_json("{\"match\":{\"key\":\"category\",\"value\":\"生活\"}}")
+  let f = parse_filter_json(
+    "{\"match\":{\"key\":\"category\",\"value\":\"生活\"}}",
+  )
   match f {
     Some(Leaf(Match(key, @types.String(val)))) => {
       inspect(key, content="category")
@@ -63,7 +67,9 @@ test "filter_json/match_bool" {
 
 ///|
 test "filter_json/range" {
-  let f = parse_filter_json("{\"range\":{\"key\":\"score\",\"gte\":0.5,\"lt\":1.0}}")
+  let f = parse_filter_json(
+    "{\"range\":{\"key\":\"score\",\"gte\":0.5,\"lt\":1.0}}",
+  )
   match f {
     Some(Leaf(Range(key, range))) => {
       inspect(key, content="score")
@@ -117,9 +123,7 @@ test "filter_json/must_not" {
     "{\"must_not\":[{\"match\":{\"key\":\"status\",\"value\":\"解決済み\"}}]}",
   )
   match f {
-    Some(MustNot(exprs)) => {
-      inspect(exprs.length(), content="1")
-    }
+    Some(MustNot(exprs)) => inspect(exprs.length(), content="1")
     _ => inspect(false, content="true")
   }
 }

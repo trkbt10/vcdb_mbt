@@ -21,6 +21,14 @@ pub fn encode_wal_record(WalRecord) -> Bytes
 
 pub fn encode_wal_segment(Array[WalRecord]) -> Bytes
 
+pub fn filter_wal_by_timestamp(Bytes, Int64) -> Array[WalRecord]
+
+pub fn max_wal_timestamp(Bytes) -> Int64
+
+pub fn merge_wal(Bytes, Bytes) -> Bytes
+
+pub fn replay_wal_data(Bytes, @store.CoreStore, cutoff_ts? : Int64) -> Int
+
 pub fn verify_wal_checksum(Bytes) -> Bool
 
 pub fn verify_wal_header(@binary.BinaryReader) -> Bool
@@ -32,37 +40,43 @@ pub let wal_version : Byte
 // Errors
 
 // Types and methods
+pub struct AsyncWalRuntime[S] {
+  storage : S
+  path : String
+  kind : @storage.StorageKind
+  mut data : Bytes
+  mut record_count : Int
+  mut loaded : Bool
+}
+pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::append(Self[S], Array[WalRecord]) -> Unit
+pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::async_exists(Self[S]) -> Bool
+pub fn[S] AsyncWalRuntime::byte_size(Self[S]) -> Int
+pub fn[S] AsyncWalRuntime::is_loaded(Self[S]) -> Bool
+pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::load(Self[S]) -> Bytes
+pub fn[S] AsyncWalRuntime::new(S, String, kind? : @storage.StorageKind) -> Self[S]
+pub fn[S] AsyncWalRuntime::path(Self[S]) -> String
+pub fn[S] AsyncWalRuntime::record_count(Self[S]) -> Int
+pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::replay_into(Self[S], @store.CoreStore) -> Int
+pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::truncate(Self[S]) -> Unit
+
 pub struct WalRecord {
   record_type : WalRecordType
   id : @types.VectorId
   attrs : @types.Attrs?
   vector : Array[Double]?
-}
-pub fn WalRecord::remove(@types.VectorId) -> Self
-pub fn WalRecord::set_attrs(@types.VectorId, @types.Attrs) -> Self
-pub fn WalRecord::upsert(@types.VectorId, Array[Double], @types.Attrs) -> Self
-pub impl Show for WalRecord
+  timestamp : Int64
+} derive(Show)
+pub fn WalRecord::remove(@types.VectorId, timestamp? : Int64) -> Self
+pub fn WalRecord::set_attrs(@types.VectorId, @types.Attrs, timestamp? : Int64) -> Self
+pub fn WalRecord::upsert(@types.VectorId, Array[Double], @types.Attrs, timestamp? : Int64) -> Self
 
 pub enum WalRecordType {
   Upsert
   Remove
   SetAttrs
-}
+} derive(Eq, Show)
 pub fn WalRecordType::from_byte(Byte) -> Self?
 pub fn WalRecordType::to_byte(Self) -> Byte
-pub impl Eq for WalRecordType
-pub impl Show for WalRecordType
-
-pub struct WalRuntime {
-  storage : @storage.MemoryStorage
-  path : String
-}
-pub fn WalRuntime::append(Self, Array[WalRecord]) -> Unit raise @storage.IOError
-pub fn WalRuntime::exists(Self) -> Bool
-pub fn WalRuntime::new(@storage.MemoryStorage, String) -> Self
-pub fn WalRuntime::replay_into(Self, @store.CoreStore) -> Int raise @storage.IOError
-pub fn WalRuntime::size(Self) -> Int
-pub fn WalRuntime::truncate(Self) -> Unit
 
 // Type aliases
 

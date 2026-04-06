@@ -327,7 +327,7 @@ pub fn VectorDB::scroll(
     Some(o) => Some(o - 1L)
     None => None
   }
-  self.scroll_filtered(expr=None, offset=adjusted, limit=limit)
+  self.scroll_filtered(expr=None, offset=adjusted, limit~)
 }
 
 ///|

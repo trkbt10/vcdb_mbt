@@ -159,12 +159,7 @@ pub fn vcdb_search(
 ///|
 pub fn vcdb_has(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
   match instances.get(instance_id) {
-    Some(db) =>
-      if db.has(vid_from_pair(id_hi, id_lo)) {
-        1
-      } else {
-        0
-      }
+    Some(db) => if db.has(vid_from_pair(id_hi, id_lo)) { 1 } else { 0 }
     None => -1
   }
 }
@@ -172,12 +167,7 @@ pub fn vcdb_has(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
 ///|
 pub fn vcdb_remove(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
   match instances.get(instance_id) {
-    Some(db) =>
-      if db.remove(vid_from_pair(id_hi, id_lo)) {
-        1
-      } else {
-        0
-      }
+    Some(db) => if db.remove(vid_from_pair(id_hi, id_lo)) { 1 } else { 0 }
     None => -1
   }
 }
@@ -232,11 +222,7 @@ fn kind_to_int(kind : @storage.StorageKind) -> Int {
 /// instead of implementing their own hash function.
 ///
 /// Returns a placement group number in [0, pg_count).
-pub fn crush_placement_group(
-  id_hi : Int,
-  id_lo : Int,
-  pg_count : Int,
-) -> Int {
+pub fn crush_placement_group(id_hi : Int, id_lo : Int, pg_count : Int) -> Int {
   let vid = vid_from_pair(id_hi, id_lo)
   let map = @placement.CrushMap::new(pg_count, 1, [])
   let result = @placement.crush_locate(vid, map)

@@ -21,7 +21,10 @@
 /// Instance storage for persistent mode.
 let persistent_instances : @hashmap.HashMap[
   Int,
-  @col_persist.PersistentVectorDB[@storage.JsAsyncCallbackStorage, @storage.JsAsyncCallbackStorage],
+  @col_persist.PersistentVectorDB[
+    @storage.JsAsyncCallbackStorage,
+    @storage.JsAsyncCallbackStorage,
+  ],
 ] = @hashmap.new()
 
 // ── Callback name derivation (SoT) ──────────────────────────
@@ -130,12 +133,7 @@ pub fn persistent_init(
       snapshot_callback_name(instance_id),
     )
     let pdb = @col_persist.PersistentVectorDB::init(
-      wal_storage,
-      snapshot_storage,
-      base_path,
-      collection_name,
-      dim,
-      capacity,
+      wal_storage, snapshot_storage, base_path, collection_name, dim, capacity,
     )
     persistent_instances[instance_id] = pdb
   })
@@ -152,9 +150,7 @@ fn get_pdb(
     Some(pdb) => pdb
     None =>
       abort(
-        "Persistent DB instance " +
-        instance_id.to_string() +
-        " not initialized",
+        "Persistent DB instance " + instance_id.to_string() + " not initialized",
       )
   }
 }
@@ -170,8 +166,9 @@ pub fn persistent_upsert(
 ) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(async fn() {
     let pdb = get_pdb(instance_id)
-    let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = points.map(
-      fn(p) {
+    let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = points.map(fn(
+        p,
+      ) {
         let (id_hi, id_lo, vector, payload_json) = p
         let vid = vid_from_pair(id_hi, id_lo)
         let attrs = parse_json_to_attrs(payload_json)
@@ -312,7 +309,7 @@ pub fn persistent_scroll(
   } else {
     None
   }
-  let entries = pdb.scroll(offset=offset_i64, limit=limit)
+  let entries = pdb.scroll(offset=offset_i64, limit~)
   let results : Array[(Int, Int, String)] = []
   for entry in entries {
     let (vid, record) = entry
@@ -344,7 +341,7 @@ pub fn persistent_scroll_filtered(
     None
   }
   let filter = @filter.parse_filter_json(filter_json)
-  let entries = pdb.scroll_filtered(expr=filter, offset=offset_i64, limit=limit)
+  let entries = pdb.scroll_filtered(expr=filter, offset=offset_i64, limit~)
   let results : Array[(Int, Int, String)] = []
   for entry in entries {
     let (vid, record) = entry

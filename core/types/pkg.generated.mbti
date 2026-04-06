@@ -27,11 +27,9 @@ pub(all) enum AttrValue {
   Int(Int64)
   Float(Double)
   String(String)
-}
-pub impl Eq for AttrValue
-pub impl Show for AttrValue
+} derive(Eq, Show)
 
-pub(all) struct Attrs(Map[String, AttrValue])
+pub(all) struct Attrs(Map[String, AttrValue]) derive(Show)
 pub fn Attrs::clear(Self) -> Unit
 pub fn Attrs::copy(Self) -> Self
 pub fn Attrs::get(Self, String) -> AttrValue?
@@ -41,16 +39,14 @@ pub fn Attrs::is_empty(Self) -> Bool
 pub fn Attrs::keys(Self) -> Array[String]
 pub fn Attrs::set(Self, String, AttrValue) -> Unit
 pub fn Attrs::size(Self) -> Int
-pub impl Show for Attrs
 
 pub(all) struct DatabaseOptions {
   dim : Int
   metric : Metric
   capacity : Int
   strategy : Strategy
-}
+} derive(Show)
 pub fn DatabaseOptions::default(Int) -> Self
-pub impl Show for DatabaseOptions
 
 pub(all) struct HNSWParams {
   m : Int
@@ -59,31 +55,27 @@ pub(all) struct HNSWParams {
   level_mult : Double
   seed : UInt64
   allow_replace_deleted : Bool
-}
+} derive(Show)
 pub fn HNSWParams::default() -> Self
-pub impl Show for HNSWParams
 
 pub(all) struct IVFParams {
   nlist : Int
   nprobe : Int
-}
+} derive(Show)
 pub fn IVFParams::default() -> Self
-pub impl Show for IVFParams
 
 pub(all) enum Metric {
   Cosine
   L2
   Dot
-}
-pub impl Eq for Metric
-pub impl Show for Metric
+} derive(Eq, Show)
 
 pub(all) struct NumericRange {
   gt : Double?
   gte : Double?
   lt : Double?
   lte : Double?
-}
+} derive(Show)
 pub fn NumericRange::between(Double, Double, lower_inclusive? : Bool, upper_inclusive? : Bool) -> Self
 pub fn NumericRange::empty() -> Self
 pub fn NumericRange::gt(Double) -> Self
@@ -91,38 +83,30 @@ pub fn NumericRange::gte(Double) -> Self
 pub fn NumericRange::lt(Double) -> Self
 pub fn NumericRange::lte(Double) -> Self
 pub fn NumericRange::matches(Self, Double) -> Bool
-pub impl Show for NumericRange
 
 pub(all) struct SearchHit {
   id : VectorId
   score : Double
   attrs : Attrs
-}
-pub impl Show for SearchHit
+} derive(Show)
 
 pub(all) enum Strategy {
   Bruteforce
   HNSW(HNSWParams)
   IVF(IVFParams)
-}
-pub impl Show for Strategy
+} derive(Show)
 
-pub(all) struct VectorId(Int64)
+pub(all) struct VectorId(Int64) derive(Compare, Eq, Hash, Show)
 pub fn VectorId::from_int(Int) -> Self
 pub fn VectorId::from_int64(Int64) -> Self
 #deprecated
 pub fn VectorId::inner(Self) -> Int64
 pub fn VectorId::to_int64(Self) -> Int64
-pub impl Compare for VectorId
-pub impl Eq for VectorId
-pub impl Hash for VectorId
-pub impl Show for VectorId
 
 pub(all) struct VectorRecord {
   vector : Array[Double]
   attrs : Attrs
-}
-pub impl Show for VectorRecord
+} derive(Show)
 
 // Type aliases
 

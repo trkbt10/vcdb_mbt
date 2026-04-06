@@ -146,11 +146,7 @@ test "merge_count: failed shard excluded" {
 
 ///|
 test "shard_for_id: deterministic" {
-  let map = @placement.CrushMap::new(
-    8,
-    1,
-    [@placement.CrushTarget::new("s0")],
-  )
+  let map = @placement.CrushMap::new(8, 1, [@placement.CrushTarget::new("s0")])
   let shard1 = shard_for_id(make_vid(42), map)
   let shard2 = shard_for_id(make_vid(42), map)
   assert_eq(shard1, shard2)
@@ -158,11 +154,7 @@ test "shard_for_id: deterministic" {
 
 ///|
 test "shard_for_id: within range" {
-  let map = @placement.CrushMap::new(
-    8,
-    1,
-    [@placement.CrushTarget::new("s0")],
-  )
+  let map = @placement.CrushMap::new(8, 1, [@placement.CrushTarget::new("s0")])
   for i in 0..<100 {
     let shard = shard_for_id(make_vid(i), map)
     assert_true(shard >= 0 && shard < 8)
@@ -171,22 +163,14 @@ test "shard_for_id: within range" {
 
 ///|
 test "all_shards: returns correct count" {
-  let map = @placement.CrushMap::new(
-    4,
-    1,
-    [@placement.CrushTarget::new("s0")],
-  )
+  let map = @placement.CrushMap::new(4, 1, [@placement.CrushTarget::new("s0")])
   let shards = all_shards(map)
   assert_eq(shards, [0, 1, 2, 3])
 }
 
 ///|
 test "group_by_shard: distributes points" {
-  let map = @placement.CrushMap::new(
-    4,
-    1,
-    [@placement.CrushTarget::new("s0")],
-  )
+  let map = @placement.CrushMap::new(4, 1, [@placement.CrushTarget::new("s0")])
   let points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = []
   for i in 0..<20 {
     points.push((make_vid(i), [1.0], @types.empty_attrs()))
@@ -205,11 +189,7 @@ test "group_by_shard: distributes points" {
 
 ///|
 test "group_by_shard: consistent with shard_for_id" {
-  let map = @placement.CrushMap::new(
-    8,
-    1,
-    [@placement.CrushTarget::new("s0")],
-  )
+  let map = @placement.CrushMap::new(8, 1, [@placement.CrushTarget::new("s0")])
   let vid = make_vid(42)
   let expected_shard = shard_for_id(vid, map)
   let points = [(vid, [1.0], @types.empty_attrs())]

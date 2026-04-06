@@ -52,7 +52,10 @@ pub async fn NativeGateway::execute(
 }
 
 ///|
-pub async fn NativeGateway::run(self : NativeGateway, args : Array[String]) -> String {
+pub async fn NativeGateway::run(
+  self : NativeGateway,
+  args : Array[String],
+) -> String {
   if args.length() == 0 {
     return @cli.print_help()
   }
@@ -69,9 +72,7 @@ pub async fn NativeGateway::run(self : NativeGateway, args : Array[String]) -> S
 fn main {
   let app = NativeGateway::new()
   run_async_main(async fn() noraise {
-    let result = try app.run(command_args()) catch {
-      _ => "error"
-    }
+    let result = app.run(command_args()) catch { _ => "error" }
     println(result)
   })
 }

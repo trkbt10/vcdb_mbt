@@ -58,9 +58,7 @@ pub(all) struct ReplicationLag {
 
 ///|
 /// Create a new replication state with all replicas at position 0.
-pub fn ReplicationState::new(
-  replica_keys : Array[String],
-) -> ReplicationState {
+pub fn ReplicationState::new(replica_keys : Array[String]) -> ReplicationState {
   let positions : Map[String, ReplicaPosition] = {}
   for key in replica_keys {
     positions[key] = { replica_key: key, last_applied_ts: 0L }
@@ -144,10 +142,7 @@ pub fn ReplicationState::update_replica_position(
     Some(pos) =>
       self.positions[replica_key] = { ..pos, last_applied_ts: applied_ts }
     None =>
-      self.positions[replica_key] = {
-        replica_key,
-        last_applied_ts: applied_ts,
-      }
+      self.positions[replica_key] = { replica_key, last_applied_ts: applied_ts }
   }
 }
 
@@ -171,7 +166,11 @@ pub fn ReplicationState::compute_replication_lag(
         // this by decoding the WAL if needed.
         result.push({
           replica_key: key,
-          lag_ns: if lag_ns > 0L { lag_ns } else { 0L },
+          lag_ns: if lag_ns > 0L {
+            lag_ns
+          } else {
+            0L
+          },
           lag_records: -1, // Unknown without WAL access
         })
       }
