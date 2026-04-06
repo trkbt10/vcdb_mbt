@@ -3,7 +3,6 @@ import {
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/persistence/codec",
-  "trkbt10/vcdb/core/persistence/collection" @col_persist,
   "trkbt10/vcdb/core/placement",
   "trkbt10/vcdb/core/distributed",
   "trkbt10/vcdb/core/filter",
@@ -69,5 +68,6 @@ options(
   targets: {
     "gateway_exports.mbt": [ "js" ],
     "persistent_exports.mbt": [ "js" ],
+    "wbtest.mbt": [ "js" ],
   },
 )

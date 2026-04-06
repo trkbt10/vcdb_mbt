@@ -8,4 +8,6 @@ import {
   "trkbt10/vcdb/core/binary",
   "trkbt10/vcdb/core/collection",
   "trkbt10/vcdb/core/filter",
+  "trkbt10/vcdb/core/storage",
+  "trkbt10/vcdb/core/persistence/wal",
 }

@@ -94,6 +94,6 @@ pub trait Storage {
   atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
   del(Self, String, StorageKind) -> Unit raise IOError
   exists(Self, String, StorageKind) -> Bool
-  list(Self, StorageKind) -> Array[String]
+  list(Self, StorageKind) -> Array[String] raise IOError
 }
 

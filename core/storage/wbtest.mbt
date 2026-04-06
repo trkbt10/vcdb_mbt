@@ -179,7 +179,7 @@ test "storage/trait_impl" {
     _ => Bytes::new(0)
   }
   inspect(data.length(), content="4")
-  let files = (storage as &Storage).list(Data)
+  let files = (storage as &Storage).list(Data) catch { _ => [] }
   inspect(files.length(), content="1")
   (storage as &Storage).del("trait_test.txt", Data) catch {
     _ => ()

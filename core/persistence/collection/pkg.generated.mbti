@@ -31,7 +31,7 @@ pub fn[W, S] PersistentVectorDB::dim(Self[W, S]) -> Int
 pub fn[W, S] PersistentVectorDB::get(Self[W, S], @types.VectorId) -> @types.VectorRecord?
 pub fn[W, S] PersistentVectorDB::get_underlying_db(Self[W, S]) -> @vcdb.VectorDB
 pub fn[W, S] PersistentVectorDB::has(Self[W, S], @types.VectorId) -> Bool
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::init(W, S, String, String, Int, Int, checkpoint_threshold? : Int, checkpoint_bytes? : Int) -> Self[W, S]
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::init(W, S, String, String, Int, Int, metric? : @types.Metric, strategy? : @types.Strategy, checkpoint_threshold? : Int, checkpoint_bytes? : Int) -> Self[W, S]
 pub fn[W, S] PersistentVectorDB::new(@vcdb.VectorDB, @wal.AsyncWalRuntime[W], S, String, String, checkpoint_threshold? : Int, checkpoint_bytes? : Int) -> Self[W, S]
 pub fn[W, S] PersistentVectorDB::raw_size(Self[W, S]) -> Int
 pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::remove(Self[W, S], @types.VectorId, Int64) -> Bool

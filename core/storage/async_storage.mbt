@@ -46,7 +46,7 @@ pub(open) trait AsyncStorage {
   async_del(Self, String, StorageKind, () -> Unit, (String) -> Unit) -> Unit
   /// Check if file exists.
   async_exists(Self, String, StorageKind, (Bool) -> Unit, (String) -> Unit) -> Unit
-  /// List all files for a given kind.
+  /// List all files for a given kind. Rejects on backend failures.
   async_list(Self, StorageKind, (Array[String]) -> Unit, (String) -> Unit) -> Unit
 }
 

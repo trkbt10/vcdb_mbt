@@ -37,33 +37,75 @@ pub fn CollectionConfig::default(name : String, dim : Int) -> CollectionConfig {
 /// Supports both formats:
 /// - {"dim": 4, "metric": "Cosine"}
 /// - {"vectors": {"size": 4, "distance": "Cosine"}} (Qdrant-compatible)
-pub fn CollectionConfig::from_json(json : JsonValue) -> CollectionConfig? {
+pub fn CollectionConfig::from_json(
+  json : JsonValue,
+) -> Result[CollectionConfig, String] {
   match json {
     JObject(_) => {
       let name = get_string(json, "name").unwrap_or("")
-      // Support both formats for dimension
-      let dim = match get_object(json, "vectors") {
-        Some(vectors) => get_int(JObject(vectors), "size").unwrap_or(128)
-        None => get_int(json, "dim").unwrap_or(128)
+      let dim = match parse_collection_dim(json) {
+        Ok(v) => v
+        Err(err) => return Err(err)
       }
-      // Support both formats for metric
-      let metric_str = match get_object(json, "vectors") {
-        Some(vectors) => get_string(JObject(vectors), "distance")
-        None => get_string(json, "metric")
+      let metric = match parse_collection_metric(json) {
+        Ok(v) => v
+        Err(err) => return Err(err)
       }
-      let metric = match metric_str {
-        Some("l2") | Some("L2") => @types.L2
-        Some("dot") | Some("Dot") => @types.Dot
-        _ => @types.Cosine
+      let strategy = match parse_collection_strategy(json) {
+        Ok(v) => v
+        Err(err) => return Err(err)
       }
-      let strategy = match get_string(json, "strategy") {
-        Some("bruteforce") | Some("Bruteforce") => @types.Bruteforce
-        Some("ivf") | Some("IVF") => @types.IVF(@types.IVFParams::default())
-        _ => @types.HNSW(@types.HNSWParams::default())
-      }
-      Some({ name, dim, metric, strategy })
+      Ok({ name, dim, metric, strategy })
     }
-    _ => None
+    _ => Err("expected JSON object")
+  }
+}
+
+///|
+fn parse_collection_dim(json : JsonValue) -> Result[Int, String] {
+  match get_object(json, "vectors") {
+    Some(vectors) =>
+      match get_int(JObject(vectors), "size") {
+        Some(dim) =>
+          if dim > 0 {
+            Ok(dim)
+          } else {
+            Err("vectors.size must be > 0")
+          }
+        None => Err("vectors.size is required")
+      }
+    None =>
+      match get_int(json, "dim") {
+        Some(dim) => if dim > 0 { Ok(dim) } else { Err("dim must be > 0") }
+        None => Err("dim is required")
+      }
+  }
+}
+
+///|
+fn parse_collection_metric(json : JsonValue) -> Result[@types.Metric, String] {
+  let metric_str = match get_object(json, "vectors") {
+    Some(vectors) => get_string(JObject(vectors), "distance")
+    None => get_string(json, "metric")
+  }
+  match metric_str {
+    None | Some("cosine") | Some("Cosine") => Ok(@types.Cosine)
+    Some("l2") | Some("L2") => Ok(@types.L2)
+    Some("dot") | Some("Dot") => Ok(@types.Dot)
+    Some(metric) => Err("unsupported metric: " + metric)
+  }
+}
+
+///|
+fn parse_collection_strategy(
+  json : JsonValue,
+) -> Result[@types.Strategy, String] {
+  match get_string(json, "strategy") {
+    None | Some("hnsw") | Some("HNSW") =>
+      Ok(@types.HNSW(@types.HNSWParams::default()))
+    Some("bruteforce") | Some("Bruteforce") => Ok(@types.Bruteforce)
+    Some("ivf") | Some("IVF") => Ok(@types.IVF(@types.IVFParams::default()))
+    Some(strategy) => Err("unsupported strategy: " + strategy)
   }
 }
 
@@ -114,7 +156,11 @@ pub fn PointData::from_json(json : JsonValue) -> PointData? {
         None => return None
       }
       let payload = match get_object(json, "payload") {
-        Some(obj) => json_to_attrs(JObject(obj)).unwrap_or(@types.empty_attrs())
+        Some(obj) =>
+          match json_to_attrs(JObject(obj)) {
+            Some(attrs) => attrs
+            None => return None
+          }
         None => @types.empty_attrs()
       }
       Some({ id, vector, payload })

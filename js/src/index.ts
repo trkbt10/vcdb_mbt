@@ -1,20 +1,43 @@
 /**
  * @vcdb/server - Vector database server package
  *
- * For storage backends, use subpath imports to enable tree-shaking:
+ * Subpath imports for tree-shaking:
  *
- * - `@vcdb/server/storage/memory` - In-memory storage
- * - `@vcdb/server/storage/node` - Node.js filesystem
- * - `@vcdb/server/storage/indexeddb` - Browser IndexedDB
- * - `@vcdb/server/storage/opfs` - Browser OPFS
- * - `@vcdb/server/storage/local-storage` - Browser localStorage
- * - `@vcdb/server/storage/cache` - Browser Cache API
- * - `@vcdb/server/storage/r2` - Cloudflare R2
- * - `@vcdb/server/storage/do-kv` - Cloudflare Durable Object storage
- * - `@vcdb/server/wasm` - MoonBit WASM VectorDB
+ * Storage backends:
+ *   - `@vcdb/server/storage/memory`
+ *   - `@vcdb/server/storage/node`
+ *   - `@vcdb/server/storage/indexeddb`
+ *   - `@vcdb/server/storage/opfs`
+ *   - `@vcdb/server/storage/local-storage`
+ *   - `@vcdb/server/storage/service-worker`
+ *   - `@vcdb/server/storage/r2`
+ *   - `@vcdb/server/storage/do-kv`
+ *   - `@vcdb/server/storage/cached`
+ *
+ * VectorDB:
+ *   - `@vcdb/server/vectordb`        — in-memory VectorDB
+ *   - `@vcdb/server/persistent`      — persistent VectorDB (WAL)
+ *   - `@vcdb/server/gateway`         — HTTP gateway API
+ *
+ * Cloudflare:
+ *   - `@vcdb/server/cloudflare/persistent-do` — DO storage bridge
+ *
+ * Module loader:
+ *   - `@vcdb/server/loader`          — loadModule / isModuleLoaded
  */
 
-// Only export types from the main entry point
+// Domain types
+export type {
+  VectorId,
+  Metric,
+  Strategy,
+  SearchResult,
+  SearchHit,
+  PointRecord,
+  ScrollEntry,
+} from "./types.js";
+
+// Storage types
 export {
   StorageKind,
   type StorageAdapter,

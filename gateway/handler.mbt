@@ -6,16 +6,20 @@
 /// Read operations are sync (in-memory VectorDB).
 
 ///|
-/// Handle search in a collection (sync — reads from in-memory VectorDB)
-pub fn handle_search(
-  db : @vcdb.VectorDB,
+/// Handle search in a collection (sync — reads from in-memory engine)
+pub fn[W, S] handle_search(
+  db : @vcdb.VectorDB[W, S],
   req : SearchRequest,
 ) -> Result[SearchResponse, GatewayError] {
   let dim = db.dim()
   if req.vector.length() != dim {
     return Err(DimensionMismatch(expected=dim, got=req.vector.length()))
   }
-  let hits = db.search(req.vector, req.limit, None)
+  let filter = match req.filter {
+    Some(json) => @filter.parse_filter_json(json.to_string())
+    None => None
+  }
+  let hits = db.search(req.vector, req.limit, filter)
   let results : Array[SearchHitResponse] = []
   for hit in hits {
     let payload = if req.with_payload { Some(hit.attrs) } else { None }
@@ -34,8 +38,8 @@ pub fn handle_search(
 
 ///|
 /// Handle get point by ID (sync)
-pub fn handle_get_point(
-  db : @vcdb.VectorDB,
+pub fn[W, S] handle_get_point(
+  db : @vcdb.VectorDB[W, S],
   id : Int64,
 ) -> Result[PointResponse, GatewayError] {
   let vec_id = @types.VectorId::from_int64(id)
@@ -47,8 +51,8 @@ pub fn handle_get_point(
 
 ///|
 /// Handle scrolling points in a collection (sync).
-pub fn handle_scroll(
-  db : @vcdb.VectorDB,
+pub fn[W, S] handle_scroll(
+  db : @vcdb.VectorDB[W, S],
   req : ScrollRequest,
 ) -> Result[ScrollResponse, GatewayError] {
   let entries = db.scroll(offset=req.offset, limit=req.limit)
@@ -103,8 +107,11 @@ pub async fn[S : @storage.AsyncStorage] handle_delete_collection(
 /// Handle list collections (async — may load from storage)
 pub async fn[S : @storage.AsyncStorage] handle_list_collections(
   manager : CollectionManager[S],
-) -> CollectionsResponse {
-  { collections: manager.list_info() }
+) -> Result[CollectionsResponse, GatewayError] {
+  match manager.list_info() {
+    Ok(collections) => Ok({ collections, })
+    Err(err) => Err(err)
+  }
 }
 
 ///|
@@ -113,10 +120,7 @@ pub async fn[S : @storage.AsyncStorage] handle_get_collection(
   manager : CollectionManager[S],
   name : String,
 ) -> Result[CollectionInfo, GatewayError] {
-  match manager.get_info(name) {
-    Some(info) => Ok(info)
-    None => Err(CollectionNotFound(name))
-  }
+  manager.get_info(name)
 }
 
 ///|
@@ -124,11 +128,11 @@ pub async fn[S : @storage.AsyncStorage] handle_get_collection(
 pub async fn[S : @storage.AsyncStorage, T] with_collection(
   manager : CollectionManager[S],
   name : String,
-  handler : (@vcdb.VectorDB) -> Result[T, GatewayError],
+  handler : (@vcdb.VectorDB[S, S]) -> Result[T, GatewayError],
 ) -> Result[T, GatewayError] {
   match manager.get(name) {
-    Some(db) => handler(db)
-    None => Err(CollectionNotFound(name))
+    Ok(db) => handler(db)
+    Err(err) => Err(err)
   }
 }
 
@@ -177,19 +181,21 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
   match (http_method, path) {
     ("GET", []) => ApiResponse::ok(handle_service_info())
     ("GET", ["healthz"]) => ApiResponse::ok(handle_health())
-    ("GET", ["collections"]) => {
-      let resp = handle_list_collections(manager)
-      ApiResponse::ok(resp.to_json())
-    }
+    ("GET", ["collections"]) =>
+      match handle_list_collections(manager) {
+        Ok(resp) => ApiResponse::ok(resp.to_json())
+        Err(e) => ApiResponse::err(error_to_string(e))
+      }
     ("POST", ["collections", name]) => {
       let config = match parse_json(body) {
         Some(json) => {
-          let base = CollectionConfig::from_json(json).unwrap_or(
-            CollectionConfig::default(name, 128),
-          )
+          let base = match CollectionConfig::from_json(json) {
+            Ok(parsed) => parsed
+            Err(msg) => return ApiResponse::err("Invalid request body: " + msg)
+          }
           { ..base, name, }
         }
-        None => CollectionConfig::default(name, 128)
+        None => return ApiResponse::err("Invalid JSON")
       }
       match handle_create_collection(manager, config) {
         Ok(_) => ApiResponse::ok(JBool(true))

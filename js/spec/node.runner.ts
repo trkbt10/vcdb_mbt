@@ -7,7 +7,7 @@
 import { runStorageSpec } from "./storage.spec.js";
 import { createMemoryStorage } from "../src/storage/memory.js";
 import { createNodeStorage } from "../src/storage/node.js";
-import { CachedStorage } from "../src/storage/wasm-bridge.js";
+import { CachedStorage } from "../src/storage/cached-storage.js";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";

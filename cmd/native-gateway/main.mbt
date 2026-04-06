@@ -72,7 +72,7 @@ pub async fn NativeGateway::run(
 fn main {
   let app = NativeGateway::new()
   run_async_main(async fn() noraise {
-    let result = app.run(command_args()) catch { _ => "error" }
+    let result = app.run(command_args()) catch { e => e.to_string() }
     println(result)
   })
 }

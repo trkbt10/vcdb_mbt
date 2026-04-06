@@ -4,6 +4,9 @@ fn test_join_path(base : String, child : String) -> String {
 }
 
 ///|
+fn run_async_blocking(f : async () -> Unit noraise) -> Unit = "%async.run"
+
+///|
 fn remove_tree(path : String) -> Unit {
   if not(@fs.path_exists(path)) {
     return
@@ -41,5 +44,85 @@ test "native file storage read write list" {
   storage.del("demo/test.bin", Data)
   assert_false(storage.exists("demo/test.bin", Data))
 
+  remove_tree(root)
+}
+
+///|
+test "native file storage append propagates read failure" {
+  let root = "/tmp/vcdb-native-storage-append-failure-wbtest"
+  remove_tree(root)
+  let data_root = test_join_path(root, "data")
+  let nested = test_join_path(data_root, "demo")
+  let bad_path = test_join_path(nested, "bad.bin")
+  @fs.create_dir(root) catch {
+    _ => abort("failed to create test root")
+  }
+  @fs.create_dir(data_root) catch {
+    _ => abort("failed to create data root")
+  }
+  @fs.create_dir(nested) catch {
+    _ => abort("failed to create nested dir")
+  }
+  @fs.create_dir(bad_path) catch {
+    _ => abort("failed to create bad path dir")
+  }
+
+  let storage = NativeFileStorage::new(root)
+  let mut failed = false
+  storage.append("demo/bad.bin", Bytes::from_array([b'x'][:]), Data) catch {
+    _ => failed = true
+  }
+
+  assert_true(failed)
+  assert_true(@fs.is_dir(bad_path) catch { _ => false })
+  remove_tree(root)
+}
+
+///|
+test "native file storage list propagates traversal failure" {
+  let root = "/tmp/vcdb-native-storage-list-failure-wbtest"
+  remove_tree(root)
+  @fs.create_dir(root) catch {
+    _ => abort("failed to create test root")
+  }
+  let data_root = test_join_path(root, "data")
+  @fs.write_bytes_to_file(data_root, Bytes::from_array([b'x'][:])) catch {
+    _ => abort("failed to create blocking file")
+  }
+
+  let storage = NativeFileStorage::new(root)
+  let mut failed = false
+  storage.list(Data) catch {
+    _ => failed = true
+  }
+
+  assert_true(failed)
+  remove_tree(root)
+}
+
+///|
+test "native file storage async_list rejects traversal failure" {
+  let root = "/tmp/vcdb-native-storage-async-list-failure-wbtest"
+  remove_tree(root)
+  @fs.create_dir(root) catch {
+    _ => abort("failed to create test root")
+  }
+  let data_root = test_join_path(root, "data")
+  @fs.write_bytes_to_file(data_root, Bytes::from_array([b'x'][:])) catch {
+    _ => abort("failed to create blocking file")
+  }
+
+  let storage = NativeFileStorage::new(root)
+  let mut failed = false
+  run_async_blocking(async fn() noraise {
+    try {
+      let _ = async_list(storage, Data)
+    } catch {
+      AsyncIOFailed(_) => failed = true
+      _ => ()
+    }
+  })
+
+  assert_true(failed)
   remove_tree(root)
 }

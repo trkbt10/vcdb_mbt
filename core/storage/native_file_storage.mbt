@@ -102,9 +102,23 @@ fn walk_dir(
     } else {
       rel_dir + "/" + entry
     }
-    if (@fs.is_dir(abs_path) catch { _ => false }) {
+    let is_dir = @fs.is_dir(abs_path) catch {
+      e => {
+        raise_io_error(e)
+        false
+      }
+    }
+    if is_dir {
       walk_dir(abs_path, rel_path, files)
-    } else if (@fs.is_file(abs_path) catch { _ => false }) {
+      continue
+    }
+    let is_file = @fs.is_file(abs_path) catch {
+      e => {
+        raise_io_error(e)
+        false
+      }
+    }
+    if is_file {
       files.push(rel_path)
     }
   }
@@ -149,7 +163,10 @@ pub fn NativeFileStorage::append(
   let full = self.full_path(path, kind)
   let existing = if @fs.path_exists(full) {
     @fs.read_file_to_bytes(full) catch {
-      _ => Bytes::new(0)
+      e => {
+        raise_io_error(e)
+        Bytes::new(0)
+      }
     }
   } else {
     Bytes::new(0)
@@ -192,12 +209,10 @@ pub fn NativeFileStorage::exists(
 pub fn NativeFileStorage::list(
   self : NativeFileStorage,
   kind : StorageKind,
-) -> Array[String] {
+) -> Array[String] raise IOError {
   let files : Array[String] = []
   let root = join_path(self.root_dir, kind_dir(kind))
-  walk_dir(root, "", files) catch {
-    _ => ()
-  }
+  walk_dir(root, "", files)
   files
 }
 
@@ -335,7 +350,13 @@ pub impl AsyncStorage for NativeFileStorage with async_list(
   self,
   kind,
   resolve,
-  _reject,
+  reject,
 ) {
-  resolve(self.list(kind))
+  let files = self.list(kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve(files)
 }

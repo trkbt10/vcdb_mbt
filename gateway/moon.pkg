@@ -2,7 +2,6 @@ import {
   "trkbt10/vcdb",
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/storage",
-  "trkbt10/vcdb/core/persistence/collection" @col_persist,
-  "trkbt10/vcdb/core/persistence/wal",
+  "trkbt10/vcdb/core/filter",
   "moonbitlang/core/strconv",
 }

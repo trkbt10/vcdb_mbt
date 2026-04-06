@@ -43,10 +43,11 @@ pub fn gateway_storage_list(_kind : Int) -> Array[String] {
 }
 
 ///|
-pub fn gateway_storage_read(path : String, _kind : Int) -> Bytes {
-  gateway_storage.read(path) catch {
-    _ => b""
-  }
+pub fn gateway_storage_read(
+  path : String,
+  _kind : Int,
+) -> Bytes raise @storage.IOError {
+  gateway_storage.read(path)
 }
 
 ///|

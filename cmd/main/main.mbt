@@ -1,32 +1,24 @@
 ///|
 /// vcdb CLI Demo - Vector Database functionality demonstration
 /// Run with `moon run cmd/main` from the project root.
+fn run_async(f : async () -> Unit noraise) -> Unit = "%async.run"
+
 fn main {
-  println("=== vcdb Vector Database Demo ===\n")
-
-  // Demo 1: Basic Bruteforce Search
-  demo_bruteforce()
-
-  // Demo 2: HNSW Search
-  demo_hnsw()
-
-  // Demo 3: Search with Filters
-  demo_filtered_search()
-
-  // Demo 4: Serialization Roundtrip
-  demo_serialization()
-
-  // Demo 5: Multi-metric comparison
-  demo_metrics()
-
-  println("\n=== All demos completed successfully! ===")
+  run_async(async fn() noraise {
+    let _ = demo_bruteforce() catch { e => abort(e.to_string()) }
+    let _ = demo_hnsw() catch { e => abort(e.to_string()) }
+    let _ = demo_filtered_search() catch { e => abort(e.to_string()) }
+    let _ = demo_serialization() catch { e => abort(e.to_string()) }
+    let _ = demo_metrics() catch { e => abort(e.to_string()) }
+    println("\n=== All demos completed successfully! ===")
+  })
 }
 
 ///|
-fn demo_bruteforce() -> Unit {
+async fn demo_bruteforce() -> Unit {
   println("--- Demo 1: Bruteforce Search ---")
 
-  let db = @vcdb.VectorDB::with_dim(3)
+  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
 
   // Add sample vectors representing documents/items
   // Simulating embeddings for: "apple", "banana", "orange", "grape", "melon"
@@ -42,7 +34,7 @@ fn demo_bruteforce() -> Unit {
     let (id, name, vec) = item
     let attrs = @types.empty_attrs()
     attrs.set("name", @types.String(name))
-    db.add(@types.VectorId::from_int(id), vec, attrs)
+    db.add(@types.VectorId::from_int(id), vec, attrs, 0L)
   }
 
   println("Added \{db.size()} items to database")
@@ -64,10 +56,10 @@ fn demo_bruteforce() -> Unit {
 }
 
 ///|
-fn demo_hnsw() -> Unit {
+async fn demo_hnsw() -> Unit {
   println("--- Demo 2: HNSW Approximate Search ---")
 
-  let db = @vcdb.VectorDB::with_hnsw(4, metric=@types.Dot)
+  let db = @vcdb.VectorDB::in_memory_hnsw(4, metric=@types.Dot)
 
   // Add 100 vectors
   for i in 0..<100 {
@@ -79,7 +71,7 @@ fn demo_hnsw() -> Unit {
     ]
     let attrs = @types.empty_attrs()
     attrs.set("index", @types.Int(i.to_int64()))
-    db.add(@types.VectorId::from_int(i), v, attrs)
+    db.add(@types.VectorId::from_int(i), v, attrs, 0L)
   }
 
   println("Added \{db.size()} vectors with HNSW index")
@@ -103,10 +95,10 @@ fn demo_hnsw() -> Unit {
 }
 
 ///|
-fn demo_filtered_search() -> Unit {
+async fn demo_filtered_search() -> Unit {
   println("--- Demo 3: Search with Attribute Filter ---")
 
-  let db = @vcdb.VectorDB::with_dim(2)
+  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
 
   // Add products with categories
   let products = [
@@ -123,7 +115,7 @@ fn demo_filtered_search() -> Unit {
     let attrs = @types.empty_attrs()
     attrs.set("name", @types.String(name))
     attrs.set("category", @types.String(category))
-    db.add(@types.VectorId::from_int(id), vec, attrs)
+    db.add(@types.VectorId::from_int(id), vec, attrs, 0L)
   }
 
   println("Added \{db.size()} products")
@@ -137,7 +129,7 @@ fn demo_filtered_search() -> Unit {
   }
 
   let query = [1.0, 0.0] // Looking for electronics-like vector
-  let results = db.search(query, 3, Some(filter))
+  let results = db.search_with_filter(query, 3, Some(filter))
 
   println("Query: [1.0, 0.0] with filter: category='electronics'")
   println("Results:")
@@ -152,10 +144,10 @@ fn demo_filtered_search() -> Unit {
 }
 
 ///|
-fn demo_serialization() -> Unit {
+async fn demo_serialization() -> Unit {
   println("--- Demo 4: Serialization & Persistence ---")
 
-  let db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Cosine)
+  let db = @vcdb.VectorDB::in_memory_hnsw(3, metric=@types.Cosine)
 
   // Add data
   for i in 1..<=10 {
@@ -164,12 +156,11 @@ fn demo_serialization() -> Unit {
     db.add(
       @types.VectorId::from_int(i),
       [i.to_double() / 10.0, (10 - i).to_double() / 10.0, 0.5],
-      attrs,
-    )
+      attrs, 0L)
   }
 
   // Serialize
-  let bytes = db.serialize()
+  let bytes = db.serialize_snapshot()
   println(
     "Original DB: \{db.size()} vectors, serialized to \{bytes.length()} bytes",
   )
@@ -194,7 +185,7 @@ fn demo_serialization() -> Unit {
 }
 
 ///|
-fn demo_metrics() -> Unit {
+async fn demo_metrics() -> Unit {
   println("--- Demo 5: Metric Comparison ---")
 
   // Same vectors, different metrics
@@ -207,34 +198,19 @@ fn demo_metrics() -> Unit {
   let query = [1.0, 0.0, 0.0]
 
   // Cosine: direction matters, not magnitude
-  let db_cosine = @vcdb.VectorDB::new({
-    dim: 3,
-    metric: @types.Cosine,
-    capacity: 10,
-    strategy: @types.Bruteforce,
-  })
+  let db_cosine = @vcdb.VectorDB::in_memory(3, metric=@types.Cosine, strategy=@types.Bruteforce)
 
   // Dot: both direction and magnitude matter
-  let db_dot = @vcdb.VectorDB::new({
-    dim: 3,
-    metric: @types.Dot,
-    capacity: 10,
-    strategy: @types.Bruteforce,
-  })
+  let db_dot = @vcdb.VectorDB::in_memory(3, metric=@types.Dot, strategy=@types.Bruteforce)
 
   // L2: distance matters
-  let db_l2 = @vcdb.VectorDB::new({
-    dim: 3,
-    metric: @types.L2,
-    capacity: 10,
-    strategy: @types.Bruteforce,
-  })
+  let db_l2 = @vcdb.VectorDB::in_memory(3, metric=@types.L2, strategy=@types.Bruteforce)
 
   for vec in vectors {
     let (id, v) = vec
-    db_cosine.add(@types.VectorId::from_int(id), v, @types.empty_attrs())
-    db_dot.add(@types.VectorId::from_int(id), v, @types.empty_attrs())
-    db_l2.add(@types.VectorId::from_int(id), v, @types.empty_attrs())
+    db_cosine.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
+    db_dot.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
+    db_l2.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
   }
 
   println("Vectors: id=1 [1,0,0], id=2 [2,0,0], id=3 [0,1,0]")

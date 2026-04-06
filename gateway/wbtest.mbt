@@ -150,6 +150,11 @@ fn run_async_test(f : async () -> Unit) -> Unit {
 }
 
 ///|
+fn string_to_bytes(value : String) -> Bytes {
+  Bytes::from_array(value.to_array().map(fn(c) { c.to_int().to_byte() }))
+}
+
+///|
 test "request/parse_request_path" {
   let segments = parse_request_path("/collections/test/points")
   assert_eq(segments, ["collections", "test", "points"])
@@ -212,12 +217,12 @@ test "wal/delete_persists_via_wal" {
       storage,
     )
     match manager2.get("test") {
-      Some(d) => {
+      Ok(d) => {
         assert_eq(d.size(), 1)
         assert_true(d.has(@types.VectorId::from_int(2)))
         assert_true(not(d.has(@types.VectorId::from_int(1))))
       }
-      None => assert_true(false)
+      Err(_) => assert_true(false)
     }
   })
 }
@@ -241,11 +246,11 @@ test "wal/checkpoint_snapshot_is_current" {
       storage,
     )
     match manager2.get("test") {
-      Some(d) => {
+      Ok(d) => {
         assert_eq(d.size(), 1)
         assert_true(d.has(@types.VectorId::from_int(1)))
       }
-      None => assert_true(false)
+      Err(_) => assert_true(false)
     }
   })
 }
@@ -277,13 +282,13 @@ test "wal/reload_replays_wal" {
     )
     let db = manager2.get("test")
     match db {
-      Some(d) => {
+      Ok(d) => {
         // Both points should exist: id=1 from snapshot, id=2 from WAL replay
         assert_eq(d.size(), 2)
         assert_true(d.has(@types.VectorId::from_int(1)))
         assert_true(d.has(@types.VectorId::from_int(2)))
       }
-      None => assert_true(false)
+      Err(_) => assert_true(false)
     }
   })
 }
@@ -306,8 +311,8 @@ test "wal/auto_checkpoint_on_threshold" {
     )
     // Data should be accessible
     match manager1.get("test") {
-      Some(d) => assert_eq(d.size(), 3)
-      None => assert_true(false)
+      Ok(d) => assert_eq(d.size(), 3)
+      Err(_) => assert_true(false)
     }
     // Auto-checkpoint means data survives reload without explicit checkpoint
     let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
@@ -315,8 +320,8 @@ test "wal/auto_checkpoint_on_threshold" {
       checkpoint_threshold=3,
     )
     match manager2.get("test") {
-      Some(d) => assert_eq(d.size(), 3)
-      None => assert_true(false)
+      Ok(d) => assert_eq(d.size(), 3)
+      Err(_) => assert_true(false)
     }
   })
 }
@@ -356,6 +361,105 @@ test "request/execute_path_request" {
 
     let list = execute_path_request(manager, "GET", "/collections?limit=10", "")
     assert_eq(list.status, "ok")
+  })
+}
+
+///|
+test "request/create_collection_rejects_invalid_config" {
+  run_async_test(async fn() {
+    let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+      @storage.MemoryStorage::new(),
+    )
+    let create = execute_path_request(
+      manager, "POST", "/collections/demo", "{\"dim\":3,\"strategy\":\"bogus\"}",
+    )
+    assert_eq(create.status, "error")
+    assert_eq(
+      create.error,
+      Some("Invalid request body: unsupported strategy: bogus"),
+    )
+  })
+}
+
+///|
+test "request/upsert_rejects_invalid_payload" {
+  run_async_test(async fn() {
+    let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+      @storage.MemoryStorage::new(),
+    )
+    let create = execute_path_request(
+      manager, "POST", "/collections/demo", "{\"dim\":3}",
+    )
+    assert_eq(create.status, "ok")
+
+    let upsert = execute_path_request(
+      manager, "PUT", "/collections/demo/points", "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{\"nested\":{\"x\":1}}}]}",
+    )
+    assert_eq(upsert.status, "error")
+    assert_eq(upsert.error, Some("Invalid request body"))
+  })
+}
+
+///|
+test "request/reload_preserves_metric_and_strategy" {
+  run_async_test(async fn() {
+    let storage = @storage.MemoryStorage::new()
+    let manager1 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+      storage,
+    )
+    let create = execute_path_request(
+      manager1, "POST", "/collections/test", "{\"dim\":2,\"metric\":\"L2\",\"strategy\":\"Bruteforce\"}",
+    )
+    assert_eq(create.status, "ok")
+    let upsert = execute_path_request(
+      manager1, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
+    )
+    assert_eq(upsert.status, "ok")
+
+    let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+      storage,
+    )
+    match manager2.get("test") {
+      Ok(db) => {
+        assert_eq(db.metric(), @types.L2)
+        assert_true(db.strategy() is @types.Bruteforce)
+      }
+      Err(_) => assert_true(false)
+    }
+  })
+}
+
+///|
+test "request/invalid_persisted_config_surfaces_error" {
+  run_async_test(async fn() {
+    let storage = @storage.MemoryStorage::new()
+    storage.write(
+      @storage.collection_config_path("broken"),
+      string_to_bytes("{\"metric\":\"Cosine\"}"),
+    )
+    let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+      storage,
+    )
+
+    let get_resp = execute_path_request(
+      manager, "GET", "/collections/broken", "",
+    )
+    assert_eq(get_resp.status, "error")
+    assert_eq(
+      get_resp.error,
+      Some(
+        "Storage error: Invalid collection config for broken: dim is required",
+      ),
+    )
+
+    let list_resp = execute_path_request(manager, "GET", "/collections", "")
+    assert_eq(list_resp.status, "error")
+    assert_eq(
+      list_resp.error,
+      Some(
+        "Storage error: Invalid collection config for broken: dim is required",
+      ),
+    )
   })
 }
 

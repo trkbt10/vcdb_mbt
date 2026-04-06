@@ -43,6 +43,7 @@ pub fn VectorDB::search_with_expr(Self, Array[Double], Int, @filter.FilterExpr?,
 pub fn VectorDB::serialize(Self) -> Bytes
 pub fn VectorDB::size(Self) -> Int
 pub fn VectorDB::store(Self) -> @store.CoreStore
+pub fn VectorDB::strategy(Self) -> @types.Strategy
 pub fn VectorDB::train(Self, iterations? : Int) -> Unit
 pub fn VectorDB::update_attrs(Self, @types.VectorId, @types.Attrs) -> Bool
 pub fn VectorDB::upsert(Self, @types.VectorId, Array[Double], @types.Attrs) -> Bool

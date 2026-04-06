@@ -45,21 +45,29 @@
       "types": "./dist/storage/do-kv.d.ts",
       "import": "./dist/storage/do-kv.js"
     },
-    "./storage/wasm-bridge": {
-      "types": "./dist/storage/wasm-bridge.d.ts",
-      "import": "./dist/storage/wasm-bridge.js"
+    "./storage/cached": {
+      "types": "./dist/storage/cached-storage.d.ts",
+      "import": "./dist/storage/cached-storage.js"
     },
-    "./storage/persistent-bridge": {
-      "types": "./dist/storage/persistent-bridge.d.ts",
-      "import": "./dist/storage/persistent-bridge.js"
+    "./vectordb": {
+      "types": "./dist/vectordb.d.ts",
+      "import": "./dist/vectordb.js"
     },
     "./persistent": {
       "types": "./dist/persistent.d.ts",
       "import": "./dist/persistent.js"
     },
-    "./wasm": {
-      "types": "./dist/wasm/index.d.ts",
-      "import": "./dist/wasm/index.js"
+    "./gateway": {
+      "types": "./dist/gateway.d.ts",
+      "import": "./dist/gateway.js"
+    },
+    "./loader": {
+      "types": "./dist/ffi/loader.d.ts",
+      "import": "./dist/ffi/loader.js"
+    },
+    "./cloudflare/persistent-do": {
+      "types": "./dist/cloudflare/persistent-do.d.ts",
+      "import": "./dist/cloudflare/persistent-do.js"
     },
     "./wasm/lib.js": {
       "types": "./dist/wasm/lib.d.ts",
@@ -79,7 +87,7 @@
     "test:smoke": "node test/smoke.test.mjs",
     "test:spec": "npx tsx spec/node.runner.ts",
     "test:spec:browser": "npx tsx spec/browser.runner.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.typecheck.json"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

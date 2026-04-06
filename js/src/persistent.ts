@@ -1,44 +1,16 @@
 /**
- * @file High-level persistent VectorDB client for JS consumers.
+ * @file High-level persistent VectorDB client.
  *
- * Wraps the persistent_* FFI with JS-idiomatic types:
- *   - MbInt64 (hi/lo i32 pairs) for vector IDs and timestamps
- *   - JSON payload ↔ string serialization
- *   - MoonBit tuples (._0, ._1) ↔ named objects
- *   - Timestamp generation
+ * Wraps PersistentFfi with JS-idiomatic types:
+ *   - VectorId as bigint (not hi/lo pairs)
+ *   - JSON payload serialization
+ *   - MoonBit tuple decoding
  *
- * Consumers should never deal with MoonBit tuple encoding directly.
- * This is the single place where FFI result shapes are interpreted.
+ * Consumers never deal with MoonBit encoding directly.
  */
-import type { MbInt64, PersistentFFI } from "./storage/persistent-bridge.js";
-
-/* ── Public result types ─────────────────────────────────────── */
-
-export type SearchHit = {
-  readonly id: MbInt64;
-  readonly score: number;
-  readonly payload: Record<string, unknown> | null;
-};
-
-export type PointRecord = {
-  readonly found: boolean;
-  readonly vector: number[];
-  readonly payload: Record<string, unknown> | null;
-};
-
-export type ScrollEntry = {
-  readonly id: MbInt64;
-  readonly payload: Record<string, unknown> | null;
-};
-
-/* ── Internal helpers ────────────────────────────────────────── */
-
-/** Current time as MoonBit Int64 nanoseconds since epoch. */
-const nowNs = (): MbInt64 => {
-  const ms = Date.now();
-  const ns = ms * 1_000_000;
-  return { hi: Math.floor(ns / 0x100000000), lo: ns >>> 0 };
-};
+import type { PersistentFfi } from "./ffi/types.js";
+import type { VectorId, SearchHit, PointRecord, ScrollEntry } from "./types.js";
+import { toHiLo, fromHiLo, nowNs } from "./ffi/vector-id.js";
 
 const parsePayload = (json: string): Record<string, unknown> | null => {
   if (!json) return null;
@@ -49,17 +21,15 @@ const parsePayload = (json: string): Record<string, unknown> | null => {
   }
 };
 
-/* ── PersistentDB class ──────────────────────────────────────── */
-
 /**
- * High-level wrapper over persistent_* FFI for a single instance.
+ * High-level wrapper over PersistentFfi for a single instance.
  *
  * All MoonBit-specific encoding (tuples, hi/lo IDs, JSON serialization)
- * is handled here. Consumers work with plain JS objects.
+ * is handled here. Consumers work with bigint IDs and plain JS objects.
  */
 export class PersistentDB {
   constructor(
-    private readonly ffi: PersistentFFI,
+    private readonly ffi: PersistentFfi,
     private readonly instanceId: number,
   ) {}
 
@@ -67,32 +37,30 @@ export class PersistentDB {
 
   async upsert(
     points: readonly {
-      id: MbInt64;
+      id: VectorId;
       vector: number[];
       payload: Record<string, unknown>;
     }[],
   ): Promise<void> {
-    const ffiPoints = points.map((p) => ({
-      _0: p.id.hi,
-      _1: p.id.lo,
-      _2: p.vector,
-      _3: JSON.stringify(p.payload),
-    }));
+    const ffiPoints = points.map((p) => {
+      const { hi, lo } = toHiLo(p.id);
+      return { _0: hi, _1: lo, _2: p.vector, _3: JSON.stringify(p.payload) };
+    });
     await this.ffi.persistent_upsert(this.instanceId, ffiPoints, nowNs());
   }
 
-  async remove(id: MbInt64): Promise<boolean> {
-    return this.ffi.persistent_remove(
-      this.instanceId, id.hi, id.lo, nowNs(),
-    );
+  async remove(id: VectorId): Promise<boolean> {
+    const { hi, lo } = toHiLo(id);
+    return this.ffi.persistent_remove(this.instanceId, hi, lo, nowNs());
   }
 
   async updateAttrs(
-    id: MbInt64,
+    id: VectorId,
     attrs: Record<string, unknown>,
   ): Promise<boolean> {
+    const { hi, lo } = toHiLo(id);
     return this.ffi.persistent_update_attrs(
-      this.instanceId, id.hi, id.lo, JSON.stringify(attrs), nowNs(),
+      this.instanceId, hi, lo, JSON.stringify(attrs), nowNs(),
     );
   }
 
@@ -115,16 +83,15 @@ export class PersistentDB {
       this.instanceId, vector, topK, true, filterJson,
     );
     return results.map((r) => ({
-      id: { hi: r._0, lo: r._1 },
+      id: fromHiLo(r._0, r._1),
       score: r._2,
       payload: parsePayload(r._3),
     }));
   }
 
-  get(id: MbInt64): PointRecord {
-    const r = this.ffi.persistent_get(
-      this.instanceId, id.hi, id.lo, true,
-    );
+  get(id: VectorId): PointRecord {
+    const { hi, lo } = toHiLo(id);
+    const r = this.ffi.persistent_get(this.instanceId, hi, lo, true);
     return {
       found: r._0,
       vector: r._1,
@@ -132,46 +99,38 @@ export class PersistentDB {
     };
   }
 
-  has(id: MbInt64): boolean {
-    return this.ffi.persistent_has(this.instanceId, id.hi, id.lo);
+  has(id: VectorId): boolean {
+    const { hi, lo } = toHiLo(id);
+    return this.ffi.persistent_has(this.instanceId, hi, lo);
   }
 
   scroll(
-    offset: MbInt64 | undefined,
+    offset: VectorId | undefined,
     limit: number,
   ): readonly ScrollEntry[] {
     const hasOffset = offset !== undefined;
+    const { hi: oHi, lo: oLo } = hasOffset ? toHiLo(offset) : { hi: 0, lo: 0 };
     const results = this.ffi.persistent_scroll(
-      this.instanceId,
-      offset?.hi ?? 0,
-      offset?.lo ?? 0,
-      hasOffset,
-      limit,
-      true,
+      this.instanceId, oHi, oLo, hasOffset, limit, true,
     );
     return results.map((r) => ({
-      id: { hi: r._0, lo: r._1 },
+      id: fromHiLo(r._0, r._1),
       payload: parsePayload(r._2),
     }));
   }
 
   scrollFiltered(
     filterJson: string,
-    offset: MbInt64 | undefined,
+    offset: VectorId | undefined,
     limit: number,
   ): readonly ScrollEntry[] {
     const hasOffset = offset !== undefined;
+    const { hi: oHi, lo: oLo } = hasOffset ? toHiLo(offset) : { hi: 0, lo: 0 };
     const results = this.ffi.persistent_scroll_filtered(
-      this.instanceId,
-      filterJson,
-      offset?.hi ?? 0,
-      offset?.lo ?? 0,
-      hasOffset,
-      limit,
-      true,
+      this.instanceId, filterJson, oHi, oLo, hasOffset, limit, true,
     );
     return results.map((r) => ({
-      id: { hi: r._0, lo: r._1 },
+      id: fromHiLo(r._0, r._1),
       payload: parsePayload(r._2),
     }));
   }

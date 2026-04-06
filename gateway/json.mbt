@@ -482,22 +482,22 @@ pub fn attr_value_to_json(value : @types.AttrValue) -> JsonValue {
 
 ///|
 /// Convert JsonValue to AttrValue
-pub fn json_to_attr_value(json : JsonValue) -> @types.AttrValue {
+pub fn json_to_attr_value(json : JsonValue) -> @types.AttrValue? {
   match json {
-    JNull => @types.Null
-    JBool(b) => @types.Bool(b)
+    JNull => Some(@types.Null)
+    JBool(b) => Some(@types.Bool(b))
     JNumber(n) => {
       let int_val = n.to_int64()
       if n == int_val.to_double() && n.abs() < 9007199254740992.0 {
-        @types.Int(int_val)
+        Some(@types.Int(int_val))
       } else {
-        @types.Float(n)
+        Some(@types.Float(n))
       }
     }
-    JString(s) => @types.String(s)
-    JArray(_) => @types.Null // Arrays not supported as attr values
-    JObject(_) => @types.Null
-  } // Objects not supported as attr values
+    JString(s) => Some(@types.String(s))
+    JArray(_) => None
+    JObject(_) => None
+  }
 }
 
 ///|
@@ -508,7 +508,10 @@ pub fn json_to_attrs(json : JsonValue) -> @types.Attrs? {
       let attrs = @types.empty_attrs()
       for kv in obj {
         let (key, value) = kv
-        attrs.set(key, json_to_attr_value(value))
+        match json_to_attr_value(value) {
+          Some(attr) => attrs.set(key, attr)
+          None => return None
+        }
       }
       Some(attrs)
     }

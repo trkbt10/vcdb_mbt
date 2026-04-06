@@ -6,8 +6,13 @@
 /// Double-based paths are structurally impossible.
 
 ///|
+/// Bridge: run an async function synchronously.
+/// Safe for MemoryStorage where all I/O resolves immediately.
+fn run_async(f : async () -> Unit noraise) -> Unit = "%async.run"
+
+///|
 /// Global instance storage
-let instances : @hashmap.HashMap[Int, @vcdb.VectorDB] = @hashmap.new()
+let instances : @hashmap.HashMap[Int, @vcdb.VectorDB[@storage.MemoryStorage, @storage.MemoryStorage]] = @hashmap.new()
 
 ///|
 priv struct Counter {
@@ -36,28 +41,34 @@ fn vid_to_pair(id : @types.VectorId) -> (Int, Int) {
 
 ///|
 pub fn vcdb_create(dim : Int) -> Int {
-  let db = @vcdb.VectorDB::with_dim(dim)
   let id = counter.value
   counter.value = counter.value + 1
-  instances[id] = db
+  run_async(async fn() noraise {
+    let db = @vcdb.VectorDB::in_memory_bruteforce(dim) catch { _ => abort("vcdb_create failed") }
+    instances[id] = db
+  })
   id
 }
 
 ///|
 pub fn vcdb_create_hnsw(dim : Int) -> Int {
-  let db = @vcdb.VectorDB::with_hnsw(dim)
   let id = counter.value
   counter.value = counter.value + 1
-  instances[id] = db
+  run_async(async fn() noraise {
+    let db = @vcdb.VectorDB::in_memory_hnsw(dim) catch { _ => abort("vcdb_create_hnsw failed") }
+    instances[id] = db
+  })
   id
 }
 
 ///|
 pub fn vcdb_create_ivf(dim : Int) -> Int {
-  let db = @vcdb.VectorDB::with_ivf(dim)
   let id = counter.value
   counter.value = counter.value + 1
-  instances[id] = db
+  run_async(async fn() noraise {
+    let db = @vcdb.VectorDB::in_memory_ivf(dim) catch { _ => abort("vcdb_create_ivf failed") }
+    instances[id] = db
+  })
   id
 }
 
@@ -96,7 +107,9 @@ pub fn vcdb_add(
         return -2
       }
       let attrs = @types.empty_attrs()
-      db.add(id, vector, attrs)
+      run_async(async fn() noraise {
+        db.add(id, vector, attrs, 0L) catch { _ => () }
+      })
       0
     }
     None => -1
@@ -113,7 +126,11 @@ pub fn vcdb_upsert(
   match instances.get(instance_id) {
     Some(db) => {
       let attrs = @types.empty_attrs()
-      let _ = db.upsert(vid_from_pair(id_hi, id_lo), vector, attrs)
+      run_async(async fn() noraise {
+        db.upsert([(vid_from_pair(id_hi, id_lo), vector, attrs)], 0L) catch {
+          _ => ()
+        }
+      })
       0
     }
     None => -1
@@ -167,7 +184,16 @@ pub fn vcdb_has(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
 ///|
 pub fn vcdb_remove(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
   match instances.get(instance_id) {
-    Some(db) => if db.remove(vid_from_pair(id_hi, id_lo)) { 1 } else { 0 }
+    Some(db) => {
+      let mut result = 0
+      run_async(async fn() noraise {
+        let removed = db.remove(vid_from_pair(id_hi, id_lo), 0L) catch {
+          _ => false
+        }
+        result = if removed { 1 } else { 0 }
+      })
+      result
+    }
     None => -1
   }
 }
@@ -175,17 +201,16 @@ pub fn vcdb_remove(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
 ///|
 pub fn vcdb_serialize(instance_id : Int) -> Bytes {
   match instances.get(instance_id) {
-    Some(db) => db.serialize()
+    Some(db) => db.serialize_snapshot()
     None => b""
   }
 }
 
 ///|
 pub fn vcdb_deserialize(data : Bytes) -> Int {
-  let db = @vcdb.VectorDB::deserialize(data)
   let id = counter.value
   counter.value = counter.value + 1
-  instances[id] = db
+  instances[id] = @vcdb.VectorDB::deserialize(data)
   id
 }
 

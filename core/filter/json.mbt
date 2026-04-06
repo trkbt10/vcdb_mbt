@@ -232,6 +232,11 @@ fn LeafExpr::to_json(self : LeafExpr) -> Json {
 }
 
 ///|
+fn json_null() -> Json {
+  @json.parse("null") catch {
+    _ => abort("failed to construct JSON null")
+  }
+}
 
 ///|
 fn @types.AttrValue::to_json(self : @types.AttrValue) -> Json {
@@ -240,11 +245,6 @@ fn @types.AttrValue::to_json(self : @types.AttrValue) -> Json {
     @types.Int(n) => n.to_double().to_json()
     @types.Float(f) => f.to_json()
     @types.Bool(b) => b.to_json()
-    @types.Null => {
-      let fallback : Json = { "null": true }
-      @json.parse("null") catch {
-        _ => fallback
-      }
-    }
+    @types.Null => json_null()
   }
 }

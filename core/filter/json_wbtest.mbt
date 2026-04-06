@@ -188,6 +188,16 @@ test "filter_json/serialize_range" {
 }
 
 ///|
+test "filter_json/round_trip_null_match" {
+  let json = "{\"match\":{\"key\":\"deleted_at\",\"value\":null}}"
+  let expr = parse_filter_json(json).unwrap()
+  let serialized = filter_to_json(expr)
+  inspect(serialized.contains("\"value\":null"), content="true")
+  let reparsed = parse_filter_json(serialized)
+  inspect(reparsed is Some(Leaf(Match(_, @types.Null))), content="true")
+}
+
+///|
 test "filter_json/invalid_json" {
   inspect(parse_filter_json("not json") is None, content="true")
   inspect(parse_filter_json("[1,2,3]") is None, content="true")
