@@ -1,4 +1,7 @@
 ///|
+fn run_async(f : async () -> Unit noraise) -> Unit = "%async.run"
+
+///|
 /// Async Callback-based Storage implementation for JS environments.
 ///
 /// Wraps JS Promise-returning callbacks into the target-independent

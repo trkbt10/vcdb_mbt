@@ -156,7 +156,7 @@ pub fn evaluate_read_quorum(
     let mut all_match = true
     let reference = valid_results[0].1
     for i = 1; i < valid_results.length(); i = i + 1 {
-      if not(bytes_equal(reference, valid_results[i].1)) {
+      if !bytes_equal(reference, valid_results[i].1) {
         all_match = false
         break
       }
@@ -209,7 +209,7 @@ pub fn select_read_replicas(
   }
   let healthy : Array[String] = []
   for key in result.primaries {
-    if not(failed_set.contains(key)) {
+    if !failed_set.contains(key) {
       healthy.push(key)
     }
   }

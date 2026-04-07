@@ -3,6 +3,7 @@
 /// Run with `moon run cmd/main` from the project root.
 fn run_async(f : async () -> Unit noraise) -> Unit = "%async.run"
 
+///|
 fn main {
   run_async(async fn() noraise {
     let _ = demo_bruteforce() catch { e => abort(e.to_string()) }
@@ -156,7 +157,9 @@ async fn demo_serialization() -> Unit {
     db.add(
       @types.VectorId::from_int(i),
       [i.to_double() / 10.0, (10 - i).to_double() / 10.0, 0.5],
-      attrs, 0L)
+      attrs,
+      0L,
+    )
   }
 
   // Serialize
@@ -198,13 +201,25 @@ async fn demo_metrics() -> Unit {
   let query = [1.0, 0.0, 0.0]
 
   // Cosine: direction matters, not magnitude
-  let db_cosine = @vcdb.PersistentDB::in_memory(3, metric=@types.Cosine, strategy=@types.Bruteforce)
+  let db_cosine = @vcdb.PersistentDB::in_memory(
+    3,
+    metric=@types.Cosine,
+    strategy=@types.Bruteforce,
+  )
 
   // Dot: both direction and magnitude matter
-  let db_dot = @vcdb.PersistentDB::in_memory(3, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db_dot = @vcdb.PersistentDB::in_memory(
+    3,
+    metric=@types.Dot,
+    strategy=@types.Bruteforce,
+  )
 
   // L2: distance matters
-  let db_l2 = @vcdb.PersistentDB::in_memory(3, metric=@types.L2, strategy=@types.Bruteforce)
+  let db_l2 = @vcdb.PersistentDB::in_memory(
+    3,
+    metric=@types.L2,
+    strategy=@types.Bruteforce,
+  )
 
   for vec in vectors {
     let (id, v) = vec

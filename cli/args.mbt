@@ -51,7 +51,7 @@ pub fn parse_args(args : Array[String]) -> ParsedArgs {
     if arg.has_prefix("--") {
       let flag_name = arg.unsafe_substring(start=2, end=arg.length())
       // Check if this is a boolean flag (no value) or a key-value flag
-      if i + 1 < args.length() && not(args[i + 1].has_prefix("--")) {
+      if i + 1 < args.length() && !args[i + 1].has_prefix("--") {
         // Key-value flag
         result.flags[flag_name] = args[i + 1]
         i = i + 2
@@ -91,7 +91,7 @@ pub fn ParsedArgs::get_flag_or(
 pub fn ParsedArgs::get_int_flag(self : ParsedArgs, name : String) -> Int? {
   match self.flags.get(name) {
     Some(s) => {
-      let result : Result[Int64, _] = try? @strconv.parse_int64(s)
+      let result : Result[Int64, _] = try? @string.parse_int64(s)
       match result {
         Ok(n) => Some(n.to_int())
         Err(_) => None
@@ -137,7 +137,7 @@ pub fn parse_vector(s : String) -> Array[Double]? {
     if trimmed.length() == 0 {
       continue
     }
-    let parse_result : Result[Double, _] = try? @strconv.parse_double(trimmed)
+    let parse_result : Result[Double, _] = try? @string.parse_double(trimmed)
     match parse_result {
       Ok(n) => result.push(n)
       Err(_) => return None
@@ -178,7 +178,7 @@ pub fn parse_payload(s : String) -> @gateway.JsonValue {
       let key = kv[0].trim(chars=" ").to_string()
       let value = kv[1].trim(chars=" ").to_string()
       // Try to parse as number first
-      let parse_result : Result[Double, _] = try? @strconv.parse_double(value)
+      let parse_result : Result[Double, _] = try? @string.parse_double(value)
       match parse_result {
         Ok(n) => obj[key] = @gateway.JNumber(n)
         Err(_) =>
@@ -203,7 +203,7 @@ fn split_by_equals(s : String) -> Array[String] {
   let current : Array[Char] = []
   let mut found_equals = false
   for c in s {
-    if c == '=' && not(found_equals) {
+    if c == '=' && !found_equals {
       parts.push(String::from_array(current))
       current.clear()
       found_equals = true

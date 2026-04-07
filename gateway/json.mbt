@@ -344,7 +344,7 @@ fn JsonParser::parse_number(self : JsonParser) -> JsonValue? {
     }
   }
   let num_str = String::from_array(self.chars[start:self.pos])
-  let result : Result[Double, _] = try? @strconv.parse_double(num_str)
+  let result : Result[Double, _] = try? @string.parse_double(num_str)
   match result {
     Ok(n) => Some(JNumber(n))
     Err(_) => None

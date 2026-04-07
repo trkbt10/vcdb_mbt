@@ -121,7 +121,7 @@ fn encode_attr_value(value : @types.AttrValue) -> Bytes {
     String(s) => {
       w.push_byte(b'\x04') // type tag
       // Encode full UTF-8 to preserve Unicode
-      w.push_bytes(s.to_bytes())
+      w.push_bytes(@utf8.encode(s.view()))
     }
   }
   w.concat()

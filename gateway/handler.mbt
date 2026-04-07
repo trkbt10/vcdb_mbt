@@ -271,7 +271,7 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
       }
     }
     ("GET", ["collections", name, "points", id_str]) => {
-      let parse_result : Result[Int64, _] = try? @strconv.parse_int64(id_str)
+      let parse_result : Result[Int64, _] = try? @string.parse_int64(id_str)
       let id : Int64 = match parse_result {
         Ok(i) => i
         Err(_) => return ApiResponse::err("Invalid point ID")
@@ -283,7 +283,7 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
       }
     }
     ("DELETE", ["collections", name, "points", id_str]) => {
-      let parse_result : Result[Int64, _] = try? @strconv.parse_int64(id_str)
+      let parse_result : Result[Int64, _] = try? @string.parse_int64(id_str)
       let id : Int64 = match parse_result {
         Ok(i) => i
         Err(_) => return ApiResponse::err("Invalid point ID")

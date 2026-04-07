@@ -187,7 +187,7 @@ fn parse_pg_from_name(name : String) -> Int {
         pg_str.push(chars[j])
         j = j + 1
       }
-      if not(pg_str.is_empty()) {
+      if !pg_str.is_empty() {
         // Parse number and save as potential last valid PG
         let mut val = 0
         for c in pg_str {

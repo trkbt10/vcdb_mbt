@@ -289,10 +289,10 @@ fn VectorDB::is_tombstoned(self : VectorDB, id : @types.VectorId) -> Bool {
 ///
 /// Returns: true if the vector exists and is not tombstoned
 pub fn VectorDB::has(self : VectorDB, id : @types.VectorId) -> Bool {
-  if not(self.store.has(id)) {
+  if !self.store.has(id) {
     return false
   }
-  not(self.is_tombstoned(id))
+  !self.is_tombstoned(id)
 }
 
 ///|
@@ -403,7 +403,7 @@ pub fn VectorDB::count_filtered(
   }
   let mut count = 0
   for id in candidates {
-    if not(self.is_tombstoned(id)) {
+    if !self.is_tombstoned(id) {
       count = count + 1
     }
   }

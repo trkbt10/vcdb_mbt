@@ -1,6 +1,6 @@
 import {
   "moonbitlang/core/bench",
-  "moonbitlang/core/strconv",
+  "moonbitlang/core/string",
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/store",
   "trkbt10/vcdb/core/persistence/codec",

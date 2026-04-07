@@ -45,7 +45,7 @@ pub struct DistributedDB[T] {
 pub fn[T] DistributedDB::new(
   shard_count : Int,
   transport : T,
-  failure_threshold~ : Int = 3,
+  failure_threshold? : Int = 3,
 ) -> DistributedDB[T] {
   {
     shard_count,
@@ -102,21 +102,22 @@ pub async fn[T : ShardTransport] DistributedDB::upsert(
           let (id, vector, attrs) = p
           TransportPoint::{ id, vector, attrs }
         })
-        let result : Result[Unit, _] = try? suspend(
-          fn(resolve : (Unit) -> Unit, reject) {
-            self.transport.shard_upsert(
-              shard_id, tp, timestamp_ns, fn() { resolve(()) }, fn(err) {
-                reject(ShardFailed(err))
-              },
-            )
-          },
-        )
+        let result : Result[Unit, _] = try? suspend(fn(
+          resolve : (Unit) -> Unit,
+          reject,
+        ) {
+          self.transport.shard_upsert(
+            shard_id,
+            tp,
+            timestamp_ns,
+            fn() { resolve(()) },
+            fn(err) { reject(ShardFailed(err)) },
+          )
+        })
         match result {
           Ok(_) => self.health.report_success(shard_id, timestamp_ns)
           Err(msg) => {
-            self.health.report_failure(
-              shard_id, timestamp_ns, msg.to_string(),
-            )
+            self.health.report_failure(shard_id, timestamp_ns, msg.to_string())
             self.partition_state.detect_partition(shard_id, timestamp_ns)
           }
         }
@@ -134,9 +135,10 @@ pub async fn[T : ShardTransport] DistributedDB::remove(
   timestamp_ns : Int64,
 ) -> Bool {
   let shard_id = shard_for_id(id, self.crush_map)
-  match self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-    self.transport.shard_remove(shard_id, id, timestamp_ns, resolve, reject)
-  }) {
+  match
+    self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
+      self.transport.shard_remove(shard_id, id, timestamp_ns, resolve, reject)
+    }) {
     Some(removed) => removed
     None => false
   }
@@ -150,22 +152,24 @@ pub async fn[T : ShardTransport] DistributedDB::search(
   self : DistributedDB[T],
   query : Array[Double],
   top_k : Int,
-  filter_json~ : String = "",
-  timestamp_ns~ : Int64 = 0L,
+  filter_json? : String = "",
+  timestamp_ns? : Int64 = 0L,
 ) -> MergedSearchResult {
   let shards = healthy_shards_for_fanout(self.crush_map, self.health)
   let shard_results : Array[ShardSearchResult] = []
   for shard_id in shards {
-    match self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-      self.transport.shard_search(
-        shard_id, query, top_k, filter_json, resolve, reject,
-      )
-    }) {
-      Some(hits) =>
-        shard_results.push({ shard_id, hits, error: None })
+    match
+      self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
+        self.transport.shard_search(
+          shard_id, query, top_k, filter_json, resolve, reject,
+        )
+      }) {
+      Some(hits) => shard_results.push({ shard_id, hits, error: None })
       None =>
         shard_results.push({
-          shard_id, hits: [], error: Some("shard unreachable"),
+          shard_id,
+          hits: [],
+          error: Some("shard unreachable"),
         })
     }
   }
@@ -177,12 +181,13 @@ pub async fn[T : ShardTransport] DistributedDB::search(
 pub async fn[T : ShardTransport] DistributedDB::get(
   self : DistributedDB[T],
   id : @types.VectorId,
-  timestamp_ns~ : Int64 = 0L,
+  timestamp_ns? : Int64 = 0L,
 ) -> @types.VectorRecord? {
   let shard_id = shard_for_id(id, self.crush_map)
-  match self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-    self.transport.shard_get(shard_id, id, resolve, reject)
-  }) {
+  match
+    self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
+      self.transport.shard_get(shard_id, id, resolve, reject)
+    }) {
     Some(record) => record
     None => None
   }
@@ -193,12 +198,13 @@ pub async fn[T : ShardTransport] DistributedDB::get(
 pub async fn[T : ShardTransport] DistributedDB::has(
   self : DistributedDB[T],
   id : @types.VectorId,
-  timestamp_ns~ : Int64 = 0L,
+  timestamp_ns? : Int64 = 0L,
 ) -> Bool {
   let shard_id = shard_for_id(id, self.crush_map)
-  match self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-    self.transport.shard_has(shard_id, id, resolve, reject)
-  }) {
+  match
+    self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
+      self.transport.shard_has(shard_id, id, resolve, reject)
+    }) {
     Some(found) => found
     None => false
   }
@@ -208,24 +214,26 @@ pub async fn[T : ShardTransport] DistributedDB::has(
 /// Scroll across all healthy shards, merge results.
 pub async fn[T : ShardTransport] DistributedDB::scroll_filtered(
   self : DistributedDB[T],
-  filter_json~ : String = "",
-  offset~ : Int64? = None,
-  limit~ : Int = 10,
-  timestamp_ns~ : Int64 = 0L,
+  filter_json? : String = "",
+  offset? : Int64? = None,
+  limit? : Int = 10,
+  timestamp_ns? : Int64 = 0L,
 ) -> MergedScrollResult {
   let shards = healthy_shards_for_fanout(self.crush_map, self.health)
   let shard_results : Array[ShardScrollResult] = []
   for shard_id in shards {
-    match self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-      self.transport.shard_scroll(
-        shard_id, filter_json, offset, limit, resolve, reject,
-      )
-    }) {
-      Some(entries) =>
-        shard_results.push({ shard_id, entries, error: None })
+    match
+      self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
+        self.transport.shard_scroll(
+          shard_id, filter_json, offset, limit, resolve, reject,
+        )
+      }) {
+      Some(entries) => shard_results.push({ shard_id, entries, error: None })
       None =>
         shard_results.push({
-          shard_id, entries: [], error: Some("shard unreachable"),
+          shard_id,
+          entries: [],
+          error: Some("shard unreachable"),
         })
     }
   }
@@ -236,19 +244,23 @@ pub async fn[T : ShardTransport] DistributedDB::scroll_filtered(
 /// Count across all healthy shards, merge results.
 pub async fn[T : ShardTransport] DistributedDB::count_filtered(
   self : DistributedDB[T],
-  filter_json~ : String = "",
-  timestamp_ns~ : Int64 = 0L,
+  filter_json? : String = "",
+  timestamp_ns? : Int64 = 0L,
 ) -> MergedCountResult {
   let shards = healthy_shards_for_fanout(self.crush_map, self.health)
   let shard_results : Array[ShardCountResult] = []
   for shard_id in shards {
-    match self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-      self.transport.shard_count(shard_id, filter_json, resolve, reject)
-    }) {
-      Some(count) =>
-        shard_results.push({ shard_id, count, error: None })
+    match
+      self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
+        self.transport.shard_count(shard_id, filter_json, resolve, reject)
+      }) {
+      Some(count) => shard_results.push({ shard_id, count, error: None })
       None =>
-        shard_results.push({ shard_id, count: 0, error: Some("shard unreachable") })
+        shard_results.push({
+          shard_id,
+          count: 0,
+          error: Some("shard unreachable"),
+        })
     }
   }
   merge_count(shard_results)

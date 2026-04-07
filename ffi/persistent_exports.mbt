@@ -1,4 +1,14 @@
 ///|
+/// Convert StorageKind to Int (used by persistent_exports and gateway_exports)
+fn kind_to_int(kind : @storage.StorageKind) -> Int {
+  match kind {
+    @storage.Config => 0
+    @storage.Index => 1
+    @storage.Data => 2
+  }
+}
+
+///|
 /// Persistent FFI exports — WAL-before-state durable operations.
 ///
 /// Unlike async_exports.mbt (which returns WAL bytes for JS to persist),

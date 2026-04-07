@@ -60,7 +60,7 @@ pub struct ReplicatedStorage[T] {
 
 ///|
 /// Create a replicated storage with no replicas (passthrough).
-pub fn[T] ReplicatedStorage::local(storage : T) -> ReplicatedStorage[T] {
+pub fn[T] ReplicatedStorage::local_only(storage : T) -> ReplicatedStorage[T] {
   { primary: storage, replicas: [], config: ReplicationConfig::default() }
 }
 
@@ -69,7 +69,7 @@ pub fn[T] ReplicatedStorage::local(storage : T) -> ReplicatedStorage[T] {
 pub fn[T] ReplicatedStorage::new(
   primary : T,
   replicas : Array[T],
-  config~ : ReplicationConfig = ReplicationConfig::default(),
+  config? : ReplicationConfig = ReplicationConfig::default(),
 ) -> ReplicatedStorage[T] {
   { primary, replicas, config }
 }
@@ -80,18 +80,12 @@ pub fn[T] ReplicatedStorage::with_all_ack(
   primary : T,
   replicas : Array[T],
 ) -> ReplicatedStorage[T] {
-  {
-    primary,
-    config: ReplicationConfig::all(replicas.length()),
-    replicas,
-  }
+  { primary, config: ReplicationConfig::all(replicas.length()), replicas }
 }
 
 ///|
 /// Number of total backends (primary + replicas).
-pub fn[T] ReplicatedStorage::backend_count(
-  self : ReplicatedStorage[T],
-) -> Int {
+pub fn[T] ReplicatedStorage::backend_count(self : ReplicatedStorage[T]) -> Int {
   1 + self.replicas.length()
 }
 
@@ -127,22 +121,21 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_writ
     self.primary.async_write(path, data, kind, resolve, reject)
     return
   }
-  let state = QuorumState::new(self.config.write_quorum, self.backend_count(), resolve, reject)
-  self.primary.async_write(
-    path,
-    data,
-    kind,
-    fn() { state.on_success() },
-    fn(err) { state.on_failure(err) },
+  let state = QuorumState::new(
+    self.config.write_quorum,
+    self.backend_count(),
+    resolve,
+    reject,
   )
+  self.primary.async_write(path, data, kind, fn() { state.on_success() }, fn(
+    err,
+  ) {
+    state.on_failure(err)
+  })
   for replica in self.replicas {
-    replica.async_write(
-      path,
-      data,
-      kind,
-      fn() { state.on_success() },
-      fn(err) { state.on_failure(err) },
-    )
+    replica.async_write(path, data, kind, fn() { state.on_success() }, fn(err) {
+      state.on_failure(err)
+    })
   }
 }
 
@@ -159,7 +152,12 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_atom
     self.primary.async_atomic_write(path, data, kind, resolve, reject)
     return
   }
-  let state = QuorumState::new(self.config.write_quorum, self.backend_count(), resolve, reject)
+  let state = QuorumState::new(
+    self.config.write_quorum,
+    self.backend_count(),
+    resolve,
+    reject,
+  )
   self.primary.async_atomic_write(
     path,
     data,
@@ -168,13 +166,11 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_atom
     fn(err) { state.on_failure(err) },
   )
   for replica in self.replicas {
-    replica.async_atomic_write(
-      path,
-      data,
-      kind,
-      fn() { state.on_success() },
-      fn(err) { state.on_failure(err) },
-    )
+    replica.async_atomic_write(path, data, kind, fn() { state.on_success() }, fn(
+      err,
+    ) {
+      state.on_failure(err)
+    })
   }
 }
 
@@ -190,20 +186,19 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_del(
     self.primary.async_del(path, kind, resolve, reject)
     return
   }
-  let state = QuorumState::new(self.config.write_quorum, self.backend_count(), resolve, reject)
-  self.primary.async_del(
-    path,
-    kind,
-    fn() { state.on_success() },
-    fn(err) { state.on_failure(err) },
+  let state = QuorumState::new(
+    self.config.write_quorum,
+    self.backend_count(),
+    resolve,
+    reject,
   )
+  self.primary.async_del(path, kind, fn() { state.on_success() }, fn(err) {
+    state.on_failure(err)
+  })
   for replica in self.replicas {
-    replica.async_del(
-      path,
-      kind,
-      fn() { state.on_success() },
-      fn(err) { state.on_failure(err) },
-    )
+    replica.async_del(path, kind, fn() { state.on_success() }, fn(err) {
+      state.on_failure(err)
+    })
   }
 }
 
@@ -237,7 +232,7 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_list
 // Calls reject if enough failures make quorum impossible.
 
 ///|
-struct QuorumState {
+priv struct QuorumState {
   required : Int
   backends : Int
   mut succeeded : Int

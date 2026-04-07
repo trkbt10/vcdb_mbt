@@ -220,7 +220,7 @@ test "wal/delete_persists_via_wal" {
       Ok(d) => {
         assert_eq(d.size(), 1)
         assert_true(d.has(@types.VectorId::from_int(2)))
-        assert_true(not(d.has(@types.VectorId::from_int(1))))
+        assert_true(!d.has(@types.VectorId::from_int(1)))
       }
       Err(_) => assert_true(false)
     }

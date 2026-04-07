@@ -79,11 +79,5 @@ pub(open) trait ShardTransport {
   ) -> Unit
 
   /// Count filtered entries on a specific shard.
-  shard_count(
-    Self,
-    Int,
-    String,
-    (Int) -> Unit,
-    (String) -> Unit,
-  ) -> Unit
+  shard_count(Self, Int, String, (Int) -> Unit, (String) -> Unit) -> Unit
 }

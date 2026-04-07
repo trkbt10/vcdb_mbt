@@ -208,7 +208,7 @@ pub fn resolve_conflicts_lww(
 
   // Add remote-only records
   for id_key in remote_by_id.keys() {
-    if not(seen.contains(id_key)) {
+    if !seen.contains(id_key) {
       match remote_by_id.get(id_key) {
         Some(rec) => merged.push(rec)
         None => ()

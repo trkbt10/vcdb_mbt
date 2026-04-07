@@ -8,7 +8,7 @@ fn run_async_blocking(f : async () -> Unit noraise) -> Unit = "%async.run"
 
 ///|
 fn remove_tree(path : String) -> Unit {
-  if not(@fs.path_exists(path)) {
+  if !@fs.path_exists(path) {
     return
   }
   if (@fs.is_dir(path) catch { _ => false }) {

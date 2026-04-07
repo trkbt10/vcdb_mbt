@@ -12,7 +12,10 @@ fn run_async(f : async () -> Unit noraise) -> Unit = "%async.run"
 
 ///|
 /// Global instance storage
-let instances : @hashmap.HashMap[Int, @vcdb.PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage]] = @hashmap.new()
+let instances : @hashmap.HashMap[
+  Int,
+  @vcdb.PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage],
+] = @hashmap.new()
 
 ///|
 priv struct Counter {
@@ -27,14 +30,14 @@ let counter : Counter = { value: 1 }
 fn vid_from_pair(hi : Int, lo : Int) -> @types.VectorId {
   let hi64 = hi.to_int64()
   let lo64 = lo.to_int64().land(0xFFFFFFFFL)
-  @types.VectorId(hi64.lsl(32).lor(lo64))
+  @types.VectorId((hi64 << 32) | lo64)
 }
 
 ///|
 /// Extract hi/lo pair from VectorId (SoT for ID extraction).
 fn vid_to_pair(id : @types.VectorId) -> (Int, Int) {
   let v = id.to_int64()
-  let hi = v.lsr(32).to_int()
+  let hi = (v.reinterpret_as_uint64() >> 32).to_int()
   let lo = v.to_int()
   (hi, lo)
 }
@@ -44,7 +47,9 @@ pub fn vcdb_create(dim : Int) -> Int {
   let id = counter.value
   counter.value = counter.value + 1
   run_async(async fn() noraise {
-    let db = @vcdb.PersistentDB::in_memory_bruteforce(dim) catch { _ => abort("vcdb_create failed") }
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(dim) catch {
+      _ => abort("vcdb_create failed")
+    }
     instances[id] = db
   })
   id
@@ -55,7 +60,9 @@ pub fn vcdb_create_hnsw(dim : Int) -> Int {
   let id = counter.value
   counter.value = counter.value + 1
   run_async(async fn() noraise {
-    let db = @vcdb.PersistentDB::in_memory_hnsw(dim) catch { _ => abort("vcdb_create_hnsw failed") }
+    let db = @vcdb.PersistentDB::in_memory_hnsw(dim) catch {
+      _ => abort("vcdb_create_hnsw failed")
+    }
     instances[id] = db
   })
   id
@@ -66,7 +73,9 @@ pub fn vcdb_create_ivf(dim : Int) -> Int {
   let id = counter.value
   counter.value = counter.value + 1
   run_async(async fn() noraise {
-    let db = @vcdb.PersistentDB::in_memory_ivf(dim) catch { _ => abort("vcdb_create_ivf failed") }
+    let db = @vcdb.PersistentDB::in_memory_ivf(dim) catch {
+      _ => abort("vcdb_create_ivf failed")
+    }
     instances[id] = db
   })
   id
@@ -108,7 +117,9 @@ pub fn vcdb_add(
       }
       let attrs = @types.empty_attrs()
       run_async(async fn() noraise {
-        db.add(id, vector, attrs, 0L) catch { _ => () }
+        db.add(id, vector, attrs, 0L) catch {
+          _ => ()
+        }
       })
       0
     }
@@ -227,16 +238,6 @@ fn parse_json_to_attrs(json : String) -> @types.Attrs {
   }
 }
 
-///|
-/// Convert StorageKind to Int (used by persistent_exports and gateway_exports)
-fn kind_to_int(kind : @storage.StorageKind) -> Int {
-  match kind {
-    @storage.Config => 0
-    @storage.Index => 1
-    @storage.Data => 2
-  }
-}
-
 // ============================================================================
 // CRUSH placement — deterministic vector-to-shard mapping
 // ============================================================================
@@ -259,11 +260,7 @@ pub fn crush_placement_group(id_hi : Int, id_lo : Int, pg_count : Int) -> Int {
 // ============================================================================
 
 ///|
-/// Global storage for gateway (in-memory, implements both Storage and AsyncStorage)
-let gateway_storage : @storage.MemoryStorage = @storage.MemoryStorage::new()
-
-///|
-/// Manager with MemoryStorage
-let gateway_manager : @gateway.CollectionManager[@storage.MemoryStorage] = @gateway.CollectionManager::with_storage(
-  gateway_storage,
-)
+/// Keep @gateway import alive for JS-only gateway_exports.mbt.
+fn _gateway_import_anchor() -> @gateway.CollectionConfig {
+  @gateway.CollectionConfig::default("", 0)
+}

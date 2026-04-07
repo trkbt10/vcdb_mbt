@@ -158,7 +158,7 @@ pub fn parse_int64(input : String) -> (Bool, Int, Int) {
     return (false, 0, 0)
   }
   // Use MoonBit's native Int64 parsing — no float64 intermediate
-  let result : Result[Int64, _] = try? @strconv.parse_int64(input)
+  let result : Result[Int64, _] = try? @string.parse_int64(input)
   match result {
     Ok(n) => {
       let vid = @types.VectorId(n)

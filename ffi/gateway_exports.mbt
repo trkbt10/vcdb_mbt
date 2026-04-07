@@ -5,6 +5,16 @@
 /// via the async CollectionManager.
 
 ///|
+/// Global storage for gateway (in-memory, implements both Storage and AsyncStorage)
+let gateway_storage : @storage.MemoryStorage = @storage.MemoryStorage::new()
+
+///|
+/// Manager with MemoryStorage
+let gateway_manager : @gateway.CollectionManager[@storage.MemoryStorage] = @gateway.CollectionManager::with_storage(
+  gateway_storage,
+)
+
+///|
 /// Execute gateway request (async — returns Promise in JS).
 pub fn gateway_request(
   http_method : String,

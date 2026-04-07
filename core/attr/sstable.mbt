@@ -413,7 +413,7 @@ fn compare_bytes(a : Bytes, b : Bytes) -> Int {
 pub fn SSTable::find(self : SSTable, key : Bytes) -> SSTableRecord? {
   // Check bloom filter first
   match self.bloom {
-    Some(bloom) => if not(bloom.might_contain(key)) { return None }
+    Some(bloom) => if !bloom.might_contain(key) { return None }
     None => ()
   }
   let record_len = self.records.length()

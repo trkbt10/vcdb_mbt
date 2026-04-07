@@ -1,9 +1,4 @@
 ///|
-/// Async primitives — bound to MoonBit's built-in coroutine system.
-/// These work on ALL targets (JS, native, Wasm).
-fn run_async(f : async () -> Unit noraise) -> Unit = "%async.run"
-
-///|
 async fn[T, E : Error] suspend(
   f : ((T) -> Unit, (E) -> Unit) -> Unit,
 ) -> T raise E = "%async.suspend"

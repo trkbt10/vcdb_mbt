@@ -475,6 +475,8 @@ test "persistent/remove_recovery" {
     inspect(db2.has(make_vid(2)), content="true")
   })
 }
+
+///|
 test "persistent/update_attrs_recovery" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
@@ -501,9 +503,8 @@ test "persistent/update_attrs_recovery" {
     inspect(updated, content="true")
     // Verify in-memory
     match db.get(make_vid(1)) {
-      Some(r) => {
-                inspect(r.attrs.to_string().contains("published"), content="true")
-      }
+      Some(r) =>
+        inspect(r.attrs.to_string().contains("published"), content="true")
       None => inspect(false, content="true")
     }
     // "Crash" and re-init
@@ -518,9 +519,8 @@ test "persistent/update_attrs_recovery" {
       checkpoint_bytes=0,
     )
     match db2.get(make_vid(1)) {
-      Some(r) => {
-                inspect(r.attrs.to_string().contains("published"), content="true")
-      }
+      Some(r) =>
+        inspect(r.attrs.to_string().contains("published"), content="true")
       None => inspect(false, content="true")
     }
   })
@@ -531,7 +531,6 @@ test "persistent/update_attrs_recovery" {
 // ════════════════════════════════════════════════════════════════
 
 ///|
-
 test "persistent/init_from_empty" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
@@ -557,7 +556,6 @@ test "persistent/init_from_empty" {
 // ════════════════════════════════════════════════════════════════
 
 ///|
-
 test "persistent/idempotent_wal_replay_after_checkpoint_crash" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
@@ -600,7 +598,16 @@ test "persistent/idempotent_wal_replay_after_checkpoint_crash" {
       capacity: 1024,
       strategy: @types.HNSW(@types.HNSWParams::default()),
     }
-    let db2 = PersistentDB::from_store(store, options)
+    let engine2 = VectorDB::from_store(store, options)
+    let db2 = PersistentDB::wrap(
+      engine2,
+      @wal.AsyncWalRuntime::new(@storage.MemoryStorage::new(), ""),
+      @storage.MemoryStorage::new(),
+      "",
+      "",
+      checkpoint_threshold=2147483647,
+      checkpoint_bytes=0,
+    )
     inspect(db2.size(), content="1")
   })
 }
@@ -633,7 +640,7 @@ test "persistent/same_id_upsert_last_write_wins" {
     match db.get(make_vid(1)) {
       Some(r) => {
         inspect(r.vector[1], content="1")
-                inspect(r.attrs.to_string().contains("\"2\""), content="true")
+        inspect(r.attrs.to_string().contains("\"2\""), content="true")
       }
       None => inspect(false, content="true")
     }
@@ -652,7 +659,7 @@ test "persistent/same_id_upsert_last_write_wins" {
     match db2.get(make_vid(1)) {
       Some(r) => {
         inspect(r.vector[1], content="1")
-                inspect(r.attrs.to_string().contains("\"2\""), content="true")
+        inspect(r.attrs.to_string().contains("\"2\""), content="true")
       }
       None => inspect(false, content="true")
     }
@@ -662,7 +669,6 @@ test "persistent/same_id_upsert_last_write_wins" {
 // ── Test 13b: Multiple separate upserts (different IDs) and recovery ──
 
 ///|
-
 test "persistent/separate_upserts_recovery" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
@@ -707,7 +713,6 @@ test "persistent/separate_upserts_recovery" {
 // ════════════════════════════════════════════════════════════════
 
 ///|
-
 test "persistent/remove_nonexistent" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
@@ -739,7 +744,6 @@ test "persistent/remove_nonexistent" {
 // ════════════════════════════════════════════════════════════════
 
 ///|
-
 test "persistent/wal_sot_replay_consistency" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
@@ -783,8 +787,8 @@ test "persistent/wal_sot_replay_consistency" {
     // Both paths should produce the same state
     inspect(manual_store.size(), content=db2.size().to_string())
     // ID 1 removed, ID 2 present
-    inspect(manual_store.get(make_vid(1)).is_empty(), content="true")
-    inspect(manual_store.get(make_vid(2)).is_empty(), content="false")
+    inspect(manual_store.get(make_vid(1)) is None, content="true")
+    inspect(manual_store.get(make_vid(2)) is None, content="false")
   })
 }
 
@@ -797,7 +801,6 @@ test "persistent/wal_sot_replay_consistency" {
 // snapshot storage. Writes to shard 0 must never appear in shard 1.
 
 ///|
-
 test "persistent/multi_instance_isolation" {
   run_async_test(async fn() {
     // Shard 0
@@ -887,7 +890,6 @@ test "persistent/multi_instance_isolation" {
 // base_path / name to isolate their data. Verify no cross-contamination.
 
 ///|
-
 test "persistent/shared_storage_prefix_isolation" {
   run_async_test(async fn() {
     // Single shared storage backend for all shards
@@ -926,15 +928,11 @@ test "persistent/shared_storage_prefix_isolation" {
     inspect(shard_a.size(), content="1")
     inspect(shard_b.size(), content="1")
     match shard_a.get(make_vid(1)) {
-      Some(r) => {
-                inspect(r.attrs.to_string().contains("\"a\""), content="true")
-      }
+      Some(r) => inspect(r.attrs.to_string().contains("\"a\""), content="true")
       None => inspect(false, content="true")
     }
     match shard_b.get(make_vid(1)) {
-      Some(r) => {
-                inspect(r.attrs.to_string().contains("\"b\""), content="true")
-      }
+      Some(r) => inspect(r.attrs.to_string().contains("\"b\""), content="true")
       None => inspect(false, content="true")
     }
     // WAL paths should differ
@@ -967,15 +965,11 @@ test "persistent/shared_storage_prefix_isolation" {
     inspect(shard_a2.size(), content="1")
     inspect(shard_b2.size(), content="1")
     match shard_a2.get(make_vid(1)) {
-      Some(r) => {
-                inspect(r.attrs.to_string().contains("\"a\""), content="true")
-      }
+      Some(r) => inspect(r.attrs.to_string().contains("\"a\""), content="true")
       None => inspect(false, content="true")
     }
     match shard_b2.get(make_vid(1)) {
-      Some(r) => {
-                inspect(r.attrs.to_string().contains("\"b\""), content="true")
-      }
+      Some(r) => inspect(r.attrs.to_string().contains("\"b\""), content="true")
       None => inspect(false, content="true")
     }
   })
@@ -986,7 +980,6 @@ test "persistent/shared_storage_prefix_isolation" {
 // Verify timestamps are correctly stored and retrievable.
 
 ///|
-
 test "persistent/timestamp_preserved_in_wal" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
@@ -1033,7 +1026,6 @@ test "persistent/timestamp_preserved_in_wal" {
 // a consistent cross-shard snapshot.
 
 ///|
-
 test "persistent/cross_shard_point_in_time" {
   run_async_test(async fn() {
     let wal0 = TestAsyncStorage::new()
@@ -1109,7 +1101,6 @@ test "persistent/cross_shard_point_in_time" {
 // Other shards' WAL and data are untouched.
 
 ///|
-
 test "persistent/independent_checkpoint" {
   run_async_test(async fn() {
     let wal0 = TestAsyncStorage::new()

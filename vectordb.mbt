@@ -50,8 +50,8 @@ fn[W, S] PersistentDB::wrap(
   snapshot_storage : S,
   base_path : String,
   name : String,
-  checkpoint_threshold~ : Int = 50,
-  checkpoint_bytes~ : Int = default_checkpoint_bytes,
+  checkpoint_threshold? : Int = 50,
+  checkpoint_bytes? : Int = default_checkpoint_bytes,
 ) -> PersistentDB[W, S] {
   {
     engine,
@@ -443,7 +443,9 @@ pub fn[W, S] PersistentDB::metric(self : PersistentDB[W, S]) -> @types.Metric {
 
 ///|
 /// ANN strategy.
-pub fn[W, S] PersistentDB::strategy(self : PersistentDB[W, S]) -> @types.Strategy {
+pub fn[W, S] PersistentDB::strategy(
+  self : PersistentDB[W, S],
+) -> @types.Strategy {
   self.engine.strategy()
 }
 
@@ -466,7 +468,9 @@ pub fn[W, S] PersistentDB::train(
 
 ///|
 /// Serialize current state as snapshot bytes.
-pub fn[W, S] PersistentDB::serialize_snapshot(self : PersistentDB[W, S]) -> Bytes {
+pub fn[W, S] PersistentDB::serialize_snapshot(
+  self : PersistentDB[W, S],
+) -> Bytes {
   self.engine.serialize()
 }
 

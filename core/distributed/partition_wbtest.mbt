@@ -64,9 +64,9 @@ fn make_upsert_record(
 
 ///|
 test "partition: LWW remote wins (higher timestamp)" {
-  let local = [make_upsert_record(1, 1000L, [1.0])]
+  let local_records = [make_upsert_record(1, 1000L, [1.0])]
   let remote = [make_upsert_record(1, 2000L, [2.0])]
-  let (merged, conflicts) = resolve_conflicts_lww(local, remote)
+  let (merged, conflicts) = resolve_conflicts_lww(local_records, remote)
   assert_eq(merged.length(), 1)
   assert_eq(conflicts.length(), 1)
   assert_eq(conflicts[0].resolution, KeepRemote)
@@ -75,9 +75,9 @@ test "partition: LWW remote wins (higher timestamp)" {
 
 ///|
 test "partition: LWW local wins (higher timestamp)" {
-  let local = [make_upsert_record(1, 3000L, [1.0])]
+  let local_records = [make_upsert_record(1, 3000L, [1.0])]
   let remote = [make_upsert_record(1, 1000L, [2.0])]
-  let (merged, conflicts) = resolve_conflicts_lww(local, remote)
+  let (merged, conflicts) = resolve_conflicts_lww(local_records, remote)
   assert_eq(merged.length(), 1)
   assert_eq(conflicts.length(), 1)
   assert_eq(conflicts[0].resolution, KeepLocal)
@@ -85,9 +85,9 @@ test "partition: LWW local wins (higher timestamp)" {
 
 ///|
 test "partition: LWW tie-break same timestamp" {
-  let local = [make_upsert_record(1, 1000L, [1.0])]
+  let local_records = [make_upsert_record(1, 1000L, [1.0])]
   let remote = [make_upsert_record(1, 1000L, [2.0])]
-  let (merged, conflicts) = resolve_conflicts_lww(local, remote)
+  let (merged, conflicts) = resolve_conflicts_lww(local_records, remote)
   assert_eq(merged.length(), 1)
   assert_eq(conflicts.length(), 1)
   assert_eq(conflicts[0].resolution, TieBreakById)
@@ -95,16 +95,16 @@ test "partition: LWW tie-break same timestamp" {
 
 ///|
 test "partition: no conflicts (disjoint IDs)" {
-  let local = [make_upsert_record(1, 1000L, [1.0])]
+  let local_records = [make_upsert_record(1, 1000L, [1.0])]
   let remote = [make_upsert_record(2, 2000L, [2.0])]
-  let (merged, conflicts) = resolve_conflicts_lww(local, remote)
+  let (merged, conflicts) = resolve_conflicts_lww(local_records, remote)
   assert_eq(merged.length(), 2)
   assert_eq(conflicts.length(), 0)
 }
 
 ///|
 test "partition: mixed conflicts and non-conflicts" {
-  let local = [
+  let local_records = [
     make_upsert_record(1, 1000L, [1.0]),
     make_upsert_record(2, 3000L, [2.0]),
     make_upsert_record(3, 1000L, [3.0]),
@@ -113,7 +113,7 @@ test "partition: mixed conflicts and non-conflicts" {
     make_upsert_record(1, 2000L, [1.5]), // conflict: remote wins
     make_upsert_record(4, 4000L, [4.0]), // remote only
   ]
-  let (merged, conflicts) = resolve_conflicts_lww(local, remote)
+  let (merged, conflicts) = resolve_conflicts_lww(local_records, remote)
   assert_eq(merged.length(), 4) // IDs 1,2,3,4
   assert_eq(conflicts.length(), 1) // Only ID 1
   assert_eq(conflicts[0].resolution, KeepRemote)

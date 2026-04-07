@@ -52,7 +52,7 @@ fn ensure_dir(path : String) -> Unit raise IOError {
     current.push(ch)
     if ch == '/' {
       let part = String::from_array(current)
-      if part.length() > 0 && part != "/" && not(@fs.path_exists(part)) {
+      if part.length() > 0 && part != "/" && !@fs.path_exists(part) {
         @fs.create_dir(part) catch {
           e => raise_io_error(e)
         }
@@ -62,7 +62,7 @@ fn ensure_dir(path : String) -> Unit raise IOError {
   let final_path = String::from_array(current)
   if final_path.length() > 0 &&
     final_path != "/" &&
-    not(@fs.path_exists(final_path)) {
+    !@fs.path_exists(final_path) {
     @fs.create_dir(final_path) catch {
       e => raise_io_error(e)
     }
@@ -86,7 +86,7 @@ fn walk_dir(
   rel_dir : String,
   files : Array[String],
 ) -> Unit raise IOError {
-  if not(@fs.path_exists(abs_dir)) {
+  if !@fs.path_exists(abs_dir) {
     return
   }
   let entries = @fs.read_dir(abs_dir) catch {

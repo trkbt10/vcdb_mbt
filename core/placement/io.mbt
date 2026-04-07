@@ -667,14 +667,14 @@ fn extract_int_field(json : String, field : String) -> Int {
   for c in chars {
     if c >= '0' && c <= '9' {
       num_chars.push(c)
-    } else if not(num_chars.is_empty()) {
+    } else if !num_chars.is_empty() {
       break
     }
   }
   if num_chars.is_empty() {
     0
   } else {
-    let result : Result[Int, _] = try? @strconv.parse_int(
+    let result : Result[Int, _] = try? @string.parse_int(
       String::from_array(num_chars),
     )
     match result {
@@ -696,14 +696,14 @@ fn extract_int64_field(json : String, field : String) -> Int64 {
   for c in chars {
     if (c >= '0' && c <= '9') || c == '-' {
       num_chars.push(c)
-    } else if not(num_chars.is_empty()) {
+    } else if !num_chars.is_empty() {
       break
     }
   }
   if num_chars.is_empty() {
     0L
   } else {
-    let result : Result[Int64, _] = try? @strconv.parse_int64(
+    let result : Result[Int64, _] = try? @string.parse_int64(
       String::from_array(num_chars),
     )
     match result {
@@ -767,7 +767,7 @@ fn extract_segments(json : String) -> Array[SegmentEntry] {
     let obj_str = String::from_array(seg_chars[obj_start:pos - 1])
     let name = extract_string_field("{" + obj_str + "}", "name")
     let target_key = extract_string_field("{" + obj_str + "}", "target_key")
-    if not(name.is_empty()) {
+    if !name.is_empty() {
       segments.push({ name, target_key })
     }
   }
@@ -837,7 +837,7 @@ fn extract_crush_map(json : String) -> CrushMap {
 
     let tobj_str = String::from_array(target_chars[tobj_start:tpos - 1])
     let key = extract_string_field("{" + tobj_str + "}", "key")
-    if not(key.is_empty()) {
+    if !key.is_empty() {
       targets.push(CrushTarget::new(key))
     }
   }

@@ -42,7 +42,7 @@ fn parse_args(args : Array[String]) -> ServerOptions {
       i = i + 1
     } else if arg == "--port" && i + 1 < args.length() {
       let port_arg = args[i + 1]
-      let parsed = @strconv.parse_int(port_arg) catch {
+      let parsed = @string.parse_int(port_arg) catch {
         _ => {
           opts.error = Some("Invalid port: " + port_arg)
           return opts

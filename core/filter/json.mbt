@@ -55,7 +55,7 @@ fn parse_match(inner : Map[String, Json]) -> FilterExpr? {
   }
   let value = match inner.get("value") {
     Some(String(s)) => @types.String(s)
-    Some(Number(n)) =>
+    Some(Number(n, ..)) =>
       if n == n.to_int().to_double() {
         @types.Int(n.to_int64())
       } else {
@@ -87,7 +87,7 @@ fn parse_range(inner : Map[String, Json]) -> FilterExpr? {
 ///|
 fn json_to_double(j : Json?) -> Double? {
   match j {
-    Some(Number(n)) => Some(n)
+    Some(Number(n, ..)) => Some(n)
     _ => None
   }
 }
@@ -119,7 +119,7 @@ fn parse_compound_should(inner : Map[String, Json]) -> FilterExpr? {
     _ => return None
   }
   let min = match inner.get("min") {
-    Some(Number(n)) => n.to_int()
+    Some(Number(n, ..)) => n.to_int()
     _ => 1
   }
   if exprs.is_empty() {
@@ -157,7 +157,7 @@ fn parse_shorthand(map : Map[String, Json]) -> FilterExpr? {
     }
     let value = match json_val {
       String(s) => @types.String(s)
-      Number(n) =>
+      Number(n, ..) =>
         if n == n.to_int().to_double() {
           @types.Int(n.to_int64())
         } else {

@@ -1,13 +1,4 @@
 ///|
-/// Attribute Index Strategy
-pub enum AttrIndexStrategy {
-  Basic // Hash map based
-  Bitmap // For low-cardinality fields
-  BPTree // B+ tree for balanced read/write
-  LSM // Write-optimized with memtable
-} derive(Eq, Show)
-
-///|
 /// Convert AttrValue to string key for indexing
 /// Uses type prefix to disambiguate different types with same string representation
 pub fn attr_value_to_key(value : @types.AttrValue) -> String {

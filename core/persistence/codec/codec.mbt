@@ -31,7 +31,7 @@ pub fn attrs_to_json(attrs : @types.Attrs?) -> String {
         match a.get(key) {
           None => continue
           Some(value) => {
-            if not(first) {
+            if !first {
               chars.push(',')
             }
             first = false
@@ -56,7 +56,7 @@ pub fn parse_attrs_json(json : String) -> @types.Attrs? {
   if json == "null" {
     return None
   }
-  if not(json.has_prefix("{")) || not(json.has_suffix("}")) {
+  if !json.has_prefix("{") || !json.has_suffix("}") {
     return None
   }
   let attrs = @types.empty_attrs()
@@ -363,13 +363,13 @@ fn parse_json_value(
       }
       let num_str = String::from_array(chars[num_start:i])
       if has_dot {
-        let result : Result[Double, _] = try? @strconv.parse_double(num_str)
+        let result : Result[Double, _] = try? @string.parse_double(num_str)
         match result {
           Ok(f) => (Float(f), i)
           Err(_) => (Null, i)
         }
       } else {
-        let result : Result[Int64, _] = try? @strconv.parse_int64(num_str)
+        let result : Result[Int64, _] = try? @string.parse_int64(num_str)
         match result {
           Ok(n) => (Int(n), i)
           Err(_) => (Null, i)

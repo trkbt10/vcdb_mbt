@@ -310,7 +310,7 @@ pub fn decode_wal_records(data : Bytes) -> Array[WalRecord] {
     return records
   }
   let r = @binary.BinaryReader::new(data)
-  if not(verify_wal_header(r)) {
+  if !verify_wal_header(r) {
     return records
   }
   let body_len = wal_body_length(data)
@@ -341,7 +341,7 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
     }
   }
 
-  if not(use_existing) {
+  if !use_existing {
     w.push_bytes(encode_wal_header())
   }
 

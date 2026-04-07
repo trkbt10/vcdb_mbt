@@ -495,7 +495,10 @@ pub fn[S] CollectionManager::load_collection(
     return Err(CollectionExists(config.name))
   }
   let db = @vcdb.PersistentDB::from_snapshot(
-    data, storage, base_path, config.name,
+    data,
+    storage,
+    base_path,
+    config.name,
   )
   let collection : Collection[S] = { config, db }
   self.collections[config.name] = collection
