@@ -190,7 +190,15 @@ export interface Int64UtilFfi {
   format_int64(hi: number, lo: number): string;
 }
 
-/* ── Full module type (for loader only) ──────────────────────── */
+/* ── Composite FFI types ────────────────────────────────────── */
+
+/**
+ * Persistent + distributed FFI slice.
+ *
+ * Used by platform adapters that need persistent DB operations,
+ * distributed routing, and Int64 utilities in a single FFI handle.
+ */
+export type PersistentFFI = PersistentFfi & DistributedFfi & Int64UtilFfi;
 
 /**
  * Complete MoonBit JS-target module interface.

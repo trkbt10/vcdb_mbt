@@ -12,7 +12,7 @@ fn run_async(f : async () -> Unit noraise) -> Unit = "%async.run"
 
 ///|
 /// Global instance storage
-let instances : @hashmap.HashMap[Int, @vcdb.VectorDB[@storage.MemoryStorage, @storage.MemoryStorage]] = @hashmap.new()
+let instances : @hashmap.HashMap[Int, @vcdb.PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage]] = @hashmap.new()
 
 ///|
 priv struct Counter {
@@ -44,7 +44,7 @@ pub fn vcdb_create(dim : Int) -> Int {
   let id = counter.value
   counter.value = counter.value + 1
   run_async(async fn() noraise {
-    let db = @vcdb.VectorDB::in_memory_bruteforce(dim) catch { _ => abort("vcdb_create failed") }
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(dim) catch { _ => abort("vcdb_create failed") }
     instances[id] = db
   })
   id
@@ -55,7 +55,7 @@ pub fn vcdb_create_hnsw(dim : Int) -> Int {
   let id = counter.value
   counter.value = counter.value + 1
   run_async(async fn() noraise {
-    let db = @vcdb.VectorDB::in_memory_hnsw(dim) catch { _ => abort("vcdb_create_hnsw failed") }
+    let db = @vcdb.PersistentDB::in_memory_hnsw(dim) catch { _ => abort("vcdb_create_hnsw failed") }
     instances[id] = db
   })
   id
@@ -66,7 +66,7 @@ pub fn vcdb_create_ivf(dim : Int) -> Int {
   let id = counter.value
   counter.value = counter.value + 1
   run_async(async fn() noraise {
-    let db = @vcdb.VectorDB::in_memory_ivf(dim) catch { _ => abort("vcdb_create_ivf failed") }
+    let db = @vcdb.PersistentDB::in_memory_ivf(dim) catch { _ => abort("vcdb_create_ivf failed") }
     instances[id] = db
   })
   id
@@ -210,7 +210,7 @@ pub fn vcdb_serialize(instance_id : Int) -> Bytes {
 pub fn vcdb_deserialize(data : Bytes) -> Int {
   let id = counter.value
   counter.value = counter.value + 1
-  instances[id] = @vcdb.VectorDB::deserialize(data)
+  instances[id] = @vcdb.PersistentDB::deserialize(data)
   id
 }
 

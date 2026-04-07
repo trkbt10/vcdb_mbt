@@ -9,7 +9,7 @@
 /// Test: Int64 max/min values in attributes
 test "edge/numeric/int64_bounds" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   let attrs = @types.empty_attrs()
   attrs.set("max", @types.Int(9223372036854775807L)) // Int64.max
@@ -34,7 +34,7 @@ test "edge/numeric/int64_bounds" {
 /// Test: Float64 special values
 test "edge/numeric/float_special" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Dot, strategy=@types.Bruteforce)
 
   let attrs = @types.empty_attrs()
   attrs.set("tiny", @types.Float(0.00000000001))
@@ -59,7 +59,7 @@ test "edge/numeric/float_special" {
 /// Test: VectorId boundary values
 test "edge/numeric/vectorid_bounds" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   let max_id = @types.VectorId::from_int64(9223372036854775807L)
   let zero_id = @types.VectorId::from_int(0)
@@ -84,7 +84,7 @@ test "edge/numeric/vectorid_bounds" {
 /// Test: Single dimension vector (dim=1)
 test "edge/dim/single_dimension" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(1, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(1, metric=@types.Dot, strategy=@types.Bruteforce)
 
   db.add(@types.VectorId::from_int(1), [5.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [3.0], @types.empty_attrs(), 0L)
@@ -104,7 +104,7 @@ test "edge/dim/single_dimension" {
 test "edge/dim/high_dimension" {
   run_async_test(async fn() {
   let dim = 512
-  let db = @vcdb.VectorDB::in_memory(dim, metric=@types.Cosine, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(dim, metric=@types.Cosine, strategy=@types.Bruteforce)
 
   // Create vectors with different "hot" positions
   for i in 0..<10 {
@@ -132,7 +132,7 @@ test "edge/dim/high_dimension" {
 /// Test: Multiple vectors with identical scores
 test "edge/score/identical_scores" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Dot, strategy=@types.Bruteforce)
 
   // All have dot product = 1.0 with [1, 0]
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
@@ -159,7 +159,7 @@ test "edge/score/identical_scores" {
 /// Test: Very close but distinct scores
 test "edge/score/close_scores" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(1, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(1, metric=@types.Dot, strategy=@types.Bruteforce)
 
   db.add(@types.VectorId::from_int(1), [1.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [1.0000001], @types.empty_attrs(), 0L)
@@ -182,7 +182,7 @@ test "edge/score/close_scores" {
 /// Test: All-zero vector with L2 metric
 test "edge/vector/zero_vector_l2" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(3, metric=@types.L2, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(3, metric=@types.L2, strategy=@types.Bruteforce)
 
   db.add(@types.VectorId::from_int(1), [0.0, 0.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [1.0, 0.0, 0.0], @types.empty_attrs(), 0L)
@@ -200,7 +200,7 @@ test "edge/vector/zero_vector_l2" {
 /// Test: All-zero vector with Cosine (normalized to itself)
 test "edge/vector/zero_vector_cosine" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Cosine, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Cosine, strategy=@types.Bruteforce)
 
   // Note: Zero vector can't be normalized, implementation should handle gracefully
   db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
@@ -216,7 +216,7 @@ test "edge/vector/zero_vector_cosine" {
 /// Test: All same value vector
 test "edge/vector/uniform_values" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(4, metric=@types.Cosine, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(4, metric=@types.Cosine, strategy=@types.Bruteforce)
 
   // All components same value
   db.add(
@@ -243,7 +243,7 @@ test "edge/vector/uniform_values" {
 /// Test: HNSW with single node
 test "edge/hnsw/single_node" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
 
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs(), 0L)
 
@@ -257,7 +257,7 @@ test "edge/hnsw/single_node" {
 /// Test: HNSW after removing most nodes (high tombstone ratio)
 test "edge/hnsw/high_tombstone_ratio" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_hnsw(2, metric=@types.Dot)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(2, metric=@types.Dot)
 
   // Add 20 nodes
   for i in 1..<=20 {
@@ -297,7 +297,7 @@ test "edge/hnsw/minimal_params" {
     seed: 42UL,
     allow_replace_deleted: false,
   }
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Dot, strategy=@types.HNSW(params))
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Dot, strategy=@types.HNSW(params))
 
   for i in 1..<=10 {
     db.add(
@@ -321,7 +321,7 @@ test "edge/hnsw/minimal_params" {
 test "edge/ivf/nprobe_exceeds_nlist" {
   run_async_test(async fn() {
   let params : @types.IVFParams = { nlist: 4, nprobe: 100 } // nprobe >> nlist
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Dot, strategy=@types.IVF(params))
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Dot, strategy=@types.IVF(params))
 
   for i in 1..<=10 {
     db.add(
@@ -343,7 +343,7 @@ test "edge/ivf/nprobe_exceeds_nlist" {
 test "edge/ivf/minimal_nlist" {
   run_async_test(async fn() {
   let params : @types.IVFParams = { nlist: 1, nprobe: 1 }
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Dot, strategy=@types.IVF(params))
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Dot, strategy=@types.IVF(params))
 
   for i in 1..<=10 {
     db.add(
@@ -368,7 +368,7 @@ test "edge/ivf/minimal_nlist" {
 /// Test: Filter that matches nothing
 test "edge/filter/none_match" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
@@ -392,7 +392,7 @@ test "edge/filter/none_match" {
 /// Test: Filter that matches everything
 test "edge/filter/all_match" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
@@ -510,7 +510,7 @@ test "edge/filter/deeply_nested" {
 /// Test: Empty string key and value
 test "edge/string/empty" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   let attrs = @types.empty_attrs()
   attrs.set("", @types.String("")) // Both empty
@@ -529,7 +529,7 @@ test "edge/string/empty" {
 /// Test: Very long key name
 test "edge/string/long_key" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   // 1000 character key
   let mut long_key = ""
@@ -554,7 +554,7 @@ test "edge/string/long_key" {
 /// Test: Special characters in strings
 test "edge/string/special_chars" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   let attrs = @types.empty_attrs()
   attrs.set("newline", @types.String("line1\nline2"))
@@ -586,12 +586,12 @@ test "edge/string/special_chars" {
 /// Test: Serialize empty database
 test "edge/serialize/empty_db" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
 
   let bytes = db.serialize_snapshot()
   inspect(bytes.length() > 0, content="true")
 
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.PersistentDB::deserialize(bytes)
   inspect(db2.size(), content="0")
   inspect(db2.dim(), content="3")
   })
@@ -601,7 +601,7 @@ test "edge/serialize/empty_db" {
 /// Test: Serialize single vector
 test "edge/serialize/single_vector" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   let attrs = @types.empty_attrs()
   attrs.set("only", @types.Bool(true))
@@ -609,7 +609,7 @@ test "edge/serialize/single_vector" {
   db.add(@types.VectorId::from_int(42), [1.0, 0.0], attrs, 0L)
 
   let bytes = db.serialize_snapshot()
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.PersistentDB::deserialize(bytes)
 
   inspect(db2.size(), content="1")
   inspect(db2.has(@types.VectorId::from_int(42)), content="true")
@@ -626,7 +626,7 @@ test "edge/serialize/single_vector" {
 /// Test: Serialize with many attributes per vector
 test "edge/serialize/many_attrs" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   let attrs = @types.empty_attrs()
   for i in 0..<100 {
@@ -636,7 +636,7 @@ test "edge/serialize/many_attrs" {
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
 
   let bytes = db.serialize_snapshot()
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.PersistentDB::deserialize(bytes)
 
   let record = db2.get(@types.VectorId::from_int(1)).unwrap()
   inspect(record.attrs.size(), content="100")
@@ -652,7 +652,7 @@ test "edge/serialize/many_attrs" {
 /// Test: Serialize HNSW with tombstones
 test "edge/serialize/hnsw_tombstones" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_hnsw(2, metric=@types.Dot)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(2, metric=@types.Dot)
 
   for i in 1..<=10 {
     db.add(
@@ -666,7 +666,7 @@ test "edge/serialize/hnsw_tombstones" {
   let _ = db.remove(@types.VectorId::from_int(7), 0L)
 
   let bytes = db.serialize_snapshot()
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.PersistentDB::deserialize(bytes)
 
   // Tombstoned IDs should still be tombstoned
   inspect(db2.has(@types.VectorId::from_int(3)), content="false")
@@ -683,7 +683,7 @@ test "edge/serialize/hnsw_tombstones" {
 /// Test: Exceed initial capacity
 test "edge/capacity/exceed_initial" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Dot, strategy=@types.Bruteforce)
 
   // Add more than capacity
   for i in 1..<=20 {
@@ -705,7 +705,7 @@ test "edge/capacity/exceed_initial" {
 /// Test: Capacity=1
 test "edge/capacity/minimal" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Dot, strategy=@types.Bruteforce)
 
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [2.0, 0.0], @types.empty_attrs(), 0L)
@@ -722,7 +722,7 @@ test "edge/capacity/minimal" {
 /// Test: k=0 returns empty
 test "edge/k/zero" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
 
   let results = db.search([1.0, 0.0], 0, None)
@@ -734,7 +734,7 @@ test "edge/k/zero" {
 /// Test: k=1 returns exactly one
 test "edge/k/one" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   for i in 1..<=100 {
     db.add(
@@ -752,7 +752,7 @@ test "edge/k/one" {
 /// Test: k much larger than database size
 test "edge/k/exceeds_size" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   for i in 1..<=5 {
     db.add(
@@ -819,7 +819,7 @@ test "edge/range/negative_range" {
 /// Test: Rapid add/remove/search cycle
 test "edge/ops/rapid_cycle" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   for cycle in 0..<10 {
     // Add 10
@@ -850,7 +850,7 @@ test "edge/ops/rapid_cycle" {
 /// Test: Interleaved upsert and search
 test "edge/ops/upsert_search_interleave" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   for i in 1..<=20 {
     // Upsert
@@ -877,7 +877,7 @@ test "edge/ops/upsert_search_interleave" {
 /// Test: PreFilter with empty candidate set
 test "edge/prefilter/empty_candidates" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   let index = @attr.BPTreeAttrIndex::new()
 
   for i in 1..<=10 {
@@ -907,7 +907,7 @@ test "edge/prefilter/empty_candidates" {
 /// Test: Index and DB out of sync
 test "edge/index/desync" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   let index = @attr.BPTreeAttrIndex::new()
 
   // Add to both

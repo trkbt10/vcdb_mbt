@@ -1,7 +1,7 @@
 ///|
 /// vcdb - A high-performance vector database for approximate nearest neighbor search.
 ///
-/// This module provides the main VectorEngine facade that unifies access to different
+/// This module provides the main VectorDB facade that unifies access to different
 /// ANN (Approximate Nearest Neighbor) indexing strategies:
 /// - Bruteforce: Exact linear scan, best for small datasets (<1000 vectors)
 /// - HNSW: Hierarchical Navigable Small World graphs, best for general use
@@ -9,7 +9,7 @@
 ///
 /// Example:
 /// ```moonbit
-/// let db = VectorEngine::with_hnsw(128, metric=Cosine)
+/// let db = VectorDB::with_hnsw(128, metric=Cosine)
 /// db.add(VectorId::from_int(1), embedding, attrs)
 /// let results = db.search(query, k=10, filter=None)
 /// ```
@@ -21,7 +21,7 @@ pub fn empty_attrs() -> @types.Attrs {
 }
 
 ///|
-/// VectorEngine - Internal ANN index engine.
+/// VectorDB - Internal ANN index engine.
 ///
 /// Provides unified access to all ANN strategies: Bruteforce, HNSW, and IVF.
 /// The engine automatically handles:
@@ -29,8 +29,8 @@ pub fn empty_attrs() -> @types.Attrs {
 /// - Index updates on add/remove operations
 /// - Tombstone management for HNSW deletions
 ///
-/// This is an internal implementation detail. The public API is VectorEngine[W, S].
-struct VectorEngine {
+/// This is an internal implementation detail. The public API is VectorDB[W, S].
+pub struct VectorDB {
   store : @store.CoreStore
   attr_index : @attr.BPTreeAttrIndex
   strategy : @types.Strategy
@@ -40,13 +40,13 @@ struct VectorEngine {
 }
 
 ///|
-/// Create a new VectorEngine with the given options.
+/// Create a new VectorDB with the given options.
 ///
 /// Parameters:
 /// - options: Configuration including dimension, metric, capacity, and strategy
 ///
-/// Returns: A new VectorEngine instance configured according to options
-fn VectorEngine::new(options : @types.DatabaseOptions) -> VectorEngine {
+/// Returns: A new VectorDB instance configured according to options
+pub fn VectorDB::new(options : @types.DatabaseOptions) -> VectorDB {
   let store = @store.CoreStore::new(
     options.dim,
     options.metric,
@@ -87,18 +87,18 @@ fn VectorEngine::new(options : @types.DatabaseOptions) -> VectorEngine {
 }
 
 ///|
-/// Create a VectorEngine with default options (Bruteforce strategy).
+/// Create a VectorDB with default options (Bruteforce strategy).
 ///
 /// Parameters:
 /// - dim: Vector dimension
 ///
-/// Returns: A VectorEngine with Bruteforce strategy and Cosine metric
-fn VectorEngine::with_dim(dim : Int) -> VectorEngine {
-  VectorEngine::new(@types.DatabaseOptions::default(dim))
+/// Returns: A VectorDB with Bruteforce strategy and Cosine metric
+pub fn VectorDB::with_dim(dim : Int) -> VectorDB {
+  VectorDB::new(@types.DatabaseOptions::default(dim))
 }
 
 ///|
-/// Create a VectorEngine with HNSW strategy.
+/// Create a VectorDB with HNSW strategy.
 ///
 /// HNSW (Hierarchical Navigable Small World) is recommended for most use cases.
 /// It provides O(log n) search time with high recall.
@@ -107,22 +107,22 @@ fn VectorEngine::with_dim(dim : Int) -> VectorEngine {
 /// - dim: Vector dimension
 /// - metric: Similarity metric (default: Cosine)
 ///
-/// Returns: A VectorEngine configured with HNSW index
-fn VectorEngine::with_hnsw(
+/// Returns: A VectorDB configured with HNSW index
+pub fn VectorDB::with_hnsw(
   dim : Int,
   metric? : @types.Metric = Cosine,
-) -> VectorEngine {
+) -> VectorDB {
   let options : @types.DatabaseOptions = {
     dim,
     metric,
     capacity: 1024,
     strategy: HNSW(@types.HNSWParams::default()),
   }
-  VectorEngine::new(options)
+  VectorDB::new(options)
 }
 
 ///|
-/// Create a VectorEngine with IVF strategy.
+/// Create a VectorDB with IVF strategy.
 ///
 /// IVF (Inverted File Index) is best for very large datasets.
 /// Requires training with train() before optimal search performance.
@@ -131,18 +131,18 @@ fn VectorEngine::with_hnsw(
 /// - dim: Vector dimension
 /// - metric: Similarity metric (default: Cosine)
 ///
-/// Returns: A VectorEngine configured with IVF index
-fn VectorEngine::with_ivf(
+/// Returns: A VectorDB configured with IVF index
+pub fn VectorDB::with_ivf(
   dim : Int,
   metric? : @types.Metric = Cosine,
-) -> VectorEngine {
+) -> VectorDB {
   let options : @types.DatabaseOptions = {
     dim,
     metric,
     capacity: 1024,
     strategy: IVF(@types.IVFParams::default()),
   }
-  VectorEngine::new(options)
+  VectorDB::new(options)
 }
 
 ///|
@@ -150,7 +150,7 @@ fn VectorEngine::with_ivf(
 ///
 /// For HNSW, this excludes tombstoned (deleted) vectors.
 /// Use raw_size() to get the total count including tombstones.
-fn VectorEngine::size(self : VectorEngine) -> Int {
+pub fn VectorDB::size(self : VectorDB) -> Int {
   match self.hnsw {
     Some(state) => {
       let (alive, _) = @ann.hnsw_tombstone_stats(state, self.store)
@@ -163,40 +163,40 @@ fn VectorEngine::size(self : VectorEngine) -> Int {
 ///|
 /// Get the raw size including tombstoned vectors.
 /// This is primarily for internal use and serialization.
-fn VectorEngine::raw_size(self : VectorEngine) -> Int {
+pub fn VectorDB::raw_size(self : VectorDB) -> Int {
   self.store.size()
 }
 
 ///|
 /// Get the dimension of vectors in this database.
-fn VectorEngine::dim(self : VectorEngine) -> Int {
+pub fn VectorDB::dim(self : VectorDB) -> Int {
   self.store.dim
 }
 
 ///|
 /// Get the similarity metric used by this database.
-fn VectorEngine::metric(self : VectorEngine) -> @types.Metric {
+pub fn VectorDB::metric(self : VectorDB) -> @types.Metric {
   self.store.metric
 }
 
 ///|
 /// Get the ANN strategy used by this database.
-fn VectorEngine::strategy(self : VectorEngine) -> @types.Strategy {
+pub fn VectorDB::strategy(self : VectorDB) -> @types.Strategy {
   self.strategy
 }
 
 ///|
 /// Get access to the underlying CoreStore (for distributed storage operations)
-fn VectorEngine::store(self : VectorEngine) -> @store.CoreStore {
+pub fn VectorDB::store(self : VectorDB) -> @store.CoreStore {
   self.store
 }
 
 ///|
-/// Create VectorEngine from an existing CoreStore (for loading from distributed storage)
-fn VectorEngine::from_store(
+/// Create VectorDB from an existing CoreStore (for loading from distributed storage)
+pub fn VectorDB::from_store(
   store : @store.CoreStore,
   options : @types.DatabaseOptions,
-) -> VectorEngine {
+) -> VectorDB {
   let attr_index = @attr.BPTreeAttrIndex::new()
   for i in 0..<store.size() {
     attr_index.set_attrs(store.ids[i], store.attrs[i])
@@ -268,7 +268,7 @@ fn rebuild_metadata_index(
 /// HNSW uses tombstones for soft-delete to maintain graph connectivity.
 /// Tombstoned vectors are excluded from search results but remain in storage
 /// until compact() is called.
-fn VectorEngine::is_tombstoned(self : VectorEngine, id : @types.VectorId) -> Bool {
+fn VectorDB::is_tombstoned(self : VectorDB, id : @types.VectorId) -> Bool {
   match self.hnsw {
     None => false
     Some(state) =>
@@ -288,7 +288,7 @@ fn VectorEngine::is_tombstoned(self : VectorEngine, id : @types.VectorId) -> Boo
 /// - id: The vector ID to check
 ///
 /// Returns: true if the vector exists and is not tombstoned
-fn VectorEngine::has(self : VectorEngine, id : @types.VectorId) -> Bool {
+pub fn VectorDB::has(self : VectorDB, id : @types.VectorId) -> Bool {
   if not(self.store.has(id)) {
     return false
   }
@@ -304,8 +304,8 @@ fn VectorEngine::has(self : VectorEngine, id : @types.VectorId) -> Bool {
 /// - id: The vector ID to retrieve
 ///
 /// Returns: The vector record if found and accessible, None otherwise
-fn VectorEngine::get(
-  self : VectorEngine,
+pub fn VectorDB::get(
+  self : VectorDB,
   id : @types.VectorId,
 ) -> @types.VectorRecord? {
   if self.is_tombstoned(id) {
@@ -320,8 +320,8 @@ fn VectorEngine::get(
 /// Thin wrapper over scroll_filtered with no filter expression.
 /// Offset semantics: returns entries with ID >= offset (for backward
 /// compatibility with gateway which passes `last_id + 1`).
-fn VectorEngine::scroll(
-  self : VectorEngine,
+pub fn VectorDB::scroll(
+  self : VectorDB,
   offset? : Int64? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
@@ -350,8 +350,8 @@ fn VectorEngine::scroll(
 /// - limit: Maximum number of entries to return
 ///
 /// Returns: Array of (VectorId, VectorRecord) sorted by ID ascending
-fn VectorEngine::scroll_filtered(
-  self : VectorEngine,
+pub fn VectorDB::scroll_filtered(
+  self : VectorDB,
   expr? : @filter.FilterExpr? = None,
   offset? : Int64? = None,
   limit? : Int = 10,
@@ -393,8 +393,8 @@ fn VectorEngine::scroll_filtered(
 /// - expr: Optional filter expression to count
 ///
 /// Returns: Number of matching, non-tombstoned vectors
-fn VectorEngine::count_filtered(
-  self : VectorEngine,
+pub fn VectorDB::count_filtered(
+  self : VectorDB,
   expr? : @filter.FilterExpr? = None,
 ) -> Int {
   let candidates = match expr {
@@ -420,8 +420,8 @@ fn VectorEngine::count_filtered(
 /// - id: Unique identifier for the vector
 /// - vector: The embedding vector (must match database dimension)
 /// - attrs: Metadata attributes for filtering
-fn VectorEngine::add(
-  self : VectorEngine,
+pub fn VectorDB::add(
+  self : VectorDB,
   id : @types.VectorId,
   vector : Array[Double],
   attrs : @types.Attrs,
@@ -478,8 +478,8 @@ fn VectorEngine::add(
 /// - attrs: Metadata attributes
 ///
 /// Returns: true if a new vector was created, false if existing was updated
-fn VectorEngine::upsert(
-  self : VectorEngine,
+pub fn VectorDB::upsert(
+  self : VectorDB,
   id : @types.VectorId,
   vector : Array[Double],
   attrs : @types.Attrs,
@@ -530,7 +530,7 @@ fn VectorEngine::upsert(
 /// - id: The vector ID to remove
 ///
 /// Returns: true if the vector was removed, false if not found or already deleted
-fn VectorEngine::remove(self : VectorEngine, id : @types.VectorId) -> Bool {
+pub fn VectorDB::remove(self : VectorDB, id : @types.VectorId) -> Bool {
   guard self.store.has(id) else { return false }
   // For HNSW, check if already tombstoned
   match self.hnsw {
@@ -568,8 +568,8 @@ fn VectorEngine::remove(self : VectorEngine, id : @types.VectorId) -> Bool {
 /// - filter: Optional predicate to filter results by ID and attributes
 ///
 /// Returns: Array of SearchHit sorted by score (highest/most similar first)
-fn VectorEngine::search(
-  self : VectorEngine,
+pub fn VectorDB::search(
+  self : VectorDB,
   query : Array[Double],
   k : Int,
   filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
@@ -603,8 +603,8 @@ fn VectorEngine::search(
 /// - filter: Optional filter predicate
 ///
 /// Returns: The best matching SearchHit, or None if no matches
-fn VectorEngine::find(
-  self : VectorEngine,
+pub fn VectorDB::find(
+  self : VectorDB,
   query : Array[Double],
   filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
 ) -> @types.SearchHit? {
@@ -635,8 +635,8 @@ fn VectorEngine::find(
 /// - strategy: Filtering strategy (PreFilter/PostFilter/Auto)
 ///
 /// Returns: Array of SearchHit matching the filter criteria
-fn VectorEngine::search_with_expr(
-  self : VectorEngine,
+pub fn VectorDB::search_with_expr(
+  self : VectorDB,
   query : Array[Double],
   k : Int,
   expr : @filter.FilterExpr?,
@@ -675,8 +675,8 @@ fn VectorEngine::search_with_expr(
 ///
 /// Internal method used by search_with_expr for pre-filter strategy.
 /// Scores only the specified candidate vectors instead of all vectors.
-fn VectorEngine::search_candidates(
-  self : VectorEngine,
+fn VectorDB::search_candidates(
+  self : VectorDB,
   query : Array[Double],
   k : Int,
   candidates : Array[@types.VectorId],
@@ -720,8 +720,8 @@ fn VectorEngine::search_candidates(
 /// - attrs: New attributes to set
 ///
 /// Returns: true if updated, false if ID not found
-fn VectorEngine::update_attrs(
-  self : VectorEngine,
+pub fn VectorDB::update_attrs(
+  self : VectorDB,
   id : @types.VectorId,
   attrs : @types.Attrs,
 ) -> Bool {
@@ -741,7 +741,7 @@ fn VectorEngine::update_attrs(
 ///
 /// Parameters:
 /// - iterations: Number of k-means iterations (default: 10)
-fn VectorEngine::train(self : VectorEngine, iterations? : Int = 10) -> Unit {
+pub fn VectorDB::train(self : VectorDB, iterations? : Int = 10) -> Unit {
   match self.ivf {
     Some(state) => @ann.ivf_train(state, self.store, iterations~)
     None => ()
@@ -757,16 +757,16 @@ fn VectorEngine::train(self : VectorEngine, iterations? : Int = 10) -> Unit {
 ///
 /// For Bruteforce and IVF, this is a no-op (they physically remove).
 ///
-/// Returns: A new VectorEngine with the compacted state, and the number of
+/// Returns: A new VectorDB with the compacted state, and the number of
 /// removed tombstones.
-fn VectorEngine::compact(self : VectorEngine) -> (VectorEngine, Int) {
+pub fn VectorDB::compact(self : VectorDB) -> (VectorDB, Int) {
   match self.hnsw {
     Some(state) => {
       let (new_state, removed) = @ann.hnsw_compact_and_rebuild(
         state,
         self.store,
       )
-      let new_db : VectorEngine = {
+      let new_db : VectorDB = {
         store: self.store,
         attr_index: self.attr_index,
         strategy: self.strategy,
@@ -787,7 +787,7 @@ fn VectorEngine::compact(self : VectorEngine) -> (VectorEngine, Int) {
 /// Use deserialize() to restore.
 ///
 /// Returns: Binary representation of the database
-fn VectorEngine::serialize(self : VectorEngine) -> Bytes {
+pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
   let w = @binary.BinaryWriter::new()
   // Write strategy type and params
   match self.strategy {
@@ -852,8 +852,8 @@ fn VectorEngine::serialize(self : VectorEngine) -> Bytes {
 /// Parameters:
 /// - data: Binary data from serialize()
 ///
-/// Returns: The restored VectorEngine instance
-fn VectorEngine::deserialize(data : Bytes) -> VectorEngine {
+/// Returns: The restored VectorDB instance
+pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
   let r = @binary.BinaryReader::new(data)
   let strategy_type = r.read_u32()
   let (hnsw_params, ivf_params) : (@types.HNSWParams?, @types.IVFParams?) = match

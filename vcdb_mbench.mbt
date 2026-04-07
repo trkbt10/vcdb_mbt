@@ -3,7 +3,7 @@
 test "bench/add_bruteforce" (b : @bench.T) {
   let v = Array::make(128, 0.5)
   b.bench(fn() {
-    let db = VectorEngine::with_dim(128)
+    let db = VectorDB::with_dim(128)
     for i in 0..<100 {
       db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
     }
@@ -14,7 +14,7 @@ test "bench/add_bruteforce" (b : @bench.T) {
 ///|
 /// Benchmark: Vector addition - HNSW
 test "bench/add_hnsw" (b : @bench.T) {
-  let db = VectorEngine::with_hnsw(128, metric=@types.Cosine)
+  let db = VectorDB::with_hnsw(128, metric=@types.Cosine)
   let v = Array::make(128, 0.5)
   let mut i = 0
   b.bench(fn() {
@@ -27,7 +27,7 @@ test "bench/add_hnsw" (b : @bench.T) {
 ///|
 /// Benchmark: Search on 1000 vectors - Bruteforce
 test "bench/search_bruteforce_1k" (b : @bench.T) {
-  let db = VectorEngine::with_dim(128)
+  let db = VectorDB::with_dim(128)
   let v = Array::make(128, 0.5)
   for i in 0..<1000 {
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
@@ -39,7 +39,7 @@ test "bench/search_bruteforce_1k" (b : @bench.T) {
 ///|
 /// Benchmark: Search on 1000 vectors - HNSW
 test "bench/search_hnsw_1k" (b : @bench.T) {
-  let db = VectorEngine::with_hnsw(128, metric=@types.Cosine)
+  let db = VectorDB::with_hnsw(128, metric=@types.Cosine)
   let v = Array::make(128, 0.5)
   for i in 0..<1000 {
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
@@ -77,7 +77,7 @@ test "bench/normalize_128" (b : @bench.T) {
 ///|
 /// Benchmark: Serialization 100 vectors
 test "bench/serialize_100" (b : @bench.T) {
-  let db = VectorEngine::with_dim(64)
+  let db = VectorDB::with_dim(64)
   for i in 0..<100 {
     let v = Array::make(64, i.to_double() / 100.0)
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
@@ -88,19 +88,19 @@ test "bench/serialize_100" (b : @bench.T) {
 ///|
 /// Benchmark: Deserialization 100 vectors
 test "bench/deserialize_100" (b : @bench.T) {
-  let db = VectorEngine::with_dim(64)
+  let db = VectorDB::with_dim(64)
   for i in 0..<100 {
     let v = Array::make(64, i.to_double() / 100.0)
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let bytes = db.serialize()
-  b.bench(fn() { b.keep(VectorEngine::deserialize(bytes).size()) })
+  b.bench(fn() { b.keep(VectorDB::deserialize(bytes).size()) })
 }
 
 ///|
 /// Benchmark: Get by ID
 test "bench/get_by_id" (b : @bench.T) {
-  let db = VectorEngine::with_dim(64)
+  let db = VectorDB::with_dim(64)
   for i in 0..<1000 {
     let v = Array::make(64, i.to_double() / 1000.0)
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
@@ -112,7 +112,7 @@ test "bench/get_by_id" (b : @bench.T) {
 ///|
 /// Benchmark: Has check
 test "bench/has_check" (b : @bench.T) {
-  let db = VectorEngine::with_dim(64)
+  let db = VectorDB::with_dim(64)
   for i in 0..<1000 {
     let v = Array::make(64, i.to_double() / 1000.0)
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
@@ -124,7 +124,7 @@ test "bench/has_check" (b : @bench.T) {
 ///|
 /// Benchmark: Search on 10000 vectors - Bruteforce
 test "bench/search_bruteforce_10k" (b : @bench.T) {
-  let db = VectorEngine::with_dim(64)
+  let db = VectorDB::with_dim(64)
   let v = Array::make(64, 0.5)
   for i in 0..<10000 {
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
@@ -136,7 +136,7 @@ test "bench/search_bruteforce_10k" (b : @bench.T) {
 ///|
 /// Benchmark: Search on 10000 vectors - HNSW
 test "bench/search_hnsw_10k" (b : @bench.T) {
-  let db = VectorEngine::with_hnsw(64, metric=@types.Cosine)
+  let db = VectorDB::with_hnsw(64, metric=@types.Cosine)
   let v = Array::make(64, 0.5)
   for i in 0..<10000 {
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
@@ -156,7 +156,7 @@ test "bench/dot_at_64" (b : @bench.T) {
 ///|
 /// Benchmark: HNSW search with k=100
 test "bench/search_hnsw_1k_k100" (b : @bench.T) {
-  let db = VectorEngine::with_hnsw(64, metric=@types.Cosine)
+  let db = VectorDB::with_hnsw(64, metric=@types.Cosine)
   let v = Array::make(64, 0.5)
   for i in 0..<1000 {
     db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())

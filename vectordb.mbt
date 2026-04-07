@@ -1,5 +1,5 @@
 ///|
-/// VectorDB[W, S] — The single source of truth for all vector database operations.
+/// PersistentDB[W, S] — The single source of truth for all vector database operations.
 ///
 /// All reads and writes go through this type. Persistence is controlled
 /// by the storage backends injected via type parameters:
@@ -32,8 +32,8 @@ fn join_path(base : String, path : String) -> String {
 }
 
 ///|
-pub struct VectorDB[W, S] {
-  mut engine : VectorEngine
+pub struct PersistentDB[W, S] {
+  mut engine : VectorDB
   wal : @wal.AsyncWalRuntime[W]
   snapshot_storage : S
   base_path : String
@@ -44,15 +44,15 @@ pub struct VectorDB[W, S] {
 
 ///|
 /// Internal constructor — wraps an existing engine with WAL and storage.
-fn[W, S] VectorDB::wrap(
-  engine : VectorEngine,
+fn[W, S] PersistentDB::wrap(
+  engine : VectorDB,
   wal : @wal.AsyncWalRuntime[W],
   snapshot_storage : S,
   base_path : String,
   name : String,
   checkpoint_threshold~ : Int = 50,
   checkpoint_bytes~ : Int = default_checkpoint_bytes,
-) -> VectorDB[W, S] {
+) -> PersistentDB[W, S] {
   {
     engine,
     wal,
@@ -72,8 +72,8 @@ fn[W, S] VectorDB::wrap(
 ///   2. Load WAL from wal_storage into in-memory buffer
 ///   3. Deserialize snapshot -> CoreStore (or create empty)
 ///   4. Replay WAL records onto CoreStore
-///   5. Build VectorEngine from CoreStore
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::init(
+///   5. Build VectorDB from CoreStore
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::init(
   wal_storage : W,
   snapshot_storage : S,
   base_path : String,
@@ -84,7 +84,7 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::ini
   strategy? : @types.Strategy = @types.HNSW(@types.HNSWParams::default()),
   checkpoint_threshold? : Int = 50,
   checkpoint_bytes? : Int = default_checkpoint_bytes,
-) -> VectorDB[W, S] {
+) -> PersistentDB[W, S] {
   let wal_path = join_path(base_path, @storage.collection_wal_path(name))
   let wal = @wal.AsyncWalRuntime::new(wal_storage, wal_path)
 
@@ -107,12 +107,12 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::ini
   let options : @types.DatabaseOptions = { dim, metric, capacity, strategy }
   let engine = match snapshot_data {
     Some(data) => {
-      let existing = VectorEngine::deserialize(data)
+      let existing = VectorDB::deserialize(data)
       let store = existing.store
       if wal_data.length() > 0 {
         let applied = @wal.replay_wal_data(wal_data, store)
         if applied > 0 {
-          VectorEngine::from_store(store, options)
+          VectorDB::from_store(store, options)
         } else {
           existing
         }
@@ -124,13 +124,13 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::ini
       if wal_data.length() > 0 {
         let store = @store.CoreStore::new(dim, metric, capacity~)
         let _ = @wal.replay_wal_data(wal_data, store)
-        VectorEngine::from_store(store, options)
+        VectorDB::from_store(store, options)
       } else {
-        VectorEngine::new(options)
+        VectorDB::new(options)
       }
   }
 
-  VectorDB::wrap(
+  PersistentDB::wrap(
     engine,
     wal,
     snapshot_storage,
@@ -142,20 +142,20 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::ini
 }
 
 ///|
-/// Create an in-memory VectorDB (no durable persistence).
+/// Create an in-memory PersistentDB (no durable persistence).
 ///
 /// Uses MemoryStorage for both WAL and snapshot backends.
 /// Since MemoryStorage resolves all I/O synchronously, initialization
 /// completes immediately — but the function is async to maintain a
 /// uniform interface.
-pub async fn VectorDB::in_memory(
+pub async fn PersistentDB::in_memory(
   dim : Int,
   metric? : @types.Metric = @types.Cosine,
   strategy? : @types.Strategy = @types.HNSW(@types.HNSWParams::default()),
   capacity? : Int = 1024,
-) -> VectorDB[@storage.MemoryStorage, @storage.MemoryStorage] {
+) -> PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage] {
   let storage = @storage.MemoryStorage::new()
-  VectorDB::init(
+  PersistentDB::init(
     storage,
     storage,
     "",
@@ -170,12 +170,12 @@ pub async fn VectorDB::in_memory(
 }
 
 ///|
-/// Create an in-memory VectorDB with HNSW strategy.
-pub async fn VectorDB::in_memory_hnsw(
+/// Create an in-memory PersistentDB with HNSW strategy.
+pub async fn PersistentDB::in_memory_hnsw(
   dim : Int,
   metric? : @types.Metric = @types.Cosine,
-) -> VectorDB[@storage.MemoryStorage, @storage.MemoryStorage] {
-  VectorDB::in_memory(
+) -> PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage] {
+  PersistentDB::in_memory(
     dim,
     metric~,
     strategy=@types.HNSW(@types.HNSWParams::default()),
@@ -183,12 +183,12 @@ pub async fn VectorDB::in_memory_hnsw(
 }
 
 ///|
-/// Create an in-memory VectorDB with IVF strategy.
-pub async fn VectorDB::in_memory_ivf(
+/// Create an in-memory PersistentDB with IVF strategy.
+pub async fn PersistentDB::in_memory_ivf(
   dim : Int,
   metric? : @types.Metric = @types.Cosine,
-) -> VectorDB[@storage.MemoryStorage, @storage.MemoryStorage] {
-  VectorDB::in_memory(
+) -> PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage] {
+  PersistentDB::in_memory(
     dim,
     metric~,
     strategy=@types.IVF(@types.IVFParams::default()),
@@ -196,12 +196,12 @@ pub async fn VectorDB::in_memory_ivf(
 }
 
 ///|
-/// Create an in-memory VectorDB with Bruteforce strategy.
-pub async fn VectorDB::in_memory_bruteforce(
+/// Create an in-memory PersistentDB with Bruteforce strategy.
+pub async fn PersistentDB::in_memory_bruteforce(
   dim : Int,
   metric? : @types.Metric = @types.Cosine,
-) -> VectorDB[@storage.MemoryStorage, @storage.MemoryStorage] {
-  VectorDB::in_memory(dim, metric~, strategy=@types.Bruteforce)
+) -> PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage] {
+  PersistentDB::in_memory(dim, metric~, strategy=@types.Bruteforce)
 }
 
 // ── WAL-before-state mutations ────────────────────────────────
@@ -214,8 +214,8 @@ pub async fn VectorDB::in_memory_bruteforce(
 ///   2. Persist WAL to storage (async, awaited)
 ///   3. Update engine in-memory (sync)
 ///   4. Auto-checkpoint if thresholds exceeded
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::upsert(
-  self : VectorDB[W, S],
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::upsert(
+  self : PersistentDB[W, S],
   points : Array[(@types.VectorId, Array[Double], @types.Attrs)],
   timestamp_ns : Int64,
 ) -> Unit {
@@ -243,9 +243,9 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::ups
 ///|
 /// Add a single vector. Fails if the ID already exists (not tombstoned).
 ///
-/// This is the WAL-backed equivalent of VectorEngine::add.
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::add(
-  self : VectorDB[W, S],
+/// This is the WAL-backed equivalent of VectorDB::add.
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::add(
+  self : PersistentDB[W, S],
   id : @types.VectorId,
   vector : Array[Double],
   attrs : @types.Attrs,
@@ -270,8 +270,8 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::add
 
 ///|
 /// Remove a vector with WAL-before-state guarantee.
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::remove(
-  self : VectorDB[W, S],
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::remove(
+  self : PersistentDB[W, S],
   id : @types.VectorId,
   timestamp_ns : Int64,
 ) -> Bool {
@@ -297,8 +297,8 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::rem
 
 ///|
 /// Update attributes with WAL-before-state guarantee.
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::update_attrs(
-  self : VectorDB[W, S],
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::update_attrs(
+  self : PersistentDB[W, S],
   id : @types.VectorId,
   attrs : @types.Attrs,
   timestamp_ns : Int64,
@@ -326,8 +326,8 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::upd
 
 ///|
 /// Search by vector similarity with optional filter expression.
-pub fn[W, S] VectorDB::search(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::search(
+  self : PersistentDB[W, S],
   query : Array[Double],
   k : Int,
   filter : @filter.FilterExpr?,
@@ -337,8 +337,8 @@ pub fn[W, S] VectorDB::search(
 
 ///|
 /// Search with explicit filter expression, index override, and strategy.
-pub fn[W, S] VectorDB::search_with_expr(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::search_with_expr(
+  self : PersistentDB[W, S],
   query : Array[Double],
   k : Int,
   expr : @filter.FilterExpr?,
@@ -350,8 +350,8 @@ pub fn[W, S] VectorDB::search_with_expr(
 
 ///|
 /// Search by vector similarity with callback filter.
-pub fn[W, S] VectorDB::search_with_filter(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::search_with_filter(
+  self : PersistentDB[W, S],
   query : Array[Double],
   k : Int,
   filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
@@ -361,8 +361,8 @@ pub fn[W, S] VectorDB::search_with_filter(
 
 ///|
 /// Find the single best match.
-pub fn[W, S] VectorDB::find(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::find(
+  self : PersistentDB[W, S],
   query : Array[Double],
   filter : ((@types.VectorId, @types.Attrs) -> Bool)?,
 ) -> @types.SearchHit? {
@@ -371,8 +371,8 @@ pub fn[W, S] VectorDB::find(
 
 ///|
 /// Get a single vector by ID.
-pub fn[W, S] VectorDB::get(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::get(
+  self : PersistentDB[W, S],
   id : @types.VectorId,
 ) -> @types.VectorRecord? {
   self.engine.get(id)
@@ -380,8 +380,8 @@ pub fn[W, S] VectorDB::get(
 
 ///|
 /// Check if a vector exists.
-pub fn[W, S] VectorDB::has(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::has(
+  self : PersistentDB[W, S],
   id : @types.VectorId,
 ) -> Bool {
   self.engine.has(id)
@@ -389,8 +389,8 @@ pub fn[W, S] VectorDB::has(
 
 ///|
 /// Scroll through vectors in ascending ID order.
-pub fn[W, S] VectorDB::scroll(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::scroll(
+  self : PersistentDB[W, S],
   offset? : Int64? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
@@ -399,8 +399,8 @@ pub fn[W, S] VectorDB::scroll(
 
 ///|
 /// Scroll with filter expression.
-pub fn[W, S] VectorDB::scroll_filtered(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::scroll_filtered(
+  self : PersistentDB[W, S],
   expr? : @filter.FilterExpr? = None,
   offset? : Int64? = None,
   limit? : Int = 10,
@@ -410,8 +410,8 @@ pub fn[W, S] VectorDB::scroll_filtered(
 
 ///|
 /// Count vectors matching filter.
-pub fn[W, S] VectorDB::count_filtered(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::count_filtered(
+  self : PersistentDB[W, S],
   expr? : @filter.FilterExpr? = None,
 ) -> Int {
   self.engine.count_filtered(expr~)
@@ -419,44 +419,44 @@ pub fn[W, S] VectorDB::count_filtered(
 
 ///|
 /// Database size (excluding tombstones).
-pub fn[W, S] VectorDB::size(self : VectorDB[W, S]) -> Int {
+pub fn[W, S] PersistentDB::size(self : PersistentDB[W, S]) -> Int {
   self.engine.size()
 }
 
 ///|
 /// Raw size including tombstones.
-pub fn[W, S] VectorDB::raw_size(self : VectorDB[W, S]) -> Int {
+pub fn[W, S] PersistentDB::raw_size(self : PersistentDB[W, S]) -> Int {
   self.engine.raw_size()
 }
 
 ///|
 /// Vector dimension.
-pub fn[W, S] VectorDB::dim(self : VectorDB[W, S]) -> Int {
+pub fn[W, S] PersistentDB::dim(self : PersistentDB[W, S]) -> Int {
   self.engine.dim()
 }
 
 ///|
 /// Similarity metric.
-pub fn[W, S] VectorDB::metric(self : VectorDB[W, S]) -> @types.Metric {
+pub fn[W, S] PersistentDB::metric(self : PersistentDB[W, S]) -> @types.Metric {
   self.engine.metric()
 }
 
 ///|
 /// ANN strategy.
-pub fn[W, S] VectorDB::strategy(self : VectorDB[W, S]) -> @types.Strategy {
+pub fn[W, S] PersistentDB::strategy(self : PersistentDB[W, S]) -> @types.Strategy {
   self.engine.strategy()
 }
 
 ///|
 /// Access the underlying CoreStore (for advanced/distributed use).
-pub fn[W, S] VectorDB::store(self : VectorDB[W, S]) -> @store.CoreStore {
+pub fn[W, S] PersistentDB::store(self : PersistentDB[W, S]) -> @store.CoreStore {
   self.engine.store
 }
 
 ///|
 /// Train IVF index (IVF strategy only).
-pub fn[W, S] VectorDB::train(
-  self : VectorDB[W, S],
+pub fn[W, S] PersistentDB::train(
+  self : PersistentDB[W, S],
   iterations? : Int = 10,
 ) -> Unit {
   self.engine.train(iterations~)
@@ -466,7 +466,7 @@ pub fn[W, S] VectorDB::train(
 
 ///|
 /// Serialize current state as snapshot bytes.
-pub fn[W, S] VectorDB::serialize_snapshot(self : VectorDB[W, S]) -> Bytes {
+pub fn[W, S] PersistentDB::serialize_snapshot(self : PersistentDB[W, S]) -> Bytes {
   self.engine.serialize()
 }
 
@@ -474,13 +474,13 @@ pub fn[W, S] VectorDB::serialize_snapshot(self : VectorDB[W, S]) -> Bytes {
 /// Deserialize from snapshot bytes, wrapping with in-memory storage.
 ///
 /// Used for loading a serialized database without persistence backends.
-pub fn VectorDB::deserialize(
+pub fn PersistentDB::deserialize(
   data : Bytes,
-) -> VectorDB[@storage.MemoryStorage, @storage.MemoryStorage] {
-  let engine = VectorEngine::deserialize(data)
+) -> PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage] {
+  let engine = VectorDB::deserialize(data)
   let storage = @storage.MemoryStorage::new()
   let wal = @wal.AsyncWalRuntime::new(storage, "")
-  VectorDB::wrap(
+  PersistentDB::wrap(
     engine,
     wal,
     storage,
@@ -496,18 +496,18 @@ pub fn VectorDB::deserialize(
 ///
 /// Used by gateway's load_collection to restore from a serialized snapshot
 /// and attach real storage backends for subsequent WAL operations.
-pub fn[S] VectorDB::from_snapshot(
+pub fn[S] PersistentDB::from_snapshot(
   data : Bytes,
   storage : S,
   base_path : String,
   name : String,
   checkpoint_threshold? : Int = 50,
   checkpoint_bytes? : Int = default_checkpoint_bytes,
-) -> VectorDB[S, S] {
-  let engine = VectorEngine::deserialize(data)
+) -> PersistentDB[S, S] {
+  let engine = VectorDB::deserialize(data)
   let wal_path = join_path(base_path, @storage.collection_wal_path(name))
   let wal = @wal.AsyncWalRuntime::new(storage, wal_path)
-  VectorDB::wrap(
+  PersistentDB::wrap(
     engine,
     wal,
     storage,
@@ -521,7 +521,7 @@ pub fn[S] VectorDB::from_snapshot(
 // ── Checkpoint & lifecycle ────────────────────────────────────
 
 ///|
-fn[W, S] VectorDB::should_checkpoint(self : VectorDB[W, S]) -> Bool {
+fn[W, S] PersistentDB::should_checkpoint(self : PersistentDB[W, S]) -> Bool {
   self.wal.record_count() >= self.checkpoint_threshold ||
   (self.checkpoint_bytes > 0 && self.wal.byte_size() >= self.checkpoint_bytes)
 }
@@ -529,8 +529,8 @@ fn[W, S] VectorDB::should_checkpoint(self : VectorDB[W, S]) -> Bool {
 ///|
 /// Checkpoint: snapshot to snapshot_storage, then truncate WAL.
 /// Crash safe: snapshot-first, WAL truncate second.
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::checkpoint(
-  self : VectorDB[W, S],
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::checkpoint(
+  self : PersistentDB[W, S],
 ) -> Unit {
   // Step 1: Write snapshot (durable)
   let data = self.engine.serialize()
@@ -552,8 +552,8 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::che
 ///|
 /// Compact HNSW index (removes tombstones). Returns removed count.
 /// Triggers checkpoint after compaction.
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::compact(
-  self : VectorDB[W, S],
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::compact(
+  self : PersistentDB[W, S],
 ) -> Int {
   let (new_engine, removed) = self.engine.compact()
   if removed > 0 {
@@ -565,12 +565,12 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] VectorDB::com
 
 ///|
 /// Current WAL record count (for diagnostics).
-pub fn[W, S] VectorDB::wal_record_count(self : VectorDB[W, S]) -> Int {
+pub fn[W, S] PersistentDB::wal_record_count(self : PersistentDB[W, S]) -> Int {
   self.wal.record_count()
 }
 
 ///|
 /// Current WAL byte size (for diagnostics).
-pub fn[W, S] VectorDB::wal_byte_size(self : VectorDB[W, S]) -> Int {
+pub fn[W, S] PersistentDB::wal_byte_size(self : PersistentDB[W, S]) -> Int {
   self.wal.byte_size()
 }

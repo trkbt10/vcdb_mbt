@@ -13,6 +13,29 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+
+    "./loader": {
+      "types": "./dist/ffi/loader.d.ts",
+      "import": "./dist/ffi/loader.js"
+    },
+    "./wasm/lib.js": {
+      "types": "./dist/wasm/lib.d.ts",
+      "default": "./dist/wasm/lib.js"
+    },
+
+    "./db": {
+      "types": "./dist/db.d.ts",
+      "import": "./dist/db.js"
+    },
+    "./distributed": {
+      "types": "./dist/distributed.d.ts",
+      "import": "./dist/distributed.js"
+    },
+    "./gateway": {
+      "types": "./dist/gateway.d.ts",
+      "import": "./dist/gateway.js"
+    },
+
     "./storage/memory": {
       "types": "./dist/storage/memory.d.ts",
       "import": "./dist/storage/memory.js"
@@ -20,6 +43,10 @@
     "./storage/node": {
       "types": "./dist/storage/node.d.ts",
       "import": "./dist/storage/node.js"
+    },
+    "./storage/cached": {
+      "types": "./dist/storage/cached-storage.d.ts",
+      "import": "./dist/storage/cached-storage.js"
     },
     "./storage/indexeddb": {
       "types": "./dist/storage/indexeddb.d.ts",
@@ -44,39 +71,11 @@
     "./storage/do-kv": {
       "types": "./dist/storage/do-kv.d.ts",
       "import": "./dist/storage/do-kv.js"
-    },
-    "./storage/cached": {
-      "types": "./dist/storage/cached-storage.d.ts",
-      "import": "./dist/storage/cached-storage.js"
-    },
-    "./vectordb": {
-      "types": "./dist/vectordb.d.ts",
-      "import": "./dist/vectordb.js"
-    },
-    "./persistent": {
-      "types": "./dist/persistent.d.ts",
-      "import": "./dist/persistent.js"
-    },
-    "./gateway": {
-      "types": "./dist/gateway.d.ts",
-      "import": "./dist/gateway.js"
-    },
-    "./loader": {
-      "types": "./dist/ffi/loader.d.ts",
-      "import": "./dist/ffi/loader.js"
-    },
-    "./cloudflare/persistent-do": {
-      "types": "./dist/cloudflare/persistent-do.d.ts",
-      "import": "./dist/cloudflare/persistent-do.js"
-    },
-    "./wasm/lib.js": {
-      "types": "./dist/wasm/lib.d.ts",
-      "default": "./dist/wasm/lib.js"
     }
   },
   "scripts": {
-    "build:moon": "cd .. && moon build --target js lib",
-    "copy:moon": "cp ../_build/js/debug/build/lib/lib.js dist/wasm/ && cp ../_build/js/debug/build/lib/moonbit.d.ts dist/wasm/",
+    "build:moon": "cd .. && moon build --target js ffi",
+    "copy:moon": "cp ../_build/js/debug/build/ffi/ffi.js dist/wasm/lib.js && cp ../_build/js/debug/build/ffi/moonbit.d.ts dist/wasm/",
     "build:ts": "tsc",
     "build": "npm run build:moon && npm run build:ts && npm run copy:moon",
     "start": "node dist/server.js",

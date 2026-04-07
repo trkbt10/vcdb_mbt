@@ -8,7 +8,7 @@
 ///|
 /// Handle search in a collection (sync — reads from in-memory engine)
 pub fn[W, S] handle_search(
-  db : @vcdb.VectorDB[W, S],
+  db : @vcdb.PersistentDB[W, S],
   req : SearchRequest,
 ) -> Result[SearchResponse, GatewayError] {
   let dim = db.dim()
@@ -39,7 +39,7 @@ pub fn[W, S] handle_search(
 ///|
 /// Handle get point by ID (sync)
 pub fn[W, S] handle_get_point(
-  db : @vcdb.VectorDB[W, S],
+  db : @vcdb.PersistentDB[W, S],
   id : Int64,
 ) -> Result[PointResponse, GatewayError] {
   let vec_id = @types.VectorId::from_int64(id)
@@ -52,7 +52,7 @@ pub fn[W, S] handle_get_point(
 ///|
 /// Handle scrolling points in a collection (sync).
 pub fn[W, S] handle_scroll(
-  db : @vcdb.VectorDB[W, S],
+  db : @vcdb.PersistentDB[W, S],
   req : ScrollRequest,
 ) -> Result[ScrollResponse, GatewayError] {
   let entries = db.scroll(offset=req.offset, limit=req.limit)
@@ -128,7 +128,7 @@ pub async fn[S : @storage.AsyncStorage] handle_get_collection(
 pub async fn[S : @storage.AsyncStorage, T] with_collection(
   manager : CollectionManager[S],
   name : String,
-  handler : (@vcdb.VectorDB[S, S]) -> Result[T, GatewayError],
+  handler : (@vcdb.PersistentDB[S, S]) -> Result[T, GatewayError],
 ) -> Result[T, GatewayError] {
   match manager.get(name) {
     Ok(db) => handler(db)

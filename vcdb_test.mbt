@@ -18,7 +18,7 @@ fn run_async_test(f : async () -> Unit) -> Unit {
 /// Test: Basic VectorDB operations with Bruteforce
 test "api/bruteforce_basic" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
   // Add vectors
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs(), 0L)
@@ -40,7 +40,7 @@ test "api/bruteforce_basic" {
 /// Test: HNSW search correctness
 test "api/hnsw_search" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [0.9, 0.1, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(3), [0.0, 1.0, 0.0], @types.empty_attrs(), 0L)
@@ -57,7 +57,7 @@ test "api/hnsw_search" {
 /// Test: IVF with training
 test "api/ivf_training" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_ivf(3, metric=@types.Dot)
+  let db = @vcdb.PersistentDB::in_memory_ivf(3, metric=@types.Dot)
   // Add vectors in different clusters
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [0.9, 0.1, 0.0], @types.empty_attrs(), 0L)
@@ -75,7 +75,7 @@ test "api/ivf_training" {
 /// Test: Cosine metric auto-normalization
 test "api/cosine_normalization" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.Cosine, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.Cosine, strategy=@types.Bruteforce)
   // Add non-normalized vector [3, 4] - should be normalized to [0.6, 0.8]
   db.add(@types.VectorId::from_int(1), [3.0, 4.0], @types.empty_attrs(), 0L)
   let record = db.get(@types.VectorId::from_int(1))
@@ -90,7 +90,7 @@ test "api/cosine_normalization" {
 /// Test: L2 metric (negative squared distance)
 test "api/l2_metric" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory(2, metric=@types.L2, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(2, metric=@types.L2, strategy=@types.Bruteforce)
   db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(3), [10.0, 10.0], @types.empty_attrs(), 0L)
@@ -107,7 +107,7 @@ test "api/l2_metric" {
 /// Test: Attributes storage and retrieval
 test "api/attributes" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   let attrs = @types.empty_attrs()
   attrs.set("name", @types.String("test"))
   attrs.set("count", @types.Int(42L))
@@ -132,7 +132,7 @@ test "api/attributes" {
 /// Test: Search with filter
 test "api/search_filter" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   let attrs1 = @types.empty_attrs()
   attrs1.set("category", @types.String("A"))
   let attrs2 = @types.empty_attrs()
@@ -157,7 +157,7 @@ test "api/search_filter" {
 /// Test: Upsert (update existing vector)
 test "api/upsert" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   // Initial upsert
   inspect(db.has(@types.VectorId::from_int(1)), content="false")
   db.upsert(
@@ -182,7 +182,7 @@ test "api/upsert" {
 /// Test: Remove vector
 test "api/remove" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(3), [0.5, 0.5], @types.empty_attrs(), 0L)
@@ -202,7 +202,7 @@ test "api/remove" {
 /// Test: Full serialization roundtrip
 test "api/serialization_roundtrip" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
   let attrs = @types.empty_attrs()
   attrs.set("tag", @types.String("important"))
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs, 0L)
@@ -212,7 +212,7 @@ test "api/serialization_roundtrip" {
   let bytes = db.serialize_snapshot()
   inspect(bytes.length() > 0, content="true")
   // Deserialize
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.PersistentDB::deserialize(bytes)
   inspect(db2.size(), content="3")
   // Verify data
   let record = db2.get(@types.VectorId::from_int(1))
@@ -233,12 +233,12 @@ test "api/serialization_roundtrip" {
 /// Test: HNSW serialization roundtrip
 test "api/hnsw_serialization" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs(), 0L)
   // Serialize & deserialize
   let bytes = db.serialize_snapshot()
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.PersistentDB::deserialize(bytes)
   // Search should work
   let results = db2.search([1.0, 0.0, 0.0], 1, None)
   inspect(results[0].id.to_int64(), content="1")
@@ -250,9 +250,9 @@ test "api/hnsw_serialization" {
 test "api/recall_validation" {
   run_async_test(async fn() {
   // Create bruteforce DB as ground truth (using Dot metric)
-  let bf_db = @vcdb.VectorDB::in_memory(4, metric=@types.Dot, strategy=@types.Bruteforce)
+  let bf_db = @vcdb.PersistentDB::in_memory(4, metric=@types.Dot, strategy=@types.Bruteforce)
   // Create HNSW DB with same metric
-  let hnsw_db = @vcdb.VectorDB::in_memory_hnsw(4, metric=@types.Dot)
+  let hnsw_db = @vcdb.PersistentDB::in_memory_hnsw(4, metric=@types.Dot)
   // Add same vectors to both
   for i in 0..<20 {
     let v = [
@@ -288,7 +288,7 @@ test "api/recall_validation" {
 /// Test: Empty database edge case
 test "api/empty_db" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
   inspect(db.size(), content="0")
   // Search on empty should return empty
   let results = db.search([1.0, 0.0, 0.0], 10, None)
@@ -303,7 +303,7 @@ test "api/empty_db" {
 /// Test: Find (single best match)
 test "api/find" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
   db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
   // Find best match
@@ -311,7 +311,7 @@ test "api/find" {
   inspect(result is None, content="false")
   inspect(result.unwrap().id.to_int64(), content="1")
   // Find on empty should return None
-  let empty_db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let empty_db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   let empty_result = empty_db.find([1.0, 0.0], None)
   inspect(empty_result is None, content="true")
   })
@@ -321,7 +321,7 @@ test "api/find" {
 /// Test: Large dataset with 200 vectors
 test "api/large_dataset" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(4)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(4)
   // Add 200 vectors in 4 clusters
   for i in 0..<200 {
     let cluster = i / 50
@@ -359,7 +359,7 @@ test "api/large_dataset" {
 /// Test: HNSW with larger dataset
 test "api/hnsw_large" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_hnsw(4, metric=@types.Cosine)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(4, metric=@types.Cosine)
   // Add 100 vectors
   for i in 0..<100 {
     let v = [
@@ -376,7 +376,7 @@ test "api/hnsw_large" {
   inspect(results.length(), content="10")
   // Serialize and restore
   let bytes = db.serialize_snapshot()
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.PersistentDB::deserialize(bytes)
   inspect(db2.size(), content="100")
   let results2 = db2.search([1.0, 2.0, 3.0, 0.0], 10, None)
   inspect(results2.length(), content="10")
@@ -387,7 +387,7 @@ test "api/hnsw_large" {
 /// Test: IVF training with clustered data
 test "api/ivf_clustered" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_ivf(4, metric=@types.Cosine)
+  let db = @vcdb.PersistentDB::in_memory_ivf(4, metric=@types.Cosine)
   // Create 3 clusters
   // Cluster A: around [1, 0, 0, 0]
   for i in 0..<30 {
@@ -431,7 +431,7 @@ test "api/ivf_clustered" {
 /// Test: Mixed operations (add, update, remove, search)
 test "api/mixed_operations" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
   // Add initial vectors
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
@@ -477,7 +477,7 @@ test "api/mixed_operations" {
 /// Test: Search with complex filter
 test "api/complex_filter" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   // Add vectors with multiple attributes
   for i in 1..<=20 {
     let attrs = @types.empty_attrs()
@@ -516,9 +516,9 @@ test "api/complex_filter" {
 test "api/metrics_comparison" {
   run_async_test(async fn() {
   // Same data, different metrics
-  let db_cosine = @vcdb.VectorDB::in_memory(3, metric=@types.Cosine, strategy=@types.Bruteforce)
-  let db_dot = @vcdb.VectorDB::in_memory(3, metric=@types.Dot, strategy=@types.Bruteforce)
-  let db_l2 = @vcdb.VectorDB::in_memory(3, metric=@types.L2, strategy=@types.Bruteforce)
+  let db_cosine = @vcdb.PersistentDB::in_memory(3, metric=@types.Cosine, strategy=@types.Bruteforce)
+  let db_dot = @vcdb.PersistentDB::in_memory(3, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db_l2 = @vcdb.PersistentDB::in_memory(3, metric=@types.L2, strategy=@types.Bruteforce)
   // Add vectors
   db_cosine.add(
     @types.VectorId::from_int(1),
@@ -566,7 +566,7 @@ test "api/metrics_comparison" {
 /// Test: Bulk add operations
 test "api/bulk_add" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
   // Add multiple vectors at once
   for i in 1..<=50 {
     let attrs = @types.empty_attrs()
@@ -605,7 +605,7 @@ test "api/bulk_add" {
 /// Test: Bulk upsert operations
 test "api/bulk_upsert" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   // Initial adds
   for i in 1..<=20 {
     db.add(
@@ -638,7 +638,7 @@ test "api/bulk_upsert" {
 /// Test: Bulk remove operations
 test "api/bulk_remove" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   // Add 50 vectors
   for i in 1..<=50 {
     db.add(
@@ -666,7 +666,7 @@ test "api/bulk_remove" {
 /// Test: Search with range filter using attr index
 test "api/search_range_prefilter" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   // Add vectors with numeric values
   for i in 1..<=100 {
     let attrs = @types.empty_attrs()
@@ -695,7 +695,7 @@ test "api/search_range_prefilter" {
 /// until compact() is called. Heavy tombstoning degrades recall.
 test "api/hnsw_remove_search" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_hnsw(3, metric=@types.Dot)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
   // Add vectors
   for i in 1..<=20 {
     db.add(
@@ -733,7 +733,7 @@ test "api/hnsw_remove_search" {
 test "api/high_dimensional" {
   run_async_test(async fn() {
   let dim = 128
-  let db = @vcdb.VectorDB::in_memory(dim, metric=@types.Cosine, strategy=@types.Bruteforce)
+  let db = @vcdb.PersistentDB::in_memory(dim, metric=@types.Cosine, strategy=@types.Bruteforce)
   // Add vectors
   for i in 1..<=50 {
     let v : Array[Double] = Array::make(dim, 0.0)
@@ -759,7 +759,7 @@ test "api/high_dimensional" {
 /// Test: Complex must/must_not/should expressions
 test "api/complex_expr_search" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
   // Setup data
   for i in 1..<=20 {
     let attrs = @types.empty_attrs()
@@ -790,7 +790,7 @@ test "api/complex_expr_search" {
 /// Test: Unified CRUD operations
 test "api/unified_crud" {
   run_async_test(async fn() {
-  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
   // set single
   db.add(
     @types.VectorId::from_int(1),

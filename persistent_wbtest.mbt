@@ -1,4 +1,4 @@
-// Whitebox tests for VectorDB[W, S] persistence layer.
+// Whitebox tests for PersistentDB[W, S] persistence layer.
 //
 // These tests verify the core invariants:
 // 1. WAL-before-state: WAL is persisted before engine is mutated
@@ -135,7 +135,7 @@ test "persistent/wal_before_state_on_upsert" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -171,7 +171,7 @@ test "persistent/crash_recovery_from_wal" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -190,7 +190,7 @@ test "persistent/crash_recovery_from_wal" {
       200L,
     )
     inspect(db.size(), content="2")
-    let db2 = VectorDB::init(
+    let db2 = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -211,7 +211,7 @@ test "persistent/replay_preserves_metric_and_strategy" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -224,7 +224,7 @@ test "persistent/replay_preserves_metric_and_strategy" {
       checkpoint_bytes=0,
     )
     db.upsert([(make_vid(1), [1.0, 2.0], make_attrs("k", "v"))], 100L)
-    let reloaded = VectorDB::init(
+    let reloaded = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -251,7 +251,7 @@ test "persistent/checkpoint_snapshot_before_wal_truncate" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -287,7 +287,7 @@ test "persistent/recovery_after_checkpoint" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -299,7 +299,7 @@ test "persistent/recovery_after_checkpoint" {
     )
     db.upsert([(make_vid(1), [1.0, 2.0, 3.0], make_attrs("k", "v"))], 100L)
     db.checkpoint()
-    let db2 = VectorDB::init(
+    let db2 = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -323,7 +323,7 @@ test "persistent/recovery_snapshot_plus_wal" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -337,7 +337,7 @@ test "persistent/recovery_snapshot_plus_wal" {
     db.checkpoint()
     db.upsert([(make_vid(2), [4.0, 5.0, 6.0], make_attrs("k", "v2"))], 200L)
     inspect(db.size(), content="2")
-    let db2 = VectorDB::init(
+    let db2 = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -362,7 +362,7 @@ test "persistent/auto_checkpoint_by_record_count" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -390,7 +390,7 @@ test "persistent/auto_checkpoint_by_byte_size" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -416,7 +416,7 @@ test "persistent/remove_wal_before_state" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -448,7 +448,7 @@ test "persistent/remove_recovery" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -461,7 +461,7 @@ test "persistent/remove_recovery" {
     db.upsert([(make_vid(1), [1.0, 2.0, 3.0], @types.empty_attrs())], 100L)
     db.upsert([(make_vid(2), [4.0, 5.0, 6.0], @types.empty_attrs())], 200L)
     let _ = db.remove(make_vid(1), 300L)
-    let db2 = VectorDB::init(
+    let db2 = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -479,7 +479,7 @@ test "persistent/update_attrs_recovery" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -507,7 +507,7 @@ test "persistent/update_attrs_recovery" {
       None => inspect(false, content="true")
     }
     // "Crash" and re-init
-    let db2 = VectorDB::init(
+    let db2 = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -536,7 +536,7 @@ test "persistent/init_from_empty" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -562,7 +562,7 @@ test "persistent/idempotent_wal_replay_after_checkpoint_crash" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -590,7 +590,7 @@ test "persistent/idempotent_wal_replay_after_checkpoint_crash" {
     let has_snap = @storage.async_exists(snap_store, data_path, @storage.Data)
     inspect(has_snap, content="true")
     let snap_data = @storage.async_read(snap_store, data_path, @storage.Data)
-    let db = VectorEngine::deserialize(snap_data)
+    let db = PersistentDB::deserialize(snap_data)
     let store = db.store()
     let applied = @wal.replay_wal_data(wal_data, store)
     inspect(applied > 0, content="true")
@@ -600,7 +600,7 @@ test "persistent/idempotent_wal_replay_after_checkpoint_crash" {
       capacity: 1024,
       strategy: @types.HNSW(@types.HNSWParams::default()),
     }
-    let db2 = VectorEngine::from_store(store, options)
+    let db2 = PersistentDB::from_store(store, options)
     inspect(db2.size(), content="1")
   })
 }
@@ -616,7 +616,7 @@ test "persistent/same_id_upsert_last_write_wins" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -638,7 +638,7 @@ test "persistent/same_id_upsert_last_write_wins" {
       None => inspect(false, content="true")
     }
     // Crash and recover from WAL — should replay both, last wins
-    let db2 = VectorDB::init(
+    let db2 = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -667,7 +667,7 @@ test "persistent/separate_upserts_recovery" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -682,7 +682,7 @@ test "persistent/separate_upserts_recovery" {
     db.upsert([(make_vid(2), [0.0, 1.0, 0.0], make_attrs("ver", "2"))], 200L)
     inspect(db.size(), content="2")
     // Crash and recover
-    let db2 = VectorDB::init(
+    let db2 = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -712,7 +712,7 @@ test "persistent/remove_nonexistent" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -744,7 +744,7 @@ test "persistent/wal_sot_replay_consistency" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -769,8 +769,8 @@ test "persistent/wal_sot_replay_consistency" {
     let manual_store = @store.CoreStore::new(3, @types.Cosine, capacity=1024)
     let applied = @wal.replay_wal_data(wal_bytes, manual_store)
     inspect(applied > 0, content="true")
-    // Compare with PersistentVectorDB re-init
-    let db2 = VectorDB::init(
+    // Compare with PersistentPersistentDB re-init
+    let db2 = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -803,7 +803,7 @@ test "persistent/multi_instance_isolation" {
     // Shard 0
     let wal0 = TestAsyncStorage::new()
     let snap0 = TestAsyncStorage::new()
-    let shard0 = VectorDB::init(
+    let shard0 = PersistentDB::init(
       wal0,
       snap0,
       "",
@@ -816,7 +816,7 @@ test "persistent/multi_instance_isolation" {
     // Shard 1
     let wal1 = TestAsyncStorage::new()
     let snap1 = TestAsyncStorage::new()
-    let shard1 = VectorDB::init(
+    let shard1 = PersistentDB::init(
       wal1,
       snap1,
       "",
@@ -852,7 +852,7 @@ test "persistent/multi_instance_isolation" {
     inspect(wal1.data.contains(wal1_path), content="true")
     inspect(wal1.data.contains(wal0_path), content="false")
     // Recovery: each shard recovers only its own data
-    let shard0b = VectorDB::init(
+    let shard0b = PersistentDB::init(
       wal0,
       snap0,
       "",
@@ -862,7 +862,7 @@ test "persistent/multi_instance_isolation" {
       checkpoint_threshold=1000,
       checkpoint_bytes=0,
     )
-    let shard1b = VectorDB::init(
+    let shard1b = PersistentDB::init(
       wal1,
       snap1,
       "",
@@ -894,7 +894,7 @@ test "persistent/shared_storage_prefix_isolation" {
     let shared_wal = TestAsyncStorage::new()
     let shared_snap = TestAsyncStorage::new()
     // Two shards with different names (simulating DO-ID prefix)
-    let shard_a = VectorDB::init(
+    let shard_a = PersistentDB::init(
       shared_wal,
       shared_snap,
       "do-abc",
@@ -904,7 +904,7 @@ test "persistent/shared_storage_prefix_isolation" {
       checkpoint_threshold=1000,
       checkpoint_bytes=0,
     )
-    let shard_b = VectorDB::init(
+    let shard_b = PersistentDB::init(
       shared_wal,
       shared_snap,
       "do-xyz",
@@ -944,7 +944,7 @@ test "persistent/shared_storage_prefix_isolation" {
     inspect(shared_wal.data.contains(full_a), content="true")
     inspect(shared_wal.data.contains(full_b), content="true")
     // Recovery from shared storage
-    let shard_a2 = VectorDB::init(
+    let shard_a2 = PersistentDB::init(
       shared_wal,
       shared_snap,
       "do-abc",
@@ -954,7 +954,7 @@ test "persistent/shared_storage_prefix_isolation" {
       checkpoint_threshold=1000,
       checkpoint_bytes=0,
     )
-    let shard_b2 = VectorDB::init(
+    let shard_b2 = PersistentDB::init(
       shared_wal,
       shared_snap,
       "do-xyz",
@@ -991,7 +991,7 @@ test "persistent/timestamp_preserved_in_wal" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()
-    let db = VectorDB::init(
+    let db = PersistentDB::init(
       wal_store,
       snap_store,
       "",
@@ -1040,7 +1040,7 @@ test "persistent/cross_shard_point_in_time" {
     let snap0 = TestAsyncStorage::new()
     let wal1 = TestAsyncStorage::new()
     let snap1 = TestAsyncStorage::new()
-    let shard0 = VectorDB::init(
+    let shard0 = PersistentDB::init(
       wal0,
       snap0,
       "",
@@ -1050,7 +1050,7 @@ test "persistent/cross_shard_point_in_time" {
       checkpoint_threshold=1000,
       checkpoint_bytes=0,
     )
-    let shard1 = VectorDB::init(
+    let shard1 = PersistentDB::init(
       wal1,
       snap1,
       "",
@@ -1116,7 +1116,7 @@ test "persistent/independent_checkpoint" {
     let snap0 = TestAsyncStorage::new()
     let wal1 = TestAsyncStorage::new()
     let snap1 = TestAsyncStorage::new()
-    let shard0 = VectorDB::init(
+    let shard0 = PersistentDB::init(
       wal0,
       snap0,
       "",
@@ -1126,7 +1126,7 @@ test "persistent/independent_checkpoint" {
       checkpoint_threshold=1000,
       checkpoint_bytes=0,
     )
-    let shard1 = VectorDB::init(
+    let shard1 = PersistentDB::init(
       wal1,
       snap1,
       "",
@@ -1151,7 +1151,7 @@ test "persistent/independent_checkpoint" {
     // shard0's WAL should be truncated
     inspect(shard0.wal_record_count(), content="0")
     // Both shards recover independently
-    let shard0b = VectorDB::init(
+    let shard0b = PersistentDB::init(
       wal0,
       snap0,
       "",
@@ -1161,7 +1161,7 @@ test "persistent/independent_checkpoint" {
       checkpoint_threshold=1000,
       checkpoint_bytes=0,
     )
-    let shard1b = VectorDB::init(
+    let shard1b = PersistentDB::init(
       wal1,
       snap1,
       "",

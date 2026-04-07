@@ -1,46 +1,43 @@
 /**
- * @vcdb/server - Vector database server package
+ * @vcdb/server — Vector database server package.
  *
- * Subpath imports for tree-shaking:
- *
- * Storage backends:
- *   - `@vcdb/server/storage/memory`
- *   - `@vcdb/server/storage/node`
- *   - `@vcdb/server/storage/indexeddb`
- *   - `@vcdb/server/storage/opfs`
- *   - `@vcdb/server/storage/local-storage`
- *   - `@vcdb/server/storage/service-worker`
- *   - `@vcdb/server/storage/r2`
- *   - `@vcdb/server/storage/do-kv`
- *   - `@vcdb/server/storage/cached`
- *
- * VectorDB:
- *   - `@vcdb/server/vectordb`        — in-memory VectorDB
- *   - `@vcdb/server/persistent`      — persistent VectorDB (WAL)
- *   - `@vcdb/server/gateway`         — HTTP gateway API
- *
- * Cloudflare:
- *   - `@vcdb/server/cloudflare/persistent-do` — DO storage bridge
- *
- * Module loader:
- *   - `@vcdb/server/loader`          — loadModule / isModuleLoaded
+ * This file is the single source of truth for all public domain types.
+ * Storage adapters and DB classes are imported via subpath exports.
  */
 
-// Domain types
-export type {
-  VectorId,
-  Metric,
-  Strategy,
-  SearchResult,
-  SearchHit,
-  PointRecord,
-  ScrollEntry,
-} from "./types.js";
+/* ── Domain types (SoT) ─────────────────────────────────────── */
 
-// Storage types
-export {
-  StorageKind,
-  type StorageAdapter,
-  type StorageKindType,
-  toUint8,
-} from "./storage/types.js";
+/** Unique identifier for a vector. Uses bigint for full Int64 range. */
+export type VectorId = bigint;
+
+/** Distance/similarity metric. */
+export type Metric = "cosine" | "l2" | "dot";
+
+/** ANN (Approximate Nearest Neighbor) indexing strategy. */
+export type Strategy = "bruteforce" | "hnsw" | "ivf";
+
+/** A single search result (score only, no payload). */
+export interface SearchResult {
+  readonly id: VectorId;
+  readonly score: number;
+}
+
+/** A search result with optional payload. */
+export interface SearchHit {
+  readonly id: VectorId;
+  readonly score: number;
+  readonly payload: Record<string, unknown> | null;
+}
+
+/** A point record retrieved by ID. */
+export interface PointRecord {
+  readonly found: boolean;
+  readonly vector: number[];
+  readonly payload: Record<string, unknown> | null;
+}
+
+/** An entry from scroll (cursor-based iteration). */
+export interface ScrollEntry {
+  readonly id: VectorId;
+  readonly payload: Record<string, unknown> | null;
+}

@@ -11,7 +11,7 @@
 /// Collection entry — wraps VectorDB with its config.
 pub struct Collection[S] {
   config : CollectionConfig
-  db : @vcdb.VectorDB[S, S]
+  db : @vcdb.PersistentDB[S, S]
 }
 
 ///|
@@ -167,7 +167,7 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::create(
     if already_exists {
       return Err(CollectionExists(config.name))
     }
-    let db = @vcdb.VectorDB::init(
+    let db = @vcdb.PersistentDB::init(
       storage,
       storage,
       self.base_path,
@@ -195,7 +195,7 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::create(
 pub fn[S] CollectionManager::get_db(
   self : CollectionManager[S],
   name : String,
-) -> @vcdb.VectorDB[S, S]? {
+) -> @vcdb.PersistentDB[S, S]? {
   match self.collections.get(name) {
     Some(c) => Some(c.db)
     None => None
@@ -241,7 +241,7 @@ async fn[S : @storage.AsyncStorage] CollectionManager::load_collection_from_stor
     }
 
     // Load via VectorDB::init (handles WAL + snapshot replay)
-    let db = @vcdb.VectorDB::init(
+    let db = @vcdb.PersistentDB::init(
       storage,
       storage,
       self.base_path,
@@ -306,7 +306,7 @@ async fn[S : @storage.AsyncStorage] CollectionManager::remove_persisted_collecti
 pub async fn[S : @storage.AsyncStorage] CollectionManager::get(
   self : CollectionManager[S],
   name : String,
-) -> Result[@vcdb.VectorDB[S, S], GatewayError] {
+) -> Result[@vcdb.PersistentDB[S, S], GatewayError] {
   match self.collections.get(name) {
     Some(c) => Ok(c.db)
     None =>
@@ -494,7 +494,7 @@ pub fn[S] CollectionManager::load_collection(
   if self.collections.contains(config.name) {
     return Err(CollectionExists(config.name))
   }
-  let db = @vcdb.VectorDB::from_snapshot(
+  let db = @vcdb.PersistentDB::from_snapshot(
     data, storage, base_path, config.name,
   )
   let collection : Collection[S] = { config, db }

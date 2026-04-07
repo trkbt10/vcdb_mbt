@@ -18,7 +18,7 @@ fn main {
 async fn demo_bruteforce() -> Unit {
   println("--- Demo 1: Bruteforce Search ---")
 
-  let db = @vcdb.VectorDB::in_memory_bruteforce(3)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
 
   // Add sample vectors representing documents/items
   // Simulating embeddings for: "apple", "banana", "orange", "grape", "melon"
@@ -59,7 +59,7 @@ async fn demo_bruteforce() -> Unit {
 async fn demo_hnsw() -> Unit {
   println("--- Demo 2: HNSW Approximate Search ---")
 
-  let db = @vcdb.VectorDB::in_memory_hnsw(4, metric=@types.Dot)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(4, metric=@types.Dot)
 
   // Add 100 vectors
   for i in 0..<100 {
@@ -98,7 +98,7 @@ async fn demo_hnsw() -> Unit {
 async fn demo_filtered_search() -> Unit {
   println("--- Demo 3: Search with Attribute Filter ---")
 
-  let db = @vcdb.VectorDB::in_memory_bruteforce(2)
+  let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
   // Add products with categories
   let products = [
@@ -147,7 +147,7 @@ async fn demo_filtered_search() -> Unit {
 async fn demo_serialization() -> Unit {
   println("--- Demo 4: Serialization & Persistence ---")
 
-  let db = @vcdb.VectorDB::in_memory_hnsw(3, metric=@types.Cosine)
+  let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Cosine)
 
   // Add data
   for i in 1..<=10 {
@@ -166,7 +166,7 @@ async fn demo_serialization() -> Unit {
   )
 
   // Deserialize
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+  let db2 = @vcdb.PersistentDB::deserialize(bytes)
   println("Restored DB: \{db2.size()} vectors")
 
   // Verify search works on restored DB
@@ -198,13 +198,13 @@ async fn demo_metrics() -> Unit {
   let query = [1.0, 0.0, 0.0]
 
   // Cosine: direction matters, not magnitude
-  let db_cosine = @vcdb.VectorDB::in_memory(3, metric=@types.Cosine, strategy=@types.Bruteforce)
+  let db_cosine = @vcdb.PersistentDB::in_memory(3, metric=@types.Cosine, strategy=@types.Bruteforce)
 
   // Dot: both direction and magnitude matter
-  let db_dot = @vcdb.VectorDB::in_memory(3, metric=@types.Dot, strategy=@types.Bruteforce)
+  let db_dot = @vcdb.PersistentDB::in_memory(3, metric=@types.Dot, strategy=@types.Bruteforce)
 
   // L2: distance matters
-  let db_l2 = @vcdb.VectorDB::in_memory(3, metric=@types.L2, strategy=@types.Bruteforce)
+  let db_l2 = @vcdb.PersistentDB::in_memory(3, metric=@types.L2, strategy=@types.Bruteforce)
 
   for vec in vectors {
     let (id, v) = vec

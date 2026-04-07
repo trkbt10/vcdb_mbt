@@ -21,7 +21,7 @@
 /// Instance storage for persistent mode.
 let persistent_instances : @hashmap.HashMap[
   Int,
-  @vcdb.VectorDB[
+  @vcdb.PersistentDB[
     @storage.JsAsyncCallbackStorage,
     @storage.JsAsyncCallbackStorage,
   ],
@@ -154,7 +154,7 @@ pub fn persistent_init(
     let snapshot_storage = @storage.JsAsyncCallbackStorage::new(
       snapshot_callback_name(instance_id),
     )
-    let pdb = @vcdb.VectorDB::init(
+    let pdb = @vcdb.PersistentDB::init(
       wal_storage,
       snapshot_storage,
       base_path,
@@ -171,7 +171,7 @@ pub fn persistent_init(
 ///|
 fn get_persistent_db(
   instance_id : Int,
-) -> @vcdb.VectorDB[
+) -> @vcdb.PersistentDB[
   @storage.JsAsyncCallbackStorage,
   @storage.JsAsyncCallbackStorage,
 ] {
