@@ -25,7 +25,7 @@ pub fn gateway_request(
     let response = @gateway.execute_request(
       gateway_manager, http_method, path, body,
     )
-    response.to_json().to_string()
+    response.to_json().stringify()
   })
 }
 

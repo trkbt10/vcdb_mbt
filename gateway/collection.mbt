@@ -76,7 +76,7 @@ async fn[S : @storage.AsyncStorage] CollectionManager::persist_config(
     self.base_path,
     @storage.collection_config_path(name),
   )
-  let config_json = col.config.to_json().to_string()
+  let config_json = col.config.to_json().stringify()
   let config_bytes = Bytes::from_array(
     config_json.to_array().map(fn(c) { c.to_int().to_byte() }),
   )
@@ -508,11 +508,11 @@ pub fn[S] CollectionManager::load_collection(
 ///|
 pub fn[S] CollectionManager::export_metadata(
   self : CollectionManager[S],
-) -> JsonValue {
-  let collections : Array[JsonValue] = []
+) -> Json {
+  let collections : Array[Json] = []
   for kv in self.collections {
     let (_, c) = kv
     collections.push(c.config.to_json())
   }
-  json_object([("version", JNumber(1.0)), ("collections", JArray(collections))])
+  json_object([("version", (1.0).to_json()), ("collections", Json::array(collections))])
 }

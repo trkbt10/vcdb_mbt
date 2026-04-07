@@ -16,7 +16,7 @@ pub fn[W, S] handle_search(
     return Err(DimensionMismatch(expected=dim, got=req.vector.length()))
   }
   let filter = match req.filter {
-    Some(json) => @filter.parse_filter_json(json.to_string())
+    Some(json) => @filter.parse_filter_json(json.stringify())
     None => None
   }
   let hits = db.search(req.vector, req.limit, filter)
@@ -138,17 +138,17 @@ pub async fn[S : @storage.AsyncStorage, T] with_collection(
 
 ///|
 /// Handle health check
-pub fn handle_health() -> JsonValue {
-  json_object([("status", JString("ok"))])
+pub fn handle_health() -> Json {
+  json_object([("status", "ok".to_json())])
 }
 
 ///|
 /// Handle service info
-pub fn handle_service_info() -> JsonValue {
+pub fn handle_service_info() -> Json {
   json_object([
-    ("name", JString("vcdb")),
-    ("version", JString("0.1.0")),
-    ("description", JString("MoonBit vector database")),
+    ("name", "vcdb".to_json()),
+    ("version", "0.1.0".to_json()),
+    ("description", "MoonBit vector database".to_json()),
   ])
 }
 
@@ -198,7 +198,7 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
         None => return ApiResponse::err("Invalid JSON")
       }
       match handle_create_collection(manager, config) {
-        Ok(_) => ApiResponse::ok(JBool(true))
+        Ok(_) => ApiResponse::ok(true.to_json())
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     }
@@ -209,7 +209,7 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
       }
     ("DELETE", ["collections", name]) =>
       match handle_delete_collection(manager, name) {
-        Ok(_) => ApiResponse::ok(JBool(true))
+        Ok(_) => ApiResponse::ok(true.to_json())
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     ("PUT", ["collections", name, "points"]) => {
@@ -231,8 +231,8 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
         Ok(count) =>
           ApiResponse::ok(
             json_object([
-              ("status", JString("ok")),
-              ("upserted", JNumber(count.to_double())),
+              ("status", "ok".to_json()),
+              ("upserted", count.to_double().to_json()),
             ]),
           )
         Err(e) => ApiResponse::err(error_to_string(e))
@@ -289,7 +289,7 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
         Err(_) => return ApiResponse::err("Invalid point ID")
       }
       match manager.remove_point(name, @types.VectorId::from_int64(id)) {
-        Ok(_) => ApiResponse::ok(JBool(true))
+        Ok(_) => ApiResponse::ok(true.to_json())
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     }

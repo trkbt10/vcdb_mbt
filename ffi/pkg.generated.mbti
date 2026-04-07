@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "trkbt10/vcdb/lib"
+package "trkbt10/vcdb/ffi"
 
 // Values
 pub fn crush_placement_group(Int, Int, Int) -> Int

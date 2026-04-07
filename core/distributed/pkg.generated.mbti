@@ -45,6 +45,10 @@ pub fn shard_for_id(@types.VectorId, @placement.CrushMap) -> Int
 pub fn shard_for_id_with_health(@types.VectorId, @placement.CrushMap, ShardHealthTracker) -> Int?
 
 // Errors
+pub(all) suberror ShardError {
+  ShardFailed(String)
+}
+pub fn ShardError::to_string(Self) -> String
 
 // Types and methods
 pub(all) struct ConflictRecord {
@@ -59,6 +63,28 @@ pub(all) enum ConflictResolution {
   KeepRemote
   TieBreakById
 } derive(Eq, Show)
+
+pub struct DistributedDB[T] {
+  shard_count : Int
+  crush_map : @placement.CrushMap
+  transport : T
+  health : ShardHealthTracker
+  partition_state : PartitionState
+}
+pub fn[T] DistributedDB::all_health(Self[T]) -> Array[ShardHealth]
+pub async fn[T : ShardTransport] DistributedDB::count_filtered(Self[T], filter_json? : String, timestamp_ns? : Int64) -> MergedCountResult
+pub fn[T] DistributedDB::failed_shards(Self[T]) -> Array[Int]
+pub async fn[T : ShardTransport] DistributedDB::get(Self[T], @types.VectorId, timestamp_ns? : Int64) -> @types.VectorRecord?
+pub async fn[T : ShardTransport] DistributedDB::has(Self[T], @types.VectorId, timestamp_ns? : Int64) -> Bool
+pub fn[T] DistributedDB::new(Int, T, failure_threshold? : Int) -> Self[T]
+pub fn[T] DistributedDB::partitioned_shards(Self[T]) -> Array[(Int, Int64)]
+pub async fn[T : ShardTransport] DistributedDB::remove(Self[T], @types.VectorId, Int64) -> Bool
+pub fn[T] DistributedDB::resolve_partition(Self[T], Int) -> Unit
+pub async fn[T : ShardTransport] DistributedDB::scroll_filtered(Self[T], filter_json? : String, offset? : Int64?, limit? : Int, timestamp_ns? : Int64) -> MergedScrollResult
+pub async fn[T : ShardTransport] DistributedDB::search(Self[T], Array[Double], Int, filter_json? : String, timestamp_ns? : Int64) -> MergedSearchResult
+pub fn[T] DistributedDB::shard_count(Self[T]) -> Int
+pub fn[T] DistributedDB::shard_for(Self[T], @types.VectorId) -> Int
+pub async fn[T : ShardTransport] DistributedDB::upsert(Self[T], Array[TransportPoint], Int64) -> Unit
 
 pub(all) struct MergedCountResult {
   count : Int
@@ -203,6 +229,12 @@ pub(all) enum ShardStatus {
   Failed
 } derive(Eq, Show)
 
+pub(all) struct TransportPoint {
+  id : @types.VectorId
+  vector : Array[Double]
+  attrs : @types.Attrs
+}
+
 pub(all) struct WalShipment {
   source_shard : Int
   from_ts : Int64
@@ -214,4 +246,13 @@ pub(all) struct WalShipment {
 // Type aliases
 
 // Traits
+pub(open) trait ShardTransport {
+  shard_upsert(Self, Int, Array[TransportPoint], Int64, () -> Unit, (String) -> Unit) -> Unit
+  shard_search(Self, Int, Array[Double], Int, String, (Array[@types.SearchHit]) -> Unit, (String) -> Unit) -> Unit
+  shard_get(Self, Int, @types.VectorId, (@types.VectorRecord?) -> Unit, (String) -> Unit) -> Unit
+  shard_has(Self, Int, @types.VectorId, (Bool) -> Unit, (String) -> Unit) -> Unit
+  shard_remove(Self, Int, @types.VectorId, Int64, (Bool) -> Unit, (String) -> Unit) -> Unit
+  shard_scroll(Self, Int, String, Int64?, Int, (Array[ShardScrollEntry]) -> Unit, (String) -> Unit) -> Unit
+  shard_count(Self, Int, String, (Int) -> Unit, (String) -> Unit) -> Unit
+}
 

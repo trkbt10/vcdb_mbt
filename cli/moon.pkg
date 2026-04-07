@@ -1,4 +1,4 @@
 import {
-  "trkbt10/vcdb/gateway",
   "moonbitlang/core/string",
+  "moonbitlang/core/argparse",
 }

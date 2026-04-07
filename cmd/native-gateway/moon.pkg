@@ -1,5 +1,6 @@
 import {
   "moonbitlang/core/env",
+  "moonbitlang/core/argparse",
   "trkbt10/vcdb/cli",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/types",

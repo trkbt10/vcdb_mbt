@@ -5,6 +5,8 @@ import {
   "trkbt10/vcdb/core/ann",
   "trkbt10/vcdb/core/attr",
   "trkbt10/vcdb/core/filter",
+  "trkbt10/vcdb/core/persistence/wal",
+  "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/store",
   "trkbt10/vcdb/core/types",
 }
@@ -15,6 +17,48 @@ pub fn empty_attrs() -> @types.Attrs
 // Errors
 
 // Types and methods
+pub struct PersistentDB[W, S] {
+  mut engine : VectorDB
+  wal : @wal.AsyncWalRuntime[W]
+  snapshot_storage : S
+  base_path : String
+  name : String
+  checkpoint_threshold : Int
+  checkpoint_bytes : Int
+}
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::add(Self[W, S], @types.VectorId, Array[Double], @types.Attrs, Int64) -> Unit
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::checkpoint(Self[W, S]) -> Unit
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::compact(Self[W, S]) -> Int
+pub fn[W, S] PersistentDB::count_filtered(Self[W, S], expr? : @filter.FilterExpr?) -> Int
+pub fn PersistentDB::deserialize(Bytes) -> Self[@storage.MemoryStorage, @storage.MemoryStorage]
+pub fn[W, S] PersistentDB::dim(Self[W, S]) -> Int
+pub fn[W, S] PersistentDB::find(Self[W, S], Array[Double], ((@types.VectorId, @types.Attrs) -> Bool)?) -> @types.SearchHit?
+pub fn[S] PersistentDB::from_snapshot(Bytes, S, String, String, checkpoint_threshold? : Int, checkpoint_bytes? : Int) -> Self[S, S]
+pub fn[W, S] PersistentDB::get(Self[W, S], @types.VectorId) -> @types.VectorRecord?
+pub fn[W, S] PersistentDB::has(Self[W, S], @types.VectorId) -> Bool
+pub async fn PersistentDB::in_memory(Int, metric? : @types.Metric, strategy? : @types.Strategy, capacity? : Int) -> Self[@storage.MemoryStorage, @storage.MemoryStorage]
+pub async fn PersistentDB::in_memory_bruteforce(Int, metric? : @types.Metric) -> Self[@storage.MemoryStorage, @storage.MemoryStorage]
+pub async fn PersistentDB::in_memory_hnsw(Int, metric? : @types.Metric) -> Self[@storage.MemoryStorage, @storage.MemoryStorage]
+pub async fn PersistentDB::in_memory_ivf(Int, metric? : @types.Metric) -> Self[@storage.MemoryStorage, @storage.MemoryStorage]
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::init(W, S, String, String, Int, Int, metric? : @types.Metric, strategy? : @types.Strategy, checkpoint_threshold? : Int, checkpoint_bytes? : Int) -> Self[W, S]
+pub fn[W, S] PersistentDB::metric(Self[W, S]) -> @types.Metric
+pub fn[W, S] PersistentDB::raw_size(Self[W, S]) -> Int
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::remove(Self[W, S], @types.VectorId, Int64) -> Bool
+pub fn[W, S] PersistentDB::scroll(Self[W, S], offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
+pub fn[W, S] PersistentDB::scroll_filtered(Self[W, S], expr? : @filter.FilterExpr?, offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
+pub fn[W, S] PersistentDB::search(Self[W, S], Array[Double], Int, @filter.FilterExpr?) -> Array[@types.SearchHit]
+pub fn[W, S] PersistentDB::search_with_expr(Self[W, S], Array[Double], Int, @filter.FilterExpr?, @attr.BPTreeAttrIndex?, @filter.FilterStrategy) -> Array[@types.SearchHit]
+pub fn[W, S] PersistentDB::search_with_filter(Self[W, S], Array[Double], Int, ((@types.VectorId, @types.Attrs) -> Bool)?) -> Array[@types.SearchHit]
+pub fn[W, S] PersistentDB::serialize_snapshot(Self[W, S]) -> Bytes
+pub fn[W, S] PersistentDB::size(Self[W, S]) -> Int
+pub fn[W, S] PersistentDB::store(Self[W, S]) -> @store.CoreStore
+pub fn[W, S] PersistentDB::strategy(Self[W, S]) -> @types.Strategy
+pub fn[W, S] PersistentDB::train(Self[W, S], iterations? : Int) -> Unit
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::update_attrs(Self[W, S], @types.VectorId, @types.Attrs, Int64) -> Bool
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::upsert(Self[W, S], Array[(@types.VectorId, Array[Double], @types.Attrs)], Int64) -> Unit
+pub fn[W, S] PersistentDB::wal_byte_size(Self[W, S]) -> Int
+pub fn[W, S] PersistentDB::wal_record_count(Self[W, S]) -> Int
+
 pub struct VectorDB {
   store : @store.CoreStore
   attr_index : @attr.BPTreeAttrIndex

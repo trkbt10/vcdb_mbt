@@ -69,6 +69,24 @@ pub fn MemoryStorage::write(Self, String, Bytes) -> Unit
 pub impl AsyncStorage for MemoryStorage
 pub impl Storage for MemoryStorage
 
+pub struct ReplicatedStorage[T] {
+  primary : T
+  replicas : Array[T]
+  config : ReplicationConfig
+}
+pub fn[T] ReplicatedStorage::backend_count(Self[T]) -> Int
+pub fn[T] ReplicatedStorage::local_only(T) -> Self[T]
+pub fn[T] ReplicatedStorage::new(T, Array[T], config? : ReplicationConfig) -> Self[T]
+pub fn[T] ReplicatedStorage::with_all_ack(T, Array[T]) -> Self[T]
+pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T]
+
+pub(all) struct ReplicationConfig {
+  write_quorum : Int
+}
+pub fn ReplicationConfig::all(Int) -> Self
+pub fn ReplicationConfig::default() -> Self
+pub fn ReplicationConfig::majority(Int) -> Self
+
 pub(all) enum StorageKind {
   Config
   Index

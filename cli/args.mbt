@@ -1,95 +1,167 @@
 ///|
-/// CLI argument parsing for vcdb commands
+/// CLI utilities for vcdb commands
 
 ///|
-/// Parsed command-line arguments
-pub struct ParsedArgs {
-  mut command : String
-  mut subcommand : String
-  positional : Array[String]
-  flags : Map[String, String]
-  bool_flags : Map[String, Bool]
-} derive(Show)
-
-///|
-/// Create empty parsed args
-pub fn ParsedArgs::empty() -> ParsedArgs {
-  { command: "", subcommand: "", positional: [], flags: {}, bool_flags: {} }
+/// Build the vcdb CLI command definition using @argparse.
+pub fn vcdb_command() -> @argparse.Command {
+  @argparse.Command(
+    "vcdb",
+    about="Vector Database CLI",
+    version="0.1.0",
+    subcommand_required=true,
+    subcommands=[
+      @argparse.Command(
+        "collections",
+        about="Manage collections",
+        subcommand_required=true,
+        subcommands=[
+          @argparse.Command("list", about="List all collections"),
+          @argparse.Command(
+            "create",
+            about="Create a new collection",
+            positionals=[
+              @argparse.PositionArg("name", about="Collection name"),
+            ],
+            options=[
+              @argparse.OptionArg(
+                "dim",
+                about="Vector dimension",
+                default_values=["128"],
+              ),
+              @argparse.OptionArg(
+                "metric",
+                about="Distance metric (cosine|l2|dot)",
+                default_values=["cosine"],
+              ),
+              @argparse.OptionArg(
+                "strategy",
+                about="ANN strategy (hnsw|ivf|bruteforce)",
+                default_values=["hnsw"],
+              ),
+            ],
+          ),
+          @argparse.Command(
+            "delete",
+            about="Delete a collection",
+            positionals=[
+              @argparse.PositionArg("name", about="Collection name"),
+            ],
+          ),
+          @argparse.Command(
+            "info",
+            about="Get collection info",
+            positionals=[
+              @argparse.PositionArg("name", about="Collection name"),
+            ],
+          ),
+        ],
+      ),
+      @argparse.Command(
+        "points",
+        about="Manage points",
+        subcommand_required=true,
+        subcommands=[
+          @argparse.Command(
+            "upsert",
+            about="Add/update points",
+            positionals=[
+              @argparse.PositionArg("collection", about="Collection name"),
+            ],
+            options=[
+              @argparse.OptionArg("id", about="Point ID", required=true),
+              @argparse.OptionArg(
+                "vector",
+                about="Vector values (comma-separated)",
+                required=true,
+              ),
+              @argparse.OptionArg(
+                "payload",
+                about="Payload key-value pairs (k1=v1,k2=v2)",
+              ),
+            ],
+          ),
+          @argparse.Command(
+            "get",
+            about="Get a point by ID",
+            positionals=[
+              @argparse.PositionArg("collection", about="Collection name"),
+              @argparse.PositionArg("id", about="Point ID"),
+            ],
+          ),
+          @argparse.Command(
+            "delete",
+            about="Delete a point",
+            positionals=[
+              @argparse.PositionArg("collection", about="Collection name"),
+              @argparse.PositionArg("id", about="Point ID"),
+            ],
+          ),
+          @argparse.Command(
+            "search",
+            about="Search for similar vectors",
+            positionals=[
+              @argparse.PositionArg("collection", about="Collection name"),
+            ],
+            options=[
+              @argparse.OptionArg(
+                "vector",
+                about="Query vector (comma-separated)",
+                required=true,
+              ),
+              @argparse.OptionArg(
+                "k",
+                about="Number of results",
+                default_values=["10"],
+              ),
+            ],
+          ),
+        ],
+      ),
+      @argparse.Command(
+        "request",
+        about="Execute one gateway request natively",
+        options=[
+          @argparse.OptionArg(
+            "method",
+            about="HTTP method",
+            default_values=["GET"],
+          ),
+          @argparse.OptionArg(
+            "path",
+            about="Gateway path",
+            default_values=["/healthz"],
+          ),
+          @argparse.OptionArg("body", about="Optional JSON request body"),
+        ],
+      ),
+      @argparse.Command("healthz", about="Health check"),
+    ],
+  )
 }
 
 ///|
-/// Parse command-line arguments
-/// Format: vcdb <command> [subcommand] [--flag value] [--bool-flag] [positional...]
-pub fn parse_args(args : Array[String]) -> ParsedArgs {
-  let result : ParsedArgs = ParsedArgs::empty()
-
-  if args.length() == 0 {
-    return result
+/// Get a single value from Matches by key.
+pub fn get_value(matches : @argparse.Matches, key : String) -> String? {
+  match matches.values.get(key) {
+    Some([value, ..]) => Some(value)
+    _ => None
   }
-
-  let mut i = 0
-
-  // First non-flag argument is the command
-  while i < args.length() {
-    let arg = args[i]
-    if arg.has_prefix("--") {
-      break
-    }
-    if result.command == "" {
-      result.command = arg
-    } else if result.subcommand == "" {
-      result.subcommand = arg
-    } else {
-      result.positional.push(arg)
-    }
-    i = i + 1
-  }
-
-  // Parse flags
-  while i < args.length() {
-    let arg = args[i]
-    if arg.has_prefix("--") {
-      let flag_name = arg.unsafe_substring(start=2, end=arg.length())
-      // Check if this is a boolean flag (no value) or a key-value flag
-      if i + 1 < args.length() && !args[i + 1].has_prefix("--") {
-        // Key-value flag
-        result.flags[flag_name] = args[i + 1]
-        i = i + 2
-      } else {
-        // Boolean flag
-        result.bool_flags[flag_name] = true
-        i = i + 1
-      }
-    } else {
-      // Positional argument after flags
-      result.positional.push(arg)
-      i = i + 1
-    }
-  }
-
-  result
 }
 
 ///|
-/// Get a string flag value
-pub fn ParsedArgs::get_flag(self : ParsedArgs, name : String) -> String? {
-  self.flags.get(name)
-}
-
-///|
-/// Get a string flag value with default
-pub fn ParsedArgs::get_flag_or(
-  self : ParsedArgs,
-  name : String,
+/// Get a value from Matches with a default.
+pub fn get_value_or(
+  matches : @argparse.Matches,
+  key : String,
   default : String,
 ) -> String {
-  self.flags.get(name).unwrap_or(default)
+  get_value(matches, key).unwrap_or(default)
 }
 
 ///|
-/// Get an integer flag value
-pub fn ParsedArgs::get_int_flag(self : ParsedArgs, name : String) -> Int? {
-  match self.flags.get(name) {
+/// Get an integer value from Matches.
+pub fn get_int_value(matches : @argparse.Matches, key : String) -> Int? {
+  match get_value(matches, key) {
     Some(s) => {
       let result : Result[Int64, _] = try? @string.parse_int64(s)
       match result {
@@ -102,29 +174,13 @@ pub fn ParsedArgs::get_int_flag(self : ParsedArgs, name : String) -> Int? {
 }
 
 ///|
-/// Get an integer flag value with default
-pub fn ParsedArgs::get_int_flag_or(
-  self : ParsedArgs,
-  name : String,
+/// Get an integer value from Matches with a default.
+pub fn get_int_value_or(
+  matches : @argparse.Matches,
+  key : String,
   default : Int,
 ) -> Int {
-  self.get_int_flag(name).unwrap_or(default)
-}
-
-///|
-/// Check if a boolean flag is set
-pub fn ParsedArgs::has_flag(self : ParsedArgs, name : String) -> Bool {
-  self.bool_flags.get(name).unwrap_or(false)
-}
-
-///|
-/// Get a positional argument by index
-pub fn ParsedArgs::get_positional(self : ParsedArgs, index : Int) -> String? {
-  if index >= 0 && index < self.positional.length() {
-    Some(self.positional[index])
-  } else {
-    None
-  }
+  get_int_value(matches, key).unwrap_or(default)
 }
 
 ///|
@@ -169,9 +225,9 @@ fn split_by_comma(s : String) -> Array[String] {
 
 ///|
 /// Parse key=value pairs (e.g., "name=test,count=42")
-pub fn parse_payload(s : String) -> @gateway.JsonValue {
+pub fn parse_payload(s : String) -> Json {
   let parts = split_by_comma(s)
-  let obj : Map[String, @gateway.JsonValue] = {}
+  let obj : Map[String, Json] = {}
   for part in parts {
     let kv = split_by_equals(part)
     if kv.length() >= 2 {
@@ -180,20 +236,20 @@ pub fn parse_payload(s : String) -> @gateway.JsonValue {
       // Try to parse as number first
       let parse_result : Result[Double, _] = try? @string.parse_double(value)
       match parse_result {
-        Ok(n) => obj[key] = @gateway.JNumber(n)
+        Ok(n) => obj[key] = n.to_json()
         Err(_) =>
           // Check for boolean
           if value == "true" {
-            obj[key] = @gateway.JBool(true)
+            obj[key] = true.to_json()
           } else if value == "false" {
-            obj[key] = @gateway.JBool(false)
+            obj[key] = false.to_json()
           } else {
-            obj[key] = @gateway.JString(value)
+            obj[key] = value.to_json()
           }
       }
     }
   }
-  @gateway.JObject(obj)
+  Json::object(obj)
 }
 
 ///|
@@ -213,30 +269,4 @@ fn split_by_equals(s : String) -> Array[String] {
   }
   parts.push(String::from_array(current))
   parts
-}
-
-///|
-/// Print usage help
-pub fn print_help() -> String {
-  let lines = [
-    "vcdb - Vector Database CLI", "", "Usage: vcdb <command> [subcommand] [options]",
-    "", "Commands:", "  collections list              List all collections", "  collections create <name>     Create a new collection",
-    "    --dim <n>                   Vector dimension (default: 128)", "    --metric <cosine|l2|dot>    Distance metric (default: cosine)",
-    "    --strategy <hnsw|ivf|bruteforce>  ANN strategy (default: hnsw)", "  collections delete <name>     Delete a collection",
-    "  collections info <name>       Get collection info", "", "  points upsert <collection>    Add/update points",
-    "    --id <n>                    Point ID", "    --vector <v1,v2,...>        Vector values (comma-separated)",
-    "    --payload <k1=v1,k2=v2>     Payload key-value pairs", "  points get <collection> <id>  Get a point by ID",
-    "  points delete <collection> <id>  Delete a point", "  points search <collection>    Search for similar vectors",
-    "    --vector <v1,v2,...>        Query vector", "    --k <n>                     Number of results (default: 10)",
-    "", "  request                       Execute one gateway request natively", "    --method <verb>             HTTP method (default: GET)",
-    "    --path </path>              Gateway path (default: /healthz)", "    --body <json>               Optional JSON request body",
-    "", "Options:", "  --help                        Show this help message", "  --version                     Show version",
-  ]
-  lines.iter().intersperse("\n").fold(init="", fn(acc, s) { acc + s })
-}
-
-///|
-/// Print version
-pub fn print_version() -> String {
-  "vcdb version 0.1.0"
 }

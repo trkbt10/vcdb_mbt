@@ -1,50 +1,11 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "trkbt10/vcdb/core/persistence/collection"
 
-import {
-  "trkbt10/vcdb",
-  "trkbt10/vcdb/core/filter",
-  "trkbt10/vcdb/core/persistence/wal",
-  "trkbt10/vcdb/core/storage",
-  "trkbt10/vcdb/core/store",
-  "trkbt10/vcdb/core/types",
-}
-
 // Values
 
 // Errors
 
 // Types and methods
-pub struct PersistentVectorDB[W, S] {
-  mut db : @vcdb.VectorDB
-  wal : @wal.AsyncWalRuntime[W]
-  snapshot_storage : S
-  base_path : String
-  name : String
-  checkpoint_threshold : Int
-  checkpoint_bytes : Int
-}
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::checkpoint(Self[W, S]) -> Unit
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::compact(Self[W, S]) -> Int
-pub fn[W, S] PersistentVectorDB::count_filtered(Self[W, S], expr? : @filter.FilterExpr?) -> Int
-pub fn[W, S] PersistentVectorDB::dim(Self[W, S]) -> Int
-pub fn[W, S] PersistentVectorDB::get(Self[W, S], @types.VectorId) -> @types.VectorRecord?
-pub fn[W, S] PersistentVectorDB::get_underlying_db(Self[W, S]) -> @vcdb.VectorDB
-pub fn[W, S] PersistentVectorDB::has(Self[W, S], @types.VectorId) -> Bool
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::init(W, S, String, String, Int, Int, metric? : @types.Metric, strategy? : @types.Strategy, checkpoint_threshold? : Int, checkpoint_bytes? : Int) -> Self[W, S]
-pub fn[W, S] PersistentVectorDB::new(@vcdb.VectorDB, @wal.AsyncWalRuntime[W], S, String, String, checkpoint_threshold? : Int, checkpoint_bytes? : Int) -> Self[W, S]
-pub fn[W, S] PersistentVectorDB::raw_size(Self[W, S]) -> Int
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::remove(Self[W, S], @types.VectorId, Int64) -> Bool
-pub fn[W, S] PersistentVectorDB::scroll(Self[W, S], offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
-pub fn[W, S] PersistentVectorDB::scroll_filtered(Self[W, S], expr? : @filter.FilterExpr?, offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
-pub fn[W, S] PersistentVectorDB::search(Self[W, S], Array[Double], Int, @filter.FilterExpr?) -> Array[@types.SearchHit]
-pub fn[W, S] PersistentVectorDB::serialize_snapshot(Self[W, S]) -> Bytes
-pub fn[W, S] PersistentVectorDB::size(Self[W, S]) -> Int
-pub fn[W, S] PersistentVectorDB::store(Self[W, S]) -> @store.CoreStore
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::update_attrs(Self[W, S], @types.VectorId, @types.Attrs, Int64) -> Bool
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentVectorDB::upsert(Self[W, S], Array[(@types.VectorId, Array[Double], @types.Attrs)], Int64) -> Unit
-pub fn[W, S] PersistentVectorDB::wal_byte_size(Self[W, S]) -> Int
-pub fn[W, S] PersistentVectorDB::wal_record_count(Self[W, S]) -> Int
 
 // Type aliases
 

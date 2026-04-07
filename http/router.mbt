@@ -146,7 +146,7 @@ pub async fn[S : @storage.AsyncStorage] Router::route(
   )
 
   // Convert gateway response to HTTP response
-  let json_body = response.to_json().to_string()
+  let json_body = response.to_json().stringify()
   if response.status == "ok" {
     HttpResponse::ok(json_body)
   } else {

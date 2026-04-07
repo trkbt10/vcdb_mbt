@@ -23,13 +23,6 @@ pub fn upper_bound(Array[NumEntry], Double) -> Int
 // Errors
 
 // Types and methods
-pub enum AttrIndexStrategy {
-  Basic
-  Bitmap
-  BPTree
-  LSM
-} derive(Eq, Show)
-
 type BPTree
 
 pub struct BPTreeAttrIndex {

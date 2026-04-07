@@ -2,46 +2,49 @@
 /// Tests for JSON module
 test "json/parse_null" {
   let result = parse_json("null")
-  assert_eq(result, Some(JNull))
+  assert_eq(result, Some(Json::null()))
 }
 
 ///|
 test "json/parse_bool" {
-  assert_eq(parse_json("true"), Some(JBool(true)))
-  assert_eq(parse_json("false"), Some(JBool(false)))
+  assert_eq(parse_json("true"), Some(true.to_json()))
+  assert_eq(parse_json("false"), Some(false.to_json()))
 }
 
 ///|
 test "json/parse_number" {
-  assert_eq(parse_json("42"), Some(JNumber(42.0)))
-  assert_eq(parse_json("-123"), Some(JNumber(-123.0)))
-  assert_eq(parse_json("3.14"), Some(JNumber(3.14)))
-  assert_eq(parse_json("1e10"), Some(JNumber(10000000000.0)))
+  assert_eq(parse_json("42"), Some((42.0).to_json()))
+  assert_eq(parse_json("-123"), Some((-123.0).to_json()))
+  assert_eq(parse_json("3.14"), Some((3.14).to_json()))
+  assert_eq(parse_json("1e10"), Some((10000000000.0).to_json()))
 }
 
 ///|
 test "json/parse_string" {
-  assert_eq(parse_json("\"hello\""), Some(JString("hello")))
-  assert_eq(parse_json("\"hello\\nworld\""), Some(JString("hello\nworld")))
-  assert_eq(parse_json("\"tab\\there\""), Some(JString("tab\there")))
+  assert_eq(parse_json("\"hello\""), Some("hello".to_json()))
+  assert_eq(parse_json("\"hello\\nworld\""), Some("hello\nworld".to_json()))
+  assert_eq(parse_json("\"tab\\there\""), Some("tab\there".to_json()))
 }
 
 ///|
 test "json/parse_array" {
   let result = parse_json("[1, 2, 3]")
-  assert_eq(result, Some(JArray([JNumber(1.0), JNumber(2.0), JNumber(3.0)])))
+  assert_eq(
+    result,
+    Some(Json::array([(1.0).to_json(), (2.0).to_json(), (3.0).to_json()])),
+  )
 
   let empty = parse_json("[]")
-  assert_eq(empty, Some(JArray([])))
+  assert_eq(empty, Some(Json::array([])))
 }
 
 ///|
 test "json/parse_object" {
   let result = parse_json("{\"name\": \"test\", \"value\": 42}")
   match result {
-    Some(JObject(obj)) => {
-      assert_eq(get_string(JObject(obj), "name"), Some("test"))
-      assert_eq(get_number(JObject(obj), "value"), Some(42.0))
+    Some(Object(obj)) => {
+      assert_eq(get_string(Json::object(obj), "name"), Some("test"))
+      assert_eq(get_number(Json::object(obj), "value"), Some(42.0))
     }
     _ => assert_true(false)
   }
@@ -51,14 +54,14 @@ test "json/parse_object" {
 test "json/parse_nested" {
   let result = parse_json("{\"items\": [1, 2, 3], \"meta\": {\"count\": 3}}")
   match result {
-    Some(JObject(obj)) => {
-      let items = get_array(JObject(obj), "items")
+    Some(Object(obj)) => {
+      let items = get_array(Json::object(obj), "items")
       assert_true(items is Some(_))
-      match get_object(JObject(obj), "meta") {
+      match get_object(Json::object(obj), "meta") {
         Some(meta) => {
           let count = meta.get("count")
           match count {
-            Some(JNumber(n)) => assert_eq(n, 3.0)
+            Some(Number(n, ..)) => assert_eq(n, 3.0)
             _ => assert_true(false)
           }
         }
@@ -72,11 +75,11 @@ test "json/parse_nested" {
 ///|
 test "json/to_string" {
   let obj = json_object([
-    ("name", JString("test")),
-    ("value", JNumber(42.0)),
-    ("active", JBool(true)),
+    ("name", "test".to_json()),
+    ("value", (42.0).to_json()),
+    ("active", true.to_json()),
   ])
-  let s = obj.to_string()
+  let s = obj.stringify()
   // Parse it back to verify
   let parsed = parse_json(s)
   assert_true(parsed is Some(_))
@@ -114,10 +117,10 @@ test "json/attrs_conversion" {
 ///|
 test "json/get_helpers" {
   let obj = json_object([
-    ("name", JString("test")),
-    ("count", JNumber(42.0)),
-    ("active", JBool(true)),
-    ("items", json_array([JNumber(1.0), JNumber(2.0)])),
+    ("name", "test".to_json()),
+    ("count", (42.0).to_json()),
+    ("active", true.to_json()),
+    ("items", json_array([(1.0).to_json(), (2.0).to_json()])),
   ])
 
   assert_eq(get_string(obj, "name"), Some("test"))
@@ -131,10 +134,10 @@ test "json/get_helpers" {
 ///|
 test "json/escape_roundtrip" {
   let special = "hello\nworld\ttab\"quote\\backslash"
-  let json = JString(special)
-  let s = json.to_string()
+  let json : Json = special.to_json()
+  let s = json.stringify()
   let parsed = parse_json(s)
-  assert_eq(parsed, Some(JString(special)))
+  assert_eq(parsed, Some("hello\nworld\ttab\"quote\\backslash".to_json()))
 }
 
 ///|
@@ -484,13 +487,13 @@ test "request/scroll_points" {
     )
     assert_eq(scroll.status, "ok")
     match scroll.result {
-      Some(JObject(result)) => {
+      Some(Object(result)) => {
         match result.get("points") {
-          Some(JArray(points)) => assert_eq(points.length(), 1)
+          Some(Array(points)) => assert_eq(points.length(), 1)
           _ => assert_true(false)
         }
         match result.get("next_page_offset") {
-          Some(JNumber(offset)) => assert_eq(offset, 2.0)
+          Some(Number(offset, ..)) => assert_eq(offset, 2.0)
           _ => assert_true(false)
         }
       }

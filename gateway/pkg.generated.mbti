@@ -3,7 +3,6 @@ package "trkbt10/vcdb/gateway"
 
 import {
   "trkbt10/vcdb",
-  "trkbt10/vcdb/core/persistence/collection",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/types",
 }
@@ -37,15 +36,15 @@ pub async fn[S : @storage.AsyncStorage] handle_delete_collection(CollectionManag
 
 pub async fn[S : @storage.AsyncStorage] handle_get_collection(CollectionManager[S], String) -> Result[CollectionInfo, GatewayError]
 
-pub fn handle_get_point(@vcdb.VectorDB, Int64) -> Result[PointResponse, GatewayError]
+pub fn[W, S] handle_get_point(@vcdb.PersistentDB[W, S], Int64) -> Result[PointResponse, GatewayError]
 
 pub fn handle_health() -> JsonValue
 
 pub async fn[S : @storage.AsyncStorage] handle_list_collections(CollectionManager[S]) -> Result[CollectionsResponse, GatewayError]
 
-pub fn handle_scroll(@vcdb.VectorDB, ScrollRequest) -> Result[ScrollResponse, GatewayError]
+pub fn[W, S] handle_scroll(@vcdb.PersistentDB[W, S], ScrollRequest) -> Result[ScrollResponse, GatewayError]
 
-pub fn handle_search(@vcdb.VectorDB, SearchRequest) -> Result[SearchResponse, GatewayError]
+pub fn[W, S] handle_search(@vcdb.PersistentDB[W, S], SearchRequest) -> Result[SearchResponse, GatewayError]
 
 pub fn handle_service_info() -> JsonValue
 
@@ -67,7 +66,7 @@ pub fn split_request_target(String) -> (String, String)
 
 pub fn vector_to_json(Array[Double]) -> JsonValue
 
-pub async fn[S : @storage.AsyncStorage, T] with_collection(CollectionManager[S], String, (@vcdb.VectorDB) -> Result[T, GatewayError]) -> Result[T, GatewayError]
+pub async fn[S : @storage.AsyncStorage, T] with_collection(CollectionManager[S], String, (@vcdb.PersistentDB[S, S]) -> Result[T, GatewayError]) -> Result[T, GatewayError]
 
 // Errors
 pub(all) suberror GatewayError {
@@ -91,7 +90,7 @@ pub fn ApiResponse::to_json(Self) -> JsonValue
 
 pub struct Collection[S] {
   config : CollectionConfig
-  pdb : @collection.PersistentVectorDB[S, S]
+  db : @vcdb.PersistentDB[S, S]
 }
 
 pub struct CollectionConfig {
@@ -125,8 +124,8 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::create(Self[S], Colle
 pub async fn[S : @storage.AsyncStorage] CollectionManager::delete(Self[S], String) -> Result[Unit, GatewayError]
 pub fn[S] CollectionManager::exists(Self[S], String) -> Bool
 pub fn[S] CollectionManager::export_metadata(Self[S]) -> JsonValue
-pub async fn[S : @storage.AsyncStorage] CollectionManager::get(Self[S], String) -> Result[@vcdb.VectorDB, GatewayError]
-pub fn[S] CollectionManager::get_db(Self[S], String) -> @vcdb.VectorDB?
+pub async fn[S : @storage.AsyncStorage] CollectionManager::get(Self[S], String) -> Result[@vcdb.PersistentDB[S, S], GatewayError]
+pub fn[S] CollectionManager::get_db(Self[S], String) -> @vcdb.PersistentDB[S, S]?
 pub async fn[S : @storage.AsyncStorage] CollectionManager::get_info(Self[S], String) -> Result[CollectionInfo, GatewayError]
 pub async fn[S : @storage.AsyncStorage] CollectionManager::list(Self[S]) -> Result[Array[String], GatewayError]
 pub async fn[S : @storage.AsyncStorage] CollectionManager::list_info(Self[S]) -> Result[Array[CollectionInfo], GatewayError]
