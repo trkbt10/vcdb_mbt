@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vcdb-worker",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-04-01",
+
+  // R2 bucket for persistent storage
+  "r2_buckets": [
+    {
+      "binding": "VCDB_DATA",
+      "bucket_name": "vcdb-data"
+    }
+  ]
+}

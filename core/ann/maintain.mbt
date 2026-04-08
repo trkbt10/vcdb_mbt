@@ -17,7 +17,7 @@ pub fn hnsw_compact_and_rebuild(
   // Count alive vectors
   let mut alive = 0
   for i in 0..<n {
-    if i >= state.tombstone.length() || not(state.tombstone[i]) {
+    if i >= state.tombstone.length() || !state.tombstone[i] {
       alive = alive + 1
     }
   }

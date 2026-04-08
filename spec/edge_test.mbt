@@ -8,72 +8,76 @@
 ///|
 /// Test: Int64 max/min values in attributes
 test "edge/numeric/int64_bounds" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  let attrs = @types.empty_attrs()
-  attrs.set("max", @types.Int(9223372036854775807L)) // Int64.max
-  attrs.set("min", @types.Int(-9223372036854775808L)) // Int64.min
-  attrs.set("zero", @types.Int(0L))
+    let attrs = @types.empty_attrs()
+    attrs.set("max", @types.Int(9223372036854775807L)) // Int64.max
+    attrs.set("min", @types.Int(-9223372036854775808L)) // Int64.min
+    attrs.set("zero", @types.Int(0L))
 
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
 
-  let record = db.get(@types.VectorId::from_int(1)).unwrap()
-  match record.attrs.get("max") {
-    Some(@types.Int(n)) => inspect(n, content="9223372036854775807")
-    _ => inspect(false, content="true")
-  }
-  match record.attrs.get("min") {
-    Some(@types.Int(n)) => inspect(n, content="-9223372036854775808")
-    _ => inspect(false, content="true")
-  }
+    let record = db.get(@types.VectorId::from_int(1)).unwrap()
+    match record.attrs.get("max") {
+      Some(@types.Int(n)) => inspect(n, content="9223372036854775807")
+      _ => inspect(false, content="true")
+    }
+    match record.attrs.get("min") {
+      Some(@types.Int(n)) => inspect(n, content="-9223372036854775808")
+      _ => inspect(false, content="true")
+    }
+  })
 }
 
 ///|
 /// Test: Float64 special values
 test "edge/numeric/float_special" {
-  let db = @vcdb.VectorDB::new({
-      dim: 2,
-      metric: @types.Dot,
-      capacity: 10,
-      strategy: @types.Bruteforce,
-    }, // Don't normalize to preserve values
-  )
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      2,
+      metric=@types.Dot,
+      strategy=@types.Bruteforce,
+    )
 
-  let attrs = @types.empty_attrs()
-  attrs.set("tiny", @types.Float(0.00000000001))
-  attrs.set("huge", @types.Float(1000000000000.0))
-  attrs.set("neg_tiny", @types.Float(-0.00000000001))
+    let attrs = @types.empty_attrs()
+    attrs.set("tiny", @types.Float(0.00000000001))
+    attrs.set("huge", @types.Float(1000000000000.0))
+    attrs.set("neg_tiny", @types.Float(-0.00000000001))
 
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
 
-  let record = db.get(@types.VectorId::from_int(1)).unwrap()
-  match record.attrs.get("tiny") {
-    Some(@types.Float(f)) => inspect(f > 0.0 && f < 0.001, content="true")
-    _ => inspect(false, content="true")
-  }
-  match record.attrs.get("huge") {
-    Some(@types.Float(f)) => inspect(f > 999999999999.0, content="true")
-    _ => inspect(false, content="true")
-  }
+    let record = db.get(@types.VectorId::from_int(1)).unwrap()
+    match record.attrs.get("tiny") {
+      Some(@types.Float(f)) => inspect(f > 0.0 && f < 0.001, content="true")
+      _ => inspect(false, content="true")
+    }
+    match record.attrs.get("huge") {
+      Some(@types.Float(f)) => inspect(f > 999999999999.0, content="true")
+      _ => inspect(false, content="true")
+    }
+  })
 }
 
 ///|
 /// Test: VectorId boundary values
 test "edge/numeric/vectorid_bounds" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  let max_id = @types.VectorId::from_int64(9223372036854775807L)
-  let zero_id = @types.VectorId::from_int(0)
-  let neg_id = @types.VectorId::from_int64(-1L)
+    let max_id = @types.VectorId::from_int64(9223372036854775807L)
+    let zero_id = @types.VectorId::from_int(0)
+    let neg_id = @types.VectorId::from_int64(-1L)
 
-  db.add(max_id, [1.0, 0.0], @types.empty_attrs())
-  db.add(zero_id, [0.0, 1.0], @types.empty_attrs())
-  db.add(neg_id, [0.5, 0.5], @types.empty_attrs())
+    let _ = db.add(max_id, [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(zero_id, [0.0, 1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(neg_id, [0.5, 0.5], @types.empty_attrs(), 0L)
 
-  inspect(db.has(max_id), content="true")
-  inspect(db.has(zero_id), content="true")
-  inspect(db.has(neg_id), content="true")
-  inspect(db.size(), content="3")
+    inspect(db.has(max_id), content="true")
+    inspect(db.has(zero_id), content="true")
+    inspect(db.has(neg_id), content="true")
+    inspect(db.size(), content="3")
+  })
 }
 
 // =============================================================================
@@ -83,51 +87,53 @@ test "edge/numeric/vectorid_bounds" {
 ///|
 /// Test: Single dimension vector (dim=1)
 test "edge/dim/single_dimension" {
-  let db = @vcdb.VectorDB::new({
-    dim: 1,
-    metric: @types.Dot,
-    capacity: 10,
-    strategy: @types.Bruteforce,
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      1,
+      metric=@types.Dot,
+      strategy=@types.Bruteforce,
+    )
+
+    let _ = db.add(@types.VectorId::from_int(1), [5.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [3.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [7.0], @types.empty_attrs(), 0L)
+
+    let results = db.search([1.0], 3, None)
+
+    // Dot product with [1.0]: 7 > 5 > 3
+    inspect(results[0].id.to_int64(), content="3")
+    inspect(results[1].id.to_int64(), content="1")
+    inspect(results[2].id.to_int64(), content="2")
   })
-
-  db.add(@types.VectorId::from_int(1), [5.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [3.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(3), [7.0], @types.empty_attrs())
-
-  let results = db.search([1.0], 3, None)
-
-  // Dot product with [1.0]: 7 > 5 > 3
-  inspect(results[0].id.to_int64(), content="3")
-  inspect(results[1].id.to_int64(), content="1")
-  inspect(results[2].id.to_int64(), content="2")
 }
 
 ///|
 /// Test: High dimension vector (dim=512)
 test "edge/dim/high_dimension" {
-  let dim = 512
-  let db = @vcdb.VectorDB::new({
-    dim,
-    metric: @types.Cosine,
-    capacity: 20,
-    strategy: @types.Bruteforce,
+  run_async_test(async fn() {
+    let dim = 512
+    let db = @vcdb.PersistentDB::in_memory(
+      dim,
+      metric=@types.Cosine,
+      strategy=@types.Bruteforce,
+    )
+
+    // Create vectors with different "hot" positions
+    for i in 0..<10 {
+      let v : Array[Double] = Array::make(dim, 0.0)
+      v[i * 50] = 1.0 // Single hot at different positions
+      let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+    }
+
+    inspect(db.size(), content="10")
+
+    // Query for position 100
+    let query : Array[Double] = Array::make(dim, 0.0)
+    query[100] = 1.0
+
+    let results = db.search(query, 1, None)
+    inspect(results[0].id.to_int64(), content="2") // id=2 has hot at 100
   })
-
-  // Create vectors with different "hot" positions
-  for i in 0..<10 {
-    let v : Array[Double] = Array::make(dim, 0.0)
-    v[i * 50] = 1.0 // Single hot at different positions
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
-  }
-
-  inspect(db.size(), content="10")
-
-  // Query for position 100
-  let query : Array[Double] = Array::make(dim, 0.0)
-  query[100] = 1.0
-
-  let results = db.search(query, 1, None)
-  inspect(results[0].id.to_int64(), content="2") // id=2 has hot at 100
 }
 
 // =============================================================================
@@ -137,53 +143,55 @@ test "edge/dim/high_dimension" {
 ///|
 /// Test: Multiple vectors with identical scores
 test "edge/score/identical_scores" {
-  let db = @vcdb.VectorDB::new({
-    dim: 2,
-    metric: @types.Dot,
-    capacity: 10,
-    strategy: @types.Bruteforce,
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      2,
+      metric=@types.Dot,
+      strategy=@types.Bruteforce,
+    )
+
+    // All have dot product = 1.0 with [1, 0]
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [1.0, 0.0], @types.empty_attrs(), 0L)
+
+    let results = db.search([1.0, 0.0], 3, None)
+
+    // All should have same score
+    inspect(results[0].score, content="1")
+    inspect(results[1].score, content="1")
+    inspect(results[2].score, content="1")
+
+    // All 3 IDs should be present
+    let ids : Array[Int64] = results
+      .iter()
+      .map(fn(h) { h.id.to_int64() })
+      .collect()
+    inspect(ids.length(), content="3")
   })
-
-  // All have dot product = 1.0 with [1, 0]
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(3), [1.0, 0.0], @types.empty_attrs())
-
-  let results = db.search([1.0, 0.0], 3, None)
-
-  // All should have same score
-  inspect(results[0].score, content="1")
-  inspect(results[1].score, content="1")
-  inspect(results[2].score, content="1")
-
-  // All 3 IDs should be present
-  let ids : Array[Int64] = results
-    .iter()
-    .map(fn(h) { h.id.to_int64() })
-    .collect()
-  inspect(ids.length(), content="3")
 }
 
 ///|
 /// Test: Very close but distinct scores
 test "edge/score/close_scores" {
-  let db = @vcdb.VectorDB::new({
-    dim: 1,
-    metric: @types.Dot,
-    capacity: 10,
-    strategy: @types.Bruteforce,
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      1,
+      metric=@types.Dot,
+      strategy=@types.Bruteforce,
+    )
+
+    let _ = db.add(@types.VectorId::from_int(1), [1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [1.0000001], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [1.0000002], @types.empty_attrs(), 0L)
+
+    let results = db.search([1.0], 3, None)
+
+    // Should be ordered correctly despite tiny differences
+    inspect(results[0].id.to_int64(), content="3")
+    inspect(results[1].id.to_int64(), content="2")
+    inspect(results[2].id.to_int64(), content="1")
   })
-
-  db.add(@types.VectorId::from_int(1), [1.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [1.0000001], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(3), [1.0000002], @types.empty_attrs())
-
-  let results = db.search([1.0], 3, None)
-
-  // Should be ordered correctly despite tiny differences
-  inspect(results[0].id.to_int64(), content="3")
-  inspect(results[1].id.to_int64(), content="2")
-  inspect(results[2].id.to_int64(), content="1")
 }
 
 // =============================================================================
@@ -193,69 +201,84 @@ test "edge/score/close_scores" {
 ///|
 /// Test: All-zero vector with L2 metric
 test "edge/vector/zero_vector_l2" {
-  let db = @vcdb.VectorDB::new({
-    dim: 3,
-    metric: @types.L2,
-    capacity: 10,
-    strategy: @types.Bruteforce,
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      3,
+      metric=@types.L2,
+      strategy=@types.Bruteforce,
+    )
+
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [0.0, 0.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [1.0, 0.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+
+    // Query with zero vector
+    let results = db.search([0.0, 0.0, 0.0], 2, None)
+
+    // Zero to zero distance = 0 (score = 0)
+    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].score, content="0")
   })
-
-  db.add(@types.VectorId::from_int(1), [0.0, 0.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [1.0, 0.0, 0.0], @types.empty_attrs())
-
-  // Query with zero vector
-  let results = db.search([0.0, 0.0, 0.0], 2, None)
-
-  // Zero to zero distance = 0 (score = 0)
-  inspect(results[0].id.to_int64(), content="1")
-  inspect(results[0].score, content="0")
 }
 
 ///|
 /// Test: All-zero vector with Cosine (normalized to itself)
 test "edge/vector/zero_vector_cosine" {
-  let db = @vcdb.VectorDB::new({
-    dim: 2,
-    metric: @types.Cosine,
-    capacity: 10,
-    strategy: @types.Bruteforce,
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      2,
+      metric=@types.Cosine,
+      strategy=@types.Bruteforce,
+    )
+
+    // Note: Zero vector can't be normalized, implementation should handle gracefully
+    let _ = db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
+
+    // Should not crash
+    let results = db.search([1.0, 0.0], 2, None)
+    inspect(results.length(), content="2")
   })
-
-  // Note: Zero vector can't be normalized, implementation should handle gracefully
-  db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs())
-
-  // Should not crash
-  let results = db.search([1.0, 0.0], 2, None)
-  inspect(results.length(), content="2")
 }
 
 ///|
 /// Test: All same value vector
 test "edge/vector/uniform_values" {
-  let db = @vcdb.VectorDB::new({
-    dim: 4,
-    metric: @types.Cosine,
-    capacity: 10,
-    strategy: @types.Bruteforce,
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      4,
+      metric=@types.Cosine,
+      strategy=@types.Bruteforce,
+    )
+
+    // All components same value
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [1.0, 1.0, 1.0, 1.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [2.0, 2.0, 2.0, 2.0],
+      @types.empty_attrs(),
+      0L,
+    )
+
+    // With Cosine, both should have same similarity to [1,1,1,1]
+    let results = db.search([1.0, 1.0, 1.0, 1.0], 2, None)
+    inspect(results[0].score, content="1")
+    inspect(results[1].score, content="1")
   })
-
-  // All components same value
-  db.add(
-    @types.VectorId::from_int(1),
-    [1.0, 1.0, 1.0, 1.0],
-    @types.empty_attrs(),
-  )
-  db.add(
-    @types.VectorId::from_int(2),
-    [2.0, 2.0, 2.0, 2.0],
-    @types.empty_attrs(),
-  )
-
-  // With Cosine, both should have same similarity to [1,1,1,1]
-  let results = db.search([1.0, 1.0, 1.0, 1.0], 2, None)
-  inspect(results[0].score, content="1")
-  inspect(results[1].score, content="1")
 }
 
 // =============================================================================
@@ -265,75 +288,87 @@ test "edge/vector/uniform_values" {
 ///|
 /// Test: HNSW with single node
 test "edge/hnsw/single_node" {
-  let db = @vcdb.VectorDB::with_hnsw(3, metric=@types.Dot)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
 
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [1.0, 0.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
 
-  let results = db.search([1.0, 0.0, 0.0], 10, None)
-  inspect(results.length(), content="1")
-  inspect(results[0].id.to_int64(), content="1")
+    let results = db.search([1.0, 0.0, 0.0], 10, None)
+    inspect(results.length(), content="1")
+    inspect(results[0].id.to_int64(), content="1")
+  })
 }
 
 ///|
 /// Test: HNSW after removing most nodes (high tombstone ratio)
 test "edge/hnsw/high_tombstone_ratio" {
-  let db = @vcdb.VectorDB::with_hnsw(2, metric=@types.Dot)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_hnsw(2, metric=@types.Dot)
 
-  // Add 20 nodes
-  for i in 1..<=20 {
-    db.add(
-      @types.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
-    )
-  }
+    // Add 20 nodes
+    for i in 1..<=20 {
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        @types.empty_attrs(),
+        0L,
+      )
+    }
 
-  // Remove 18 of them (90% tombstone)
-  for i in 1..<=18 {
-    let _ = db.remove(@types.VectorId::from_int(i))
-  }
+    // Remove 18 of them (90% tombstone)
+    for i in 1..<=18 {
+      let _ = db.remove(@types.VectorId::from_int(i), 0L)
+    }
 
-  // Search should still work and only return non-tombstoned
-  let results = db.search([20.0, 0.0], 10, None)
+    // Search should still work and only return non-tombstoned
+    let results = db.search([20.0, 0.0], 10, None)
 
-  // Should find at most 2 (ids 19 and 20)
-  inspect(results.length() <= 2, content="true")
+    // Should find at most 2 (ids 19 and 20)
+    inspect(results.length() <= 2, content="true")
 
-  for hit in results {
-    let id = hit.id.to_int64()
-    inspect(id >= 19L, content="true")
-  }
+    for hit in results {
+      let id = hit.id.to_int64()
+      inspect(id >= 19L, content="true")
+    }
+  })
 }
 
 ///|
 /// Test: HNSW with minimal params
 test "edge/hnsw/minimal_params" {
-  let params : @types.HNSWParams = {
-    m: 2, // Minimum allowed
-    ef_construction: 1, // Minimum
-    ef_search: 1, // Minimum
-    level_mult: 1.0,
-    seed: 42UL,
-    allow_replace_deleted: false,
-  }
-  let db = @vcdb.VectorDB::new({
-    dim: 2,
-    metric: @types.Dot,
-    capacity: 20,
-    strategy: @types.HNSW(params),
-  })
-
-  for i in 1..<=10 {
-    db.add(
-      @types.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
+  run_async_test(async fn() {
+    let params : @types.HNSWParams = {
+      m: 2, // Minimum allowed
+      ef_construction: 1, // Minimum
+      ef_search: 1, // Minimum
+      level_mult: 1.0,
+      seed: 42UL,
+      allow_replace_deleted: false,
+    }
+    let db = @vcdb.PersistentDB::in_memory(
+      2,
+      metric=@types.Dot,
+      strategy=@types.HNSW(params),
     )
-  }
 
-  // Should still work even with minimal params
-  let results = db.search([10.0, 0.0], 3, None)
-  inspect(results.length() > 0, content="true")
+    for i in 1..<=10 {
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        @types.empty_attrs(),
+        0L,
+      )
+    }
+
+    // Should still work even with minimal params
+    let results = db.search([10.0, 0.0], 3, None)
+    inspect(results.length() > 0, content="true")
+  })
 }
 
 // =============================================================================
@@ -343,53 +378,57 @@ test "edge/hnsw/minimal_params" {
 ///|
 /// Test: IVF with nprobe > nlist
 test "edge/ivf/nprobe_exceeds_nlist" {
-  let params : @types.IVFParams = { nlist: 4, nprobe: 100 } // nprobe >> nlist
-  let db = @vcdb.VectorDB::new({
-    dim: 2,
-    metric: @types.Dot,
-    capacity: 20,
-    strategy: @types.IVF(params),
-  })
-
-  for i in 1..<=10 {
-    db.add(
-      @types.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
+  run_async_test(async fn() {
+    let params : @types.IVFParams = { nlist: 4, nprobe: 100 } // nprobe >> nlist
+    let db = @vcdb.PersistentDB::in_memory(
+      2,
+      metric=@types.Dot,
+      strategy=@types.IVF(params),
     )
-  }
 
-  db.train(iterations=5)
+    for i in 1..<=10 {
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        @types.empty_attrs(),
+        0L,
+      )
+    }
 
-  // Should handle gracefully
-  let results = db.search([5.0, 0.0], 5, None)
-  inspect(results.length() > 0, content="true")
+    db.train(iterations=5)
+
+    // Should handle gracefully
+    let results = db.search([5.0, 0.0], 5, None)
+    inspect(results.length() > 0, content="true")
+  })
 }
 
 ///|
 /// Test: IVF with minimal nlist
 test "edge/ivf/minimal_nlist" {
-  let params : @types.IVFParams = { nlist: 1, nprobe: 1 }
-  let db = @vcdb.VectorDB::new({
-    dim: 2,
-    metric: @types.Dot,
-    capacity: 20,
-    strategy: @types.IVF(params),
-  })
-
-  for i in 1..<=10 {
-    db.add(
-      @types.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
+  run_async_test(async fn() {
+    let params : @types.IVFParams = { nlist: 1, nprobe: 1 }
+    let db = @vcdb.PersistentDB::in_memory(
+      2,
+      metric=@types.Dot,
+      strategy=@types.IVF(params),
     )
-  }
 
-  db.train(iterations=3)
+    for i in 1..<=10 {
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        @types.empty_attrs(),
+        0L,
+      )
+    }
 
-  // Single cluster should work
-  let results = db.search([5.0, 0.0], 5, None)
-  inspect(results.length(), content="5")
+    db.train(iterations=3)
+
+    // Single cluster should work
+    let results = db.search([5.0, 0.0], 5, None)
+    inspect(results.length(), content="5")
+  })
 }
 
 // =============================================================================
@@ -399,45 +438,49 @@ test "edge/ivf/minimal_nlist" {
 ///|
 /// Test: Filter that matches nothing
 test "edge/filter/none_match" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  for i in 1..<=10 {
-    let attrs = @types.empty_attrs()
-    attrs.set("type", @types.String("normal"))
-    db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs)
-  }
-
-  let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
-    match attrs.get("type") {
-      Some(@types.String(s)) => s == "special" // None have this
-      _ => false
+    for i in 1..<=10 {
+      let attrs = @types.empty_attrs()
+      attrs.set("type", @types.String("normal"))
+      let _ = db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
     }
-  }
 
-  let results = db.search([5.0, 0.0], 10, Some(filter))
-  inspect(results.length(), content="0")
+    let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
+      match attrs.get("type") {
+        Some(@types.String(s)) => s == "special" // None have this
+        _ => false
+      }
+    }
+
+    let results = db.search_with_filter([5.0, 0.0], 10, Some(filter))
+    inspect(results.length(), content="0")
+  })
 }
 
 ///|
 /// Test: Filter that matches everything
 test "edge/filter/all_match" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  for i in 1..<=10 {
-    let attrs = @types.empty_attrs()
-    attrs.set("exists", @types.Bool(true))
-    db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs)
-  }
-
-  let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
-    match attrs.get("exists") {
-      Some(@types.Bool(b)) => b
-      _ => false
+    for i in 1..<=10 {
+      let attrs = @types.empty_attrs()
+      attrs.set("exists", @types.Bool(true))
+      let _ = db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
     }
-  }
 
-  let results = db.search([5.0, 0.0], 10, Some(filter))
-  inspect(results.length(), content="10")
+    let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
+      match attrs.get("exists") {
+        Some(@types.Bool(b)) => b
+        _ => false
+      }
+    }
+
+    let results = db.search_with_filter([5.0, 0.0], 10, Some(filter))
+    inspect(results.length(), content="10")
+  })
 }
 
 ///|
@@ -527,67 +570,73 @@ test "edge/filter/deeply_nested" {
 ///|
 /// Test: Empty string key and value
 test "edge/string/empty" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  let attrs = @types.empty_attrs()
-  attrs.set("", @types.String("")) // Both empty
+    let attrs = @types.empty_attrs()
+    attrs.set("", @types.String("")) // Both empty
 
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
 
-  let record = db.get(@types.VectorId::from_int(1)).unwrap()
-  match record.attrs.get("") {
-    Some(@types.String(s)) => inspect(s, content="")
-    _ => inspect(false, content="true")
-  }
+    let record = db.get(@types.VectorId::from_int(1)).unwrap()
+    match record.attrs.get("") {
+      Some(@types.String(s)) => inspect(s, content="")
+      _ => inspect(false, content="true")
+    }
+  })
 }
 
 ///|
 /// Test: Very long key name
 test "edge/string/long_key" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  // 1000 character key
-  let mut long_key = ""
-  for _ in 0..<100 {
-    long_key = long_key + "0123456789"
-  }
+    // 1000 character key
+    let mut long_key = ""
+    for _ in 0..<100 {
+      long_key = long_key + "0123456789"
+    }
 
-  let attrs = @types.empty_attrs()
-  attrs.set(long_key, @types.String("value"))
+    let attrs = @types.empty_attrs()
+    attrs.set(long_key, @types.String("value"))
 
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
 
-  let record = db.get(@types.VectorId::from_int(1)).unwrap()
-  match record.attrs.get(long_key) {
-    Some(@types.String(s)) => inspect(s, content="value")
-    _ => inspect(false, content="true")
-  }
+    let record = db.get(@types.VectorId::from_int(1)).unwrap()
+    match record.attrs.get(long_key) {
+      Some(@types.String(s)) => inspect(s, content="value")
+      _ => inspect(false, content="true")
+    }
+  })
 }
 
 ///|
 /// Test: Special characters in strings
 test "edge/string/special_chars" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  let attrs = @types.empty_attrs()
-  attrs.set("newline", @types.String("line1\nline2"))
-  attrs.set("tab", @types.String("col1\tcol2"))
-  attrs.set("null_char", @types.String("before\u0000after"))
-  attrs.set("backslash", @types.String("path\\to\\file"))
-  attrs.set("quotes", @types.String("say \"hello\""))
+    let attrs = @types.empty_attrs()
+    attrs.set("newline", @types.String("line1\nline2"))
+    attrs.set("tab", @types.String("col1\tcol2"))
+    attrs.set("null_char", @types.String("before\u0000after"))
+    attrs.set("backslash", @types.String("path\\to\\file"))
+    attrs.set("quotes", @types.String("say \"hello\""))
 
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
 
-  let record = db.get(@types.VectorId::from_int(1)).unwrap()
+    let record = db.get(@types.VectorId::from_int(1)).unwrap()
 
-  match record.attrs.get("newline") {
-    Some(@types.String(s)) => inspect(s.contains("\n"), content="true")
-    _ => inspect(false, content="true")
-  }
-  match record.attrs.get("backslash") {
-    Some(@types.String(s)) => inspect(s.contains("\\"), content="true")
-    _ => inspect(false, content="true")
-  }
+    match record.attrs.get("newline") {
+      Some(@types.String(s)) => inspect(s.contains("\n"), content="true")
+      _ => inspect(false, content="true")
+    }
+    match record.attrs.get("backslash") {
+      Some(@types.String(s)) => inspect(s.contains("\\"), content="true")
+      _ => inspect(false, content="true")
+    }
+  })
 }
 
 // =============================================================================
@@ -597,87 +646,96 @@ test "edge/string/special_chars" {
 ///|
 /// Test: Serialize empty database
 test "edge/serialize/empty_db" {
-  let db = @vcdb.VectorDB::with_dim(3)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
 
-  let bytes = db.serialize()
-  inspect(bytes.length() > 0, content="true")
+    let bytes = db.serialize_snapshot()
+    inspect(bytes.length() > 0, content="true")
 
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
-  inspect(db2.size(), content="0")
-  inspect(db2.dim(), content="3")
+    let db2 = @vcdb.PersistentDB::deserialize(bytes)
+    inspect(db2.size(), content="0")
+    inspect(db2.dim(), content="3")
+  })
 }
 
 ///|
 /// Test: Serialize single vector
 test "edge/serialize/single_vector" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  let attrs = @types.empty_attrs()
-  attrs.set("only", @types.Bool(true))
+    let attrs = @types.empty_attrs()
+    attrs.set("only", @types.Bool(true))
 
-  db.add(@types.VectorId::from_int(42), [1.0, 0.0], attrs)
+    let _ = db.add(@types.VectorId::from_int(42), [1.0, 0.0], attrs, 0L)
 
-  let bytes = db.serialize()
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+    let bytes = db.serialize_snapshot()
+    let db2 = @vcdb.PersistentDB::deserialize(bytes)
 
-  inspect(db2.size(), content="1")
-  inspect(db2.has(@types.VectorId::from_int(42)), content="true")
+    inspect(db2.size(), content="1")
+    inspect(db2.has(@types.VectorId::from_int(42)), content="true")
 
-  let record = db2.get(@types.VectorId::from_int(42)).unwrap()
-  match record.attrs.get("only") {
-    Some(@types.Bool(b)) => inspect(b, content="true")
-    _ => inspect(false, content="true")
-  }
+    let record = db2.get(@types.VectorId::from_int(42)).unwrap()
+    match record.attrs.get("only") {
+      Some(@types.Bool(b)) => inspect(b, content="true")
+      _ => inspect(false, content="true")
+    }
+  })
 }
 
 ///|
 /// Test: Serialize with many attributes per vector
 test "edge/serialize/many_attrs" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  let attrs = @types.empty_attrs()
-  for i in 0..<100 {
-    attrs.set("attr_\{i}", @types.Int(i.to_int64()))
-  }
+    let attrs = @types.empty_attrs()
+    for i in 0..<100 {
+      attrs.set("attr_\{i}", @types.Int(i.to_int64()))
+    }
 
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
 
-  let bytes = db.serialize()
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+    let bytes = db.serialize_snapshot()
+    let db2 = @vcdb.PersistentDB::deserialize(bytes)
 
-  let record = db2.get(@types.VectorId::from_int(1)).unwrap()
-  inspect(record.attrs.size(), content="100")
+    let record = db2.get(@types.VectorId::from_int(1)).unwrap()
+    inspect(record.attrs.size(), content="100")
 
-  match record.attrs.get("attr_50") {
-    Some(@types.Int(n)) => inspect(n, content="50")
-    _ => inspect(false, content="true")
-  }
+    match record.attrs.get("attr_50") {
+      Some(@types.Int(n)) => inspect(n, content="50")
+      _ => inspect(false, content="true")
+    }
+  })
 }
 
 ///|
 /// Test: Serialize HNSW with tombstones
 test "edge/serialize/hnsw_tombstones" {
-  let db = @vcdb.VectorDB::with_hnsw(2, metric=@types.Dot)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_hnsw(2, metric=@types.Dot)
 
-  for i in 1..<=10 {
-    db.add(
-      @types.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
-    )
-  }
+    for i in 1..<=10 {
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        @types.empty_attrs(),
+        0L,
+      )
+    }
 
-  // Remove some
-  let _ = db.remove(@types.VectorId::from_int(3))
-  let _ = db.remove(@types.VectorId::from_int(7))
+    // Remove some
+    let _ = db.remove(@types.VectorId::from_int(3), 0L)
+    let _ = db.remove(@types.VectorId::from_int(7), 0L)
 
-  let bytes = db.serialize()
-  let db2 = @vcdb.VectorDB::deserialize(bytes)
+    let bytes = db.serialize_snapshot()
+    let db2 = @vcdb.PersistentDB::deserialize(bytes)
 
-  // Tombstoned IDs should still be tombstoned
-  inspect(db2.has(@types.VectorId::from_int(3)), content="false")
-  inspect(db2.has(@types.VectorId::from_int(7)), content="false")
-  inspect(db2.has(@types.VectorId::from_int(5)), content="true")
+    // Tombstoned IDs should still be tombstoned
+    inspect(db2.has(@types.VectorId::from_int(3)), content="false")
+    inspect(db2.has(@types.VectorId::from_int(7)), content="false")
+    inspect(db2.has(@types.VectorId::from_int(5)), content="true")
+  })
 }
 
 // =============================================================================
@@ -687,44 +745,46 @@ test "edge/serialize/hnsw_tombstones" {
 ///|
 /// Test: Exceed initial capacity
 test "edge/capacity/exceed_initial" {
-  let db = @vcdb.VectorDB::new({
-      dim: 2,
-      metric: @types.Dot,
-      capacity: 5,
-      strategy: @types.Bruteforce,
-    }, // Small initial capacity
-  )
-
-  // Add more than capacity
-  for i in 1..<=20 {
-    db.add(
-      @types.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      2,
+      metric=@types.Dot,
+      strategy=@types.Bruteforce,
     )
-  }
 
-  inspect(db.size(), content="20")
+    // Add more than capacity
+    for i in 1..<=20 {
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        @types.empty_attrs(),
+        0L,
+      )
+    }
 
-  // Search should still work
-  let results = db.search([15.0, 0.0], 5, None)
-  inspect(results.length(), content="5")
+    inspect(db.size(), content="20")
+
+    // Search should still work
+    let results = db.search([15.0, 0.0], 5, None)
+    inspect(results.length(), content="5")
+  })
 }
 
 ///|
 /// Test: Capacity=1
 test "edge/capacity/minimal" {
-  let db = @vcdb.VectorDB::new({
-    dim: 2,
-    metric: @types.Dot,
-    capacity: 1,
-    strategy: @types.Bruteforce,
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory(
+      2,
+      metric=@types.Dot,
+      strategy=@types.Bruteforce,
+    )
+
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [2.0, 0.0], @types.empty_attrs(), 0L)
+
+    inspect(db.size(), content="2")
   })
-
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [2.0, 0.0], @types.empty_attrs())
-
-  inspect(db.size(), content="2")
 }
 
 // =============================================================================
@@ -734,45 +794,53 @@ test "edge/capacity/minimal" {
 ///|
 /// Test: k=0 returns empty
 test "edge/k/zero" {
-  let db = @vcdb.VectorDB::with_dim(2)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
 
-  let results = db.search([1.0, 0.0], 0, None)
-  inspect(results.length(), content="0")
+    let results = db.search([1.0, 0.0], 0, None)
+    inspect(results.length(), content="0")
+  })
 }
 
 ///|
 /// Test: k=1 returns exactly one
 test "edge/k/one" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  for i in 1..<=100 {
-    db.add(
-      @types.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
-    )
-  }
+    for i in 1..<=100 {
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        @types.empty_attrs(),
+        0L,
+      )
+    }
 
-  let results = db.search([50.0, 0.0], 1, None)
-  inspect(results.length(), content="1")
+    let results = db.search([50.0, 0.0], 1, None)
+    inspect(results.length(), content="1")
+  })
 }
 
 ///|
 /// Test: k much larger than database size
 test "edge/k/exceeds_size" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  for i in 1..<=5 {
-    db.add(
-      @types.VectorId::from_int(i),
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
-    )
-  }
+    for i in 1..<=5 {
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        @types.empty_attrs(),
+        0L,
+      )
+    }
 
-  let results = db.search([3.0, 0.0], 1000, None)
-  inspect(results.length(), content="5") // Can only return what exists
+    let results = db.search([3.0, 0.0], 1000, None)
+    inspect(results.length(), content="5") // Can only return what exists
+  })
 }
 
 // =============================================================================
@@ -821,53 +889,63 @@ test "edge/range/negative_range" {
 ///|
 /// Test: Rapid add/remove/search cycle
 test "edge/ops/rapid_cycle" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  for cycle in 0..<10 {
-    // Add 10
-    for i in 0..<10 {
-      let id = cycle * 10 + i
-      db.add(
-        @types.VectorId::from_int(id),
-        [id.to_double(), 0.0],
-        @types.empty_attrs(),
-      )
+    for cycle in 0..<10 {
+      // Add 10
+      for i in 0..<10 {
+        let id = cycle * 10 + i
+        let _ = db.add(
+          @types.VectorId::from_int(id),
+          [id.to_double(), 0.0],
+          @types.empty_attrs(),
+          0L,
+        )
+      }
+
+      // Search
+      let _ = db.search([50.0, 0.0], 5, None)
+
+      // Remove 5
+      for i in 0..<5 {
+        let id = cycle * 10 + i
+        let _ = db.remove(@types.VectorId::from_int(id), 0L)
+      }
     }
 
-    // Search
-    let _ = db.search([50.0, 0.0], 5, None)
-
-    // Remove 5
-    for i in 0..<5 {
-      let id = cycle * 10 + i
-      let _ = db.remove(@types.VectorId::from_int(id))
-    }
-  }
-
-  // Should have 50 remaining (10 cycles * 5 kept per cycle)
-  inspect(db.size(), content="50")
+    // Should have 50 remaining (10 cycles * 5 kept per cycle)
+    inspect(db.size(), content="50")
+  })
 }
 
 ///|
 /// Test: Interleaved upsert and search
 test "edge/ops/upsert_search_interleave" {
-  let db = @vcdb.VectorDB::with_dim(2)
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
 
-  for i in 1..<=20 {
-    // Upsert
-    let _ = db.upsert(
-      @types.VectorId::from_int(i % 5 + 1), // Only 5 unique IDs
-      [i.to_double(), 0.0],
-      @types.empty_attrs(),
-    )
+    for i in 1..<=20 {
+      // Upsert
+      db.upsert(
+        [
+          (
+            @types.VectorId::from_int(i % 5 + 1),
+            [i.to_double(), 0.0],
+            @types.empty_attrs(),
+          ),
+        ],
+        0L,
+      )
 
-    // Search after each upsert
-    let results = db.search([i.to_double(), 0.0], 3, None)
-    inspect(results.length() > 0, content="true")
-  }
+      // Search after each upsert
+      let results = db.search([i.to_double(), 0.0], 3, None)
+      inspect(results.length() > 0, content="true")
+    }
 
-  // Should only have 5 vectors
-  inspect(db.size(), content="5")
+    // Should only have 5 vectors
+    inspect(db.size(), content="5")
+  })
 }
 
 // =============================================================================
@@ -877,60 +955,64 @@ test "edge/ops/upsert_search_interleave" {
 ///|
 /// Test: PreFilter with empty candidate set
 test "edge/prefilter/empty_candidates" {
-  let db = @vcdb.VectorDB::with_dim(2)
-  let index = @attr.BPTreeAttrIndex::new()
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
+    let index = @attr.BPTreeAttrIndex::new()
 
-  for i in 1..<=10 {
-    let attrs = @types.empty_attrs()
-    attrs.set("type", @types.String("A"))
+    for i in 1..<=10 {
+      let attrs = @types.empty_attrs()
+      attrs.set("type", @types.String("A"))
 
-    let id = @types.VectorId::from_int(i)
-    db.add(id, [i.to_double(), 0.0], attrs)
-    index.set_attrs(id, attrs)
-  }
+      let id = @types.VectorId::from_int(i)
+      let _ = db.add(id, [i.to_double(), 0.0], attrs, 0L)
+      index.set_attrs(id, attrs)
+    }
 
-  // Filter for non-existent type
-  let expr = @filter.FilterExpr::match_("type", @types.String("Z"))
-  let results = db.search_with_expr(
-    [5.0, 0.0],
-    10,
-    Some(expr),
-    Some(index),
-    @filter.PreFilter,
-  )
+    // Filter for non-existent type
+    let expr = @filter.FilterExpr::match_("type", @types.String("Z"))
+    let results = db.search_with_expr(
+      [5.0, 0.0],
+      10,
+      Some(expr),
+      Some(index),
+      @filter.PreFilter,
+    )
 
-  inspect(results.length(), content="0")
+    inspect(results.length(), content="0")
+  })
 }
 
 ///|
 /// Test: Index and DB out of sync
 test "edge/index/desync" {
-  let db = @vcdb.VectorDB::with_dim(2)
-  let index = @attr.BPTreeAttrIndex::new()
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
+    let index = @attr.BPTreeAttrIndex::new()
 
-  // Add to both
-  let attrs = @types.empty_attrs()
-  attrs.set("key", @types.String("val"))
+    // Add to both
+    let attrs = @types.empty_attrs()
+    attrs.set("key", @types.String("val"))
 
-  let id = @types.VectorId::from_int(1)
-  db.add(id, [1.0, 0.0], attrs)
-  index.set_attrs(id, attrs)
+    let id = @types.VectorId::from_int(1)
+    let _ = db.add(id, [1.0, 0.0], attrs, 0L)
+    index.set_attrs(id, attrs)
 
-  // Remove from DB but not index
-  let _ = db.remove(id)
+    // Remove from DB but not index
+    let _ = db.remove(id, 0L)
 
-  // Index still has it
-  inspect(index.eq("key", @types.String("val")).length(), content="1")
+    // Index still has it
+    inspect(index.eq("key", @types.String("val")).length(), content="1")
 
-  // But search with prefilter should return empty (vector doesn't exist)
-  let expr = @filter.FilterExpr::match_("key", @types.String("val"))
-  let results = db.search_with_expr(
-    [1.0, 0.0],
-    10,
-    Some(expr),
-    Some(index),
-    @filter.PreFilter,
-  )
+    // But search with prefilter should return empty (vector doesn't exist)
+    let expr = @filter.FilterExpr::match_("key", @types.String("val"))
+    let results = db.search_with_expr(
+      [1.0, 0.0],
+      10,
+      Some(expr),
+      Some(index),
+      @filter.PreFilter,
+    )
 
-  inspect(results.length(), content="0")
+    inspect(results.length(), content="0")
+  })
 }

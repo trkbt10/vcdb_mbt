@@ -1,6 +1,49 @@
 // Whitebox tests for storage module
 
 ///|
+fn run_async_blocking(f : async () -> Unit noraise) -> Unit = "%async.run"
+
+///|
+test "storage/async_read_not_found_rejects" {
+  let storage = MemoryStorage::new()
+  let mut caught = false
+  let mut err_msg = ""
+  run_async_blocking(async fn() noraise {
+    try {
+      let _ = async_read(storage, "nonexistent.txt", Data)
+    } catch {
+      AsyncIOFailed(msg) => {
+        caught = true
+        err_msg = msg
+      }
+      _ => ()
+    }
+  })
+  inspect(caught, content="true")
+  inspect(err_msg, content="Not found: nonexistent.txt")
+}
+
+///|
+test "storage/kind_aware_async_read_not_found_rejects" {
+  let storage = KindAwareStorage::new()
+  let mut caught = false
+  let mut err_msg = ""
+  run_async_blocking(async fn() noraise {
+    try {
+      let _ = async_read(storage, "missing.bin", Data)
+    } catch {
+      AsyncIOFailed(msg) => {
+        caught = true
+        err_msg = msg
+      }
+      _ => ()
+    }
+  })
+  inspect(caught, content="true")
+  inspect(err_msg, content="Not found: missing.bin")
+}
+
+///|
 test "storage/memory_readwrite" {
   let storage = MemoryStorage::new()
   let data = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'][:])
@@ -136,7 +179,7 @@ test "storage/trait_impl" {
     _ => Bytes::new(0)
   }
   inspect(data.length(), content="4")
-  let files = (storage as &Storage).list(Data)
+  let files = (storage as &Storage).list(Data) catch { _ => [] }
   inspect(files.length(), content="1")
   (storage as &Storage).del("trait_test.txt", Data) catch {
     _ => ()
@@ -168,56 +211,4 @@ test "storage/trait_append" {
     _ => Bytes::new(0)
   }
   inspect(data.length(), content="2")
-}
-
-///|
-test "storage/callback_without_registration" {
-  clear_callbacks()
-  let storage = CallbackStorage::new()
-  inspect(storage.exists("none.txt", Data), content="false")
-  inspect(storage.list(Data).length(), content="0")
-
-  let mut read_failed = false
-  let _ : Bytes = storage.read("none.txt", Data) catch {
-    IOError::IoFailed(msg) => {
-      inspect(msg, content="Storage callbacks not registered")
-      read_failed = true
-      Bytes::new(0)
-    }
-    _ => Bytes::new(0)
-  }
-  inspect(read_failed, content="true")
-}
-
-///|
-test "storage/callback_roundtrip" {
-  clear_callbacks()
-  let data : Map[String, Bytes] = {}
-  let callbacks = StorageCallbacks::new(
-    fn(path, _kind) {
-      match data.get(path) {
-        Some(bytes) => bytes
-        None => Bytes::new(0)
-      }
-    },
-    fn(path, bytes, _kind) { data.set(path, bytes) },
-    fn(path, _kind) { data.contains(path) },
-    fn(path, _kind) { data.remove(path) },
-    fn(_kind) { data.keys().collect() },
-  )
-  register_callbacks(callbacks)
-
-  let storage = CallbackStorage::new()
-  storage.write("cb.txt", Bytes::from_array([b'a', b'b'][:]), Data)
-  storage.append("cb.txt", Bytes::from_array([b'c'][:]), Data)
-  let read = storage.read("cb.txt", Data) catch { _ => Bytes::new(0) }
-  inspect(read.length(), content="3")
-  inspect(storage.exists("cb.txt", Data), content="true")
-  inspect(storage.list(Data).length(), content="1")
-  storage.del("cb.txt", Data) catch {
-    _ => ()
-  }
-  inspect(storage.exists("cb.txt", Data), content="false")
-
-  clear_callbacks()
 }

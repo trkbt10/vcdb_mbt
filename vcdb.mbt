@@ -21,18 +21,15 @@ pub fn empty_attrs() -> @types.Attrs {
 }
 
 ///|
-/// VectorDB - High-level vector database facade.
+/// VectorDB - Internal ANN index engine.
 ///
-/// Provides a unified API for all ANN strategies: Bruteforce, HNSW, and IVF.
-/// The database automatically handles:
+/// Provides unified access to all ANN strategies: Bruteforce, HNSW, and IVF.
+/// The engine automatically handles:
 /// - Vector normalization for cosine similarity
 /// - Index updates on add/remove operations
 /// - Tombstone management for HNSW deletions
 ///
-/// Fields:
-/// - store: The underlying CoreStore holding vectors and attributes
-/// - strategy: The selected ANN strategy (Bruteforce/HNSW/IVF)
-/// - bruteforce/hnsw/ivf: Strategy-specific index state
+/// This is an internal implementation detail. The public API is VectorDB[W, S].
 pub struct VectorDB {
   store : @store.CoreStore
   attr_index : @attr.BPTreeAttrIndex
@@ -119,7 +116,7 @@ pub fn VectorDB::with_hnsw(
     dim,
     metric,
     capacity: 1024,
-    strategy: HNSW(@types.HNSWParams::default()),
+    strategy: @types.Strategy::default_hnsw(),
   }
   VectorDB::new(options)
 }
@@ -143,7 +140,7 @@ pub fn VectorDB::with_ivf(
     dim,
     metric,
     capacity: 1024,
-    strategy: IVF(@types.IVFParams::default()),
+    strategy: @types.Strategy::default_ivf(),
   }
   VectorDB::new(options)
 }
@@ -180,6 +177,12 @@ pub fn VectorDB::dim(self : VectorDB) -> Int {
 /// Get the similarity metric used by this database.
 pub fn VectorDB::metric(self : VectorDB) -> @types.Metric {
   self.store.metric
+}
+
+///|
+/// Get the ANN strategy used by this database.
+pub fn VectorDB::strategy(self : VectorDB) -> @types.Strategy {
+  self.strategy
 }
 
 ///|
@@ -286,10 +289,10 @@ fn VectorDB::is_tombstoned(self : VectorDB, id : @types.VectorId) -> Bool {
 ///
 /// Returns: true if the vector exists and is not tombstoned
 pub fn VectorDB::has(self : VectorDB, id : @types.VectorId) -> Bool {
-  if not(self.store.has(id)) {
+  if !self.store.has(id) {
     return false
   }
-  not(self.is_tombstoned(id))
+  !self.is_tombstoned(id)
 }
 
 ///|
@@ -327,7 +330,7 @@ pub fn VectorDB::scroll(
     Some(o) => Some(o - 1L)
     None => None
   }
-  self.scroll_filtered(expr=None, offset=adjusted, limit=limit)
+  self.scroll_filtered(expr=None, offset=adjusted, limit~)
 }
 
 ///|
@@ -400,7 +403,7 @@ pub fn VectorDB::count_filtered(
   }
   let mut count = 0
   for id in candidates {
-    if not(self.is_tombstoned(id)) {
+    if !self.is_tombstoned(id) {
       count = count + 1
     }
   }

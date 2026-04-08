@@ -1,25 +1,26 @@
 ///|
-/// CollectionManager - manages multiple VectorDB collections
+/// CollectionManager - manages multiple named PersistentVectorDB collections.
 ///
-/// Delegates all persistence (WAL, snapshots, segmentation) to
-/// CollectionPersistence, keeping gateway free of persistence internals.
+/// All mutations go through PersistentVectorDB, which enforces
+/// WAL-before-state ordering. Read operations delegate directly.
+///
+/// Write operations are async (PersistentVectorDB I/O).
+/// Read operations are sync (in-memory VectorDB).
 
 ///|
-/// Collection entry
-pub struct Collection {
+/// Collection entry — wraps VectorDB with its config.
+pub struct Collection[S] {
   config : CollectionConfig
-  db : @vcdb.VectorDB
+  db : @vcdb.PersistentDB[S, S]
 }
 
 ///|
 /// Collection manager with optional storage
 pub struct CollectionManager[S] {
-  collections : Map[String, Collection]
+  collections : Map[String, Collection[S]]
   storage : S?
   base_path : String
-  persistence : Map[String, @col_persist.CollectionPersistence[S]]
   checkpoint_threshold : Int
-  persistence_mode : @col_persist.PersistenceMode
 }
 
 ///|
@@ -27,14 +28,7 @@ pub struct CollectionManager[S] {
 pub fn[S] CollectionManager::new(
   base_path? : String = "",
 ) -> CollectionManager[S] {
-  {
-    collections: {},
-    storage: None,
-    base_path,
-    persistence: {},
-    checkpoint_threshold: 1000,
-    persistence_mode: @col_persist.Snapshot,
-  }
+  { collections: {}, storage: None, base_path, checkpoint_threshold: 1000 }
 }
 
 ///|
@@ -43,20 +37,8 @@ pub fn[S] CollectionManager::with_storage(
   storage : S,
   base_path? : String = "",
   checkpoint_threshold? : Int = 1000,
-  segment_bytes? : Int? = None,
 ) -> CollectionManager[S] {
-  let mode = match segment_bytes {
-    None => @col_persist.Snapshot
-    Some(n) => @col_persist.Segmented(n)
-  }
-  {
-    collections: {},
-    storage: Some(storage),
-    base_path,
-    persistence: {},
-    checkpoint_threshold,
-    persistence_mode: mode,
-  }
+  { collections: {}, storage: Some(storage), base_path, checkpoint_threshold }
 }
 
 ///|
@@ -69,34 +51,16 @@ fn make_path(base_path : String, path : String) -> String {
 }
 
 ///|
-/// Get or create CollectionPersistence for a collection
-fn[S] CollectionManager::get_persistence(
-  self : CollectionManager[S],
+fn invalid_collection_config_error(
   name : String,
-) -> @col_persist.CollectionPersistence[S]? {
-  match self.persistence.get(name) {
-    Some(p) => Some(p)
-    None =>
-      match self.storage {
-        None => None
-        Some(storage) => {
-          let p = @col_persist.CollectionPersistence::new(
-            storage,
-            self.base_path,
-            name,
-            mode=self.persistence_mode,
-            checkpoint_threshold=self.checkpoint_threshold,
-          )
-          self.persistence[name] = p
-          Some(p)
-        }
-      }
-  }
+  message : String,
+) -> GatewayError {
+  StorageError("Invalid collection config for " + name + ": " + message)
 }
 
 ///|
 /// Persist config to storage
-fn[S : @storage.Storage] CollectionManager::persist_config(
+async fn[S : @storage.AsyncStorage] CollectionManager::persist_config(
   self : CollectionManager[S],
   name : String,
 ) -> Unit {
@@ -112,134 +76,188 @@ fn[S : @storage.Storage] CollectionManager::persist_config(
     self.base_path,
     @storage.collection_config_path(name),
   )
-  let config_json = col.config.to_json().to_string()
+  let config_json = col.config.to_json().stringify()
   let config_bytes = Bytes::from_array(
     config_json.to_array().map(fn(c) { c.to_int().to_byte() }),
   )
-  storage.write(config_path, config_bytes, @storage.Config) catch {
-    _ => ()
-  }
+  @storage.async_atomic_write(
+    storage,
+    config_path,
+    config_bytes,
+    @storage.Config,
+  )
 }
 
 ///|
 /// Checkpoint: write snapshot and truncate WAL
-pub fn[S : @storage.Storage] CollectionManager::checkpoint(
+pub async fn[S : @storage.AsyncStorage] CollectionManager::checkpoint(
   self : CollectionManager[S],
   name : String,
 ) -> Unit {
   self.persist_config(name)
-  match (self.collections.get(name), self.get_persistence(name)) {
-    (Some(col), Some(p)) => p.checkpoint(col.db.store())
+  match self.collections.get(name) {
+    Some(col) => col.db.checkpoint()
     _ => ()
   }
 }
 
 ///|
-/// Upsert points into a collection: updates VectorDB and records to WAL.
-pub fn[S : @storage.Storage] CollectionManager::upsert_points(
+/// Upsert points into a collection via PersistentVectorDB (WAL-before-state).
+pub async fn[S : @storage.AsyncStorage] CollectionManager::upsert_points(
   self : CollectionManager[S],
   name : String,
   points : Array[(@types.VectorId, Array[Double], @types.Attrs)],
+  timestamp_ns? : Int64 = 0L,
 ) -> Result[Int, GatewayError] {
-  let db = match self.get(name) {
-    Some(d) => d
+  let col = match self.collections.get(name) {
+    Some(c) => c
     None => return Err(CollectionNotFound(name))
   }
-  let dim = db.dim()
+  let dim = col.db.dim()
   for p in points {
     let (_, vector, _) = p
     if vector.length() != dim {
       return Err(DimensionMismatch(expected=dim, got=vector.length()))
     }
   }
-  for p in points {
-    let (id, vector, attrs) = p
-    let _ = db.upsert(id, vector, attrs)
-  }
-  match self.get_persistence(name) {
-    Some(p) => p.record_upsert(points, db.store())
-    None => ()
-  }
+  col.db.upsert(points, timestamp_ns)
   Ok(points.length())
 }
 
 ///|
-/// Remove a point from a collection: updates VectorDB and records to WAL.
-pub fn[S : @storage.Storage] CollectionManager::remove_point(
+/// Remove a point from a collection via PersistentVectorDB (WAL-before-state).
+pub async fn[S : @storage.AsyncStorage] CollectionManager::remove_point(
   self : CollectionManager[S],
   name : String,
   id : @types.VectorId,
+  timestamp_ns? : Int64 = 0L,
 ) -> Result[Unit, GatewayError] {
-  let db = match self.get(name) {
-    Some(d) => d
+  let col = match self.collections.get(name) {
+    Some(c) => c
     None => return Err(CollectionNotFound(name))
   }
-  if not(db.has(id)) {
-    return Err(NotFound("Point with id " + id.to_int64().to_string() + " not found"))
+  if !col.db.has(id) {
+    return Err(
+      NotFound("Point with id " + id.to_int64().to_string() + " not found"),
+    )
   }
-  let _ = db.remove(id)
-  match self.get_persistence(name) {
-    Some(p) => p.record_remove(id, db.store())
-    None => ()
-  }
+  let _ = col.db.remove(id, timestamp_ns)
   Ok(())
 }
 
 ///|
-/// Legacy: force full snapshot (backward-compatible, acts as checkpoint)
-pub fn[S : @storage.Storage] CollectionManager::notify_modified(
+pub async fn[S : @storage.AsyncStorage] CollectionManager::create(
   self : CollectionManager[S],
-  name : String,
-) -> Unit {
-  self.checkpoint(name)
+  config : CollectionConfig,
+) -> Result[Unit, GatewayError] {
+  try {
+    let storage = match self.storage {
+      Some(s) => s
+      None =>
+        // In-memory only — create a PersistentVectorDB with no-op persistence
+        // This case is not supported; storage is required for PersistentVectorDB.
+        return Err(StorageError("Storage backend required"))
+    }
+    let config_path = make_path(
+      self.base_path,
+      @storage.collection_config_path(config.name),
+    )
+    let already_exists = self.collections.contains(config.name) ||
+      @storage.async_exists(storage, config_path, @storage.Config)
+    if already_exists {
+      return Err(CollectionExists(config.name))
+    }
+    let db = @vcdb.PersistentDB::init(
+      storage,
+      storage,
+      self.base_path,
+      config.name,
+      config.dim,
+      1024,
+      metric=config.metric,
+      strategy=config.strategy,
+      checkpoint_threshold=self.checkpoint_threshold,
+    )
+    let collection : Collection[S] = { config, db }
+    self.collections[config.name] = collection
+    self.persist_config(config.name)
+    // Persist initial empty state
+    db.checkpoint()
+    Ok(())
+  } catch {
+    @storage.AsyncIOFailed(msg) => Err(StorageError(msg))
+    e => Err(StorageError(e.to_string()))
+  }
 }
 
 ///|
-fn[S : @storage.Storage] CollectionManager::load_collection_from_storage(
+/// Get VectorDB for read operations (sync)
+pub fn[S] CollectionManager::get_db(
   self : CollectionManager[S],
   name : String,
-) -> Collection? {
-  let storage = match self.storage {
-    Some(s) => s
-    None => return None
+) -> @vcdb.PersistentDB[S, S]? {
+  match self.collections.get(name) {
+    Some(c) => Some(c.db)
+    None => None
   }
+}
 
-  // Load config
-  let config_path = make_path(
-    self.base_path,
-    @storage.collection_config_path(name),
-  )
-  let config_bytes = storage.read(config_path, @storage.Config) catch {
-    _ => return None
-  }
-  let config_str = bytes_to_string(config_bytes)
-  let config = match parse_json(config_str) {
-    Some(json) =>
-      CollectionConfig::from_json(json).unwrap_or(
-        CollectionConfig::default(name, 128),
-      )
-    None => return None
-  }
+///|
+/// Load collection from storage (async)
+async fn[S : @storage.AsyncStorage] CollectionManager::load_collection_from_storage(
+  self : CollectionManager[S],
+  name : String,
+) -> Result[Collection[S]?, GatewayError] {
+  try {
+    let storage = match self.storage {
+      Some(s) => s
+      None => return Ok(None)
+    }
 
-  // Load data via persistence (handles segmented vs snapshot + WAL replay)
-  let p = match self.get_persistence(name) {
-    Some(p) => p
-    None => return None
-  }
-  let store = match p.load() {
-    Some(s) => s
-    None => return None
-  }
+    // Load config
+    let config_path = make_path(
+      self.base_path,
+      @storage.collection_config_path(name),
+    )
+    if !@storage.async_exists(storage, config_path, @storage.Config) {
+      return Ok(None)
+    }
+    let config_bytes = @storage.async_read(
+      storage,
+      config_path,
+      @storage.Config,
+    )
+    let config_str = bytes_to_string(config_bytes)
+    let config = match parse_json(config_str) {
+      Some(json) =>
+        match CollectionConfig::from_json(json) {
+          Ok(parsed) => { ..parsed, name, }
+          Err(msg) => return Err(invalid_collection_config_error(name, msg))
+        }
+      None =>
+        return Err(
+          invalid_collection_config_error(name, "config is not valid JSON"),
+        )
+    }
 
-  let options : @types.DatabaseOptions = {
-    dim: config.dim,
-    metric: config.metric,
-    capacity: store.size() + 100,
-    strategy: config.strategy,
-  }
-  let db = @vcdb.VectorDB::from_store(store, options)
+    // Load via VectorDB::init (handles WAL + snapshot replay)
+    let db = @vcdb.PersistentDB::init(
+      storage,
+      storage,
+      self.base_path,
+      name,
+      config.dim,
+      1024,
+      metric=config.metric,
+      strategy=config.strategy,
+      checkpoint_threshold=self.checkpoint_threshold,
+    )
 
-  Some({ config, db })
+    Ok(Some({ config, db }))
+  } catch {
+    @storage.AsyncIOFailed(msg) => Err(StorageError(msg))
+    e => Err(StorageError(e.to_string()))
+  }
 }
 
 ///|
@@ -252,7 +270,7 @@ fn bytes_to_string(bytes : Bytes) -> String {
 }
 
 ///|
-fn[S : @storage.Storage] CollectionManager::remove_persisted_collection(
+async fn[S : @storage.AsyncStorage] CollectionManager::remove_persisted_collection(
   self : CollectionManager[S],
   name : String,
 ) -> Unit {
@@ -266,171 +284,171 @@ fn[S : @storage.Storage] CollectionManager::remove_persisted_collection(
     self.base_path,
     @storage.collection_config_path(name),
   )
-  if storage.exists(config_path, @storage.Config) {
-    storage.del(config_path, @storage.Config) catch { _ => () }
+  if @storage.async_exists(storage, config_path, @storage.Config) {
+    @storage.async_del(storage, config_path, @storage.Config)
   }
 
-  // Remove all data via persistence
-  match self.get_persistence(name) {
-    Some(p) => p.remove()
-    None => ()
+  // Remove data
+  let data_path = make_path(self.base_path, @storage.collection_data_path(name))
+  if @storage.async_exists(storage, data_path, @storage.Data) {
+    @storage.async_del(storage, data_path, @storage.Data)
   }
-  self.persistence.remove(name)
+
+  // Remove WAL
+  let wal_path = make_path(self.base_path, @storage.collection_wal_path(name))
+  if @storage.async_exists(storage, wal_path, @storage.Data) {
+    @storage.async_del(storage, wal_path, @storage.Data)
+  }
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::create(
-  self : CollectionManager[S],
-  config : CollectionConfig,
-) -> Result[Unit, GatewayError] {
-  let config_path = make_path(
-    self.base_path,
-    @storage.collection_config_path(config.name),
-  )
-  let already_exists = self.collections.contains(config.name) ||
-    (match self.storage {
-      Some(storage) => storage.exists(config_path, @storage.Config)
-      None => false
-    })
-  if already_exists {
-    return Err(CollectionExists(config.name))
-  }
-  let options : @types.DatabaseOptions = {
-    dim: config.dim,
-    metric: config.metric,
-    capacity: 1024,
-    strategy: config.strategy,
-  }
-  let db = @vcdb.VectorDB::new(options)
-  let collection : Collection = { config, db }
-  self.collections[config.name] = collection
-  self.persist_config(config.name)
-  // Persist initial empty state
-  match self.get_persistence(config.name) {
-    Some(p) => p.checkpoint(db.store())
-    None => ()
-  }
-  Ok(())
-}
-
-///|
-pub fn[S : @storage.Storage] CollectionManager::get(
+/// Get or load a collection (async for lazy loading from storage)
+pub async fn[S : @storage.AsyncStorage] CollectionManager::get(
   self : CollectionManager[S],
   name : String,
-) -> @vcdb.VectorDB? {
+) -> Result[@vcdb.PersistentDB[S, S], GatewayError] {
   match self.collections.get(name) {
-    Some(c) => Some(c.db)
+    Some(c) => Ok(c.db)
     None =>
       match self.load_collection_from_storage(name) {
-        Some(col) => {
+        Ok(Some(col)) => {
+          let db = col.db
           self.collections[name] = col
-          Some(col.db)
+          Ok(db)
         }
-        None => None
+        Ok(None) => Err(CollectionNotFound(name))
+        Err(err) => Err(err)
       }
   }
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::get_info(
+pub async fn[S : @storage.AsyncStorage] CollectionManager::get_info(
   self : CollectionManager[S],
   name : String,
-) -> CollectionInfo? {
+) -> Result[CollectionInfo, GatewayError] {
   match self.collections.get(name) {
-    Some(c) => {
-      let metric_str = match c.config.metric {
-        @types.Cosine => "Cosine"
-        @types.L2 => "L2"
-        @types.Dot => "Dot"
-      }
-      let strategy_str = match c.config.strategy {
-        @types.Bruteforce => "Bruteforce"
-        @types.HNSW(_) => "HNSW"
-        @types.IVF(_) => "IVF"
-      }
-      Some({
-        name: c.config.name,
-        vectors_count: c.db.size(),
-        dim: c.config.dim,
-        metric: metric_str,
-        strategy: strategy_str,
-      })
-    }
+    Some(c) => Ok(collection_to_info(c))
     None =>
       match self.load_collection_from_storage(name) {
-        Some(col) => {
+        Ok(Some(col)) => {
+          let info = collection_to_info(col)
           self.collections[name] = col
-          self.get_info(name)
+          Ok(info)
         }
-        None => None
+        Ok(None) => Err(CollectionNotFound(name))
+        Err(err) => Err(err)
       }
   }
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::delete(
+fn[S] collection_to_info(c : Collection[S]) -> CollectionInfo {
+  let metric_str = c.config.metric.to_name()
+  let strategy_str = c.config.strategy.to_name()
+  {
+    name: c.config.name,
+    vectors_count: c.db.size(),
+    dim: c.config.dim,
+    metric: metric_str,
+    strategy: strategy_str,
+  }
+}
+
+///|
+pub async fn[S : @storage.AsyncStorage] CollectionManager::delete(
   self : CollectionManager[S],
   name : String,
 ) -> Result[Unit, GatewayError] {
-  if not(self.collections.contains(name)) {
+  if !self.collections.contains(name) {
     match self.load_collection_from_storage(name) {
-      Some(col) => self.collections[name] = col
-      None => return Err(CollectionNotFound(name))
+      Ok(Some(col)) => self.collections[name] = col
+      Ok(None) => return Err(CollectionNotFound(name))
+      Err(err) => return Err(err)
     }
   }
-  self.collections.remove(name)
-  self.remove_persisted_collection(name)
-  Ok(())
+  try {
+    self.collections.remove(name)
+    self.remove_persisted_collection(name)
+    Ok(())
+  } catch {
+    @storage.AsyncIOFailed(msg) => Err(StorageError(msg))
+    e => Err(StorageError(e.to_string()))
+  }
 }
 
 ///|
-fn config_name_from_path(path : String) -> String? {
+fn config_name_from_path(base_path : String, path : String) -> String? {
+  let relative_path = if base_path.length() == 0 {
+    path
+  } else {
+    let prefix = base_path + "/"
+    if path.has_prefix(prefix) {
+      path.unsafe_substring(start=prefix.length(), end=path.length())
+    } else {
+      path
+    }
+  }
   let suffix = ".config.json"
-  if path.has_suffix(suffix) {
-    Some(path.unsafe_substring(start=0, end=path.length() - suffix.length()))
+  if relative_path.has_suffix(suffix) {
+    Some(
+      relative_path.unsafe_substring(
+        start=0,
+        end=relative_path.length() - suffix.length(),
+      ),
+    )
   } else {
     None
   }
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::list(
+pub async fn[S : @storage.AsyncStorage] CollectionManager::list(
   self : CollectionManager[S],
-) -> Array[String] {
+) -> Result[Array[String], GatewayError] {
   let names : Array[String] = self.collections.keys().collect()
   let seen : Map[String, Bool] = {}
   for name in names {
     seen[name] = true
   }
-  match self.storage {
-    Some(storage) =>
-      for path in storage.list(@storage.Config) {
-        match config_name_from_path(path) {
-          Some(name) =>
-            if not(seen.contains(name)) {
-              names.push(name)
-              seen[name] = true
-            }
-          None => ()
+  try {
+    match self.storage {
+      Some(storage) =>
+        for path in @storage.async_list(storage, @storage.Config) {
+          match config_name_from_path(self.base_path, path) {
+            Some(name) =>
+              if !seen.contains(name) {
+                names.push(name)
+                seen[name] = true
+              }
+            None => ()
+          }
         }
-      }
-    None => ()
+      None => ()
+    }
+    Ok(names)
+  } catch {
+    @storage.AsyncIOFailed(msg) => Err(StorageError(msg))
+    e => Err(StorageError(e.to_string()))
   }
-  names
 }
 
 ///|
-pub fn[S : @storage.Storage] CollectionManager::list_info(
+pub async fn[S : @storage.AsyncStorage] CollectionManager::list_info(
   self : CollectionManager[S],
-) -> Array[CollectionInfo] {
+) -> Result[Array[CollectionInfo], GatewayError] {
   let infos : Array[CollectionInfo] = []
-  for name in self.list() {
+  let names = match self.list() {
+    Ok(values) => values
+    Err(err) => return Err(err)
+  }
+  for name in names {
     match self.get_info(name) {
-      Some(info) => infos.push(info)
-      None => ()
+      Ok(info) => infos.push(info)
+      Err(err) => return Err(err)
     }
   }
-  infos
+  Ok(infos)
 }
 
 ///|
@@ -452,7 +470,7 @@ pub fn[S] CollectionManager::serialize_collection(
   name : String,
 ) -> Bytes? {
   match self.collections.get(name) {
-    Some(c) => Some(c.db.serialize())
+    Some(c) => Some(c.db.serialize_snapshot())
     None => None
   }
 }
@@ -462,12 +480,19 @@ pub fn[S] CollectionManager::load_collection(
   self : CollectionManager[S],
   config : CollectionConfig,
   data : Bytes,
+  storage : S,
+  base_path : String,
 ) -> Result[Unit, GatewayError] {
   if self.collections.contains(config.name) {
     return Err(CollectionExists(config.name))
   }
-  let db = @vcdb.VectorDB::deserialize(data)
-  let collection : Collection = { config, db }
+  let db = @vcdb.PersistentDB::from_snapshot(
+    data,
+    storage,
+    base_path,
+    config.name,
+  )
+  let collection : Collection[S] = { config, db }
   self.collections[config.name] = collection
   Ok(())
 }
@@ -475,11 +500,11 @@ pub fn[S] CollectionManager::load_collection(
 ///|
 pub fn[S] CollectionManager::export_metadata(
   self : CollectionManager[S],
-) -> JsonValue {
-  let collections : Array[JsonValue] = []
+) -> Json {
+  let collections : Array[Json] = []
   for kv in self.collections {
     let (_, c) = kv
     collections.push(c.config.to_json())
   }
-  json_object([("version", JNumber(1.0)), ("collections", JArray(collections))])
+  json_object([("version", (1.0).to_json()), ("collections", Json::array(collections))])
 }

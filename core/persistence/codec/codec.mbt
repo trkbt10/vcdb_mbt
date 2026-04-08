@@ -19,33 +19,72 @@ pub fn decode_attrs_json(bytes : Bytes) -> @types.Attrs? {
 pub fn attrs_to_json(attrs : @types.Attrs?) -> String {
   match attrs {
     None => "null"
-    Some(a) => {
-      let keys = a.keys()
-      if keys.length() == 0 {
-        return "{}"
+    Some(a) => attrs_to_json_value(a).stringify()
+  }
+}
+
+///|
+/// Convert Attrs to a Json value (for API responses).
+pub fn attrs_to_json_value(attrs : @types.Attrs) -> Json {
+  let obj : Map[String, Json] = {}
+  for key in attrs.keys() {
+    match attrs.get(key) {
+      None => continue
+      Some(value) => obj[key] = attr_value_to_json(value)
+    }
+  }
+  Json::object(obj)
+}
+
+
+///|
+/// Convert Json to AttrValue.
+pub fn json_to_attr_value(json : Json) -> @types.AttrValue? {
+  match json {
+    Null => Some(@types.Null)
+    True => Some(@types.Bool(true))
+    False => Some(@types.Bool(false))
+    Number(n, ..) => {
+      let int_val = n.to_int64()
+      if n == int_val.to_double() && n.abs() < 9007199254740992.0 {
+        Some(@types.Int(int_val))
+      } else {
+        Some(@types.Float(n))
       }
-      let chars : Array[Char] = []
-      chars.push('{')
-      let mut first = true
-      for key in keys {
-        match a.get(key) {
-          None => continue
-          Some(value) => {
-            if not(first) {
-              chars.push(',')
-            }
-            first = false
-            chars.push('"')
-            push_escaped_json(chars, key)
-            chars.push('"')
-            chars.push(':')
-            push_attr_value_json(chars, value)
-          }
+    }
+    String(s) => Some(@types.String(s))
+    Array(_) => None
+    Object(_) => None
+  }
+}
+
+///|
+/// Convert Json object to Attrs.
+pub fn json_to_attrs(json : Json) -> @types.Attrs? {
+  match json {
+    Object(obj) => {
+      let attrs = @types.empty_attrs()
+      for kv in obj {
+        let (key, value) = kv
+        match json_to_attr_value(value) {
+          Some(attr) => attrs.set(key, attr)
+          None => return None
         }
       }
-      chars.push('}')
-      String::from_array(chars)
+      Some(attrs)
     }
+    _ => None
+  }
+}
+
+///|
+pub fn attr_value_to_json(value : @types.AttrValue) -> Json {
+  match value {
+    Null => Json::null()
+    Bool(b) => b.to_json()
+    Int(n) => n.to_double().to_json()
+    Float(f) => f.to_json()
+    String(s) => s.to_json()
   }
 }
 
@@ -56,53 +95,21 @@ pub fn parse_attrs_json(json : String) -> @types.Attrs? {
   if json == "null" {
     return None
   }
-  if not(json.has_prefix("{")) || not(json.has_suffix("}")) {
-    return None
+  let parsed = @json.parse(json) catch { _ => return None }
+  match parsed {
+    Object(obj) => {
+      let attrs = @types.empty_attrs()
+      for kv in obj {
+        let (key, value) = kv
+        match json_to_attr_value(value) {
+          Some(attr) => attrs.set(key, attr)
+          None => return None
+        }
+      }
+      Some(attrs)
+    }
+    _ => None
   }
-  let attrs = @types.empty_attrs()
-  let content = json.unsafe_substring(start=1, end=json.length() - 1)
-  if content.trim(chars=" \t\n\r").length() == 0 {
-    return Some(attrs)
-  }
-  let mut i = 0
-  let chars = content.to_array()
-  while i < chars.length() {
-    while i < chars.length() &&
-          (
-            chars[i] == ' ' ||
-            chars[i] == '\t' ||
-            chars[i] == '\n' ||
-            chars[i] == '\r'
-          ) {
-      i = i + 1
-    }
-    if i >= chars.length() {
-      break
-    }
-    if chars[i] != '"' {
-      break
-    }
-    let (key, new_i) = parse_json_string(chars, i)
-    i = new_i
-    while i < chars.length() &&
-          (chars[i] == ' ' || chars[i] == '\t' || chars[i] == ':') {
-      i = i + 1
-    }
-    let (value, new_i2) = parse_json_value(chars, i)
-    i = new_i2
-    attrs.set(key, value)
-    while i < chars.length() &&
-          (
-            chars[i] == ' ' ||
-            chars[i] == '\t' ||
-            chars[i] == ',' ||
-            chars[i] == '\n' ||
-            chars[i] == '\r'
-          ) {
-      i = i + 1
-    }
-  }
-  Some(attrs)
 }
 
 ///|
@@ -166,216 +173,4 @@ pub fn decode_utf8(bytes : Bytes) -> String {
     }
   }
   String::from_array(chars)
-}
-
-///|
-fn push_attr_value_json(chars : Array[Char], value : @types.AttrValue) -> Unit {
-  match value {
-    Null => {
-      chars.push('n')
-      chars.push('u')
-      chars.push('l')
-      chars.push('l')
-    }
-    Bool(b) =>
-      if b {
-        chars.push('t')
-        chars.push('r')
-        chars.push('u')
-        chars.push('e')
-      } else {
-        chars.push('f')
-        chars.push('a')
-        chars.push('l')
-        chars.push('s')
-        chars.push('e')
-      }
-    Int(n) => {
-      let s = n.to_string()
-      for c in s {
-        chars.push(c)
-      }
-    }
-    Float(f) => {
-      let s = f.to_string()
-      for c in s {
-        chars.push(c)
-      }
-    }
-    String(s) => {
-      chars.push('"')
-      push_escaped_json(chars, s)
-      chars.push('"')
-    }
-  }
-}
-
-///|
-fn push_escaped_json(chars : Array[Char], s : String) -> Unit {
-  for c in s {
-    let code = c.to_uint()
-    match c {
-      '"' => {
-        chars.push('\\')
-        chars.push('"')
-      }
-      '\\' => {
-        chars.push('\\')
-        chars.push('\\')
-      }
-      '\n' => {
-        chars.push('\\')
-        chars.push('n')
-      }
-      '\r' => {
-        chars.push('\\')
-        chars.push('r')
-      }
-      '\t' => {
-        chars.push('\\')
-        chars.push('t')
-      }
-      '\u0008' => {
-        chars.push('\\')
-        chars.push('b')
-      }
-      '\u000C' => {
-        chars.push('\\')
-        chars.push('f')
-      }
-      _ =>
-        if code < 0x20U {
-          chars.push('\\')
-          chars.push('u')
-          chars.push('0')
-          chars.push('0')
-          chars.push(hex_digit((code >> 4) & 0xFU))
-          chars.push(hex_digit(code & 0xFU))
-        } else {
-          chars.push(c)
-        }
-    }
-  }
-}
-
-///|
-fn hex_digit(n : UInt) -> Char {
-  if n < 10U {
-    (n + 48U).reinterpret_as_int().unsafe_to_char()
-  } else {
-    (n - 10U + 97U).reinterpret_as_int().unsafe_to_char()
-  }
-}
-
-///|
-fn parse_json_string(chars : Array[Char], start : Int) -> (String, Int) {
-  let mut i = start + 1
-  let result : Array[Char] = []
-  while i < chars.length() && chars[i] != '"' {
-    if chars[i] == '\\' && i + 1 < chars.length() {
-      i = i + 1
-      match chars[i] {
-        'n' => result.push('\n')
-        'r' => result.push('\r')
-        't' => result.push('\t')
-        'b' => result.push('\u0008')
-        'f' => result.push('\u000C')
-        '"' => result.push('"')
-        '\\' => result.push('\\')
-        'u' =>
-          if i + 4 < chars.length() {
-            let h1 = hex_char_value(chars[i + 1])
-            let h2 = hex_char_value(chars[i + 2])
-            let h3 = hex_char_value(chars[i + 3])
-            let h4 = hex_char_value(chars[i + 4])
-            let code = (h1 << 12) | (h2 << 8) | (h3 << 4) | h4
-            result.push(code.unsafe_to_char())
-            i = i + 4
-          } else {
-            result.push('u')
-          }
-        _ => result.push(chars[i])
-      }
-    } else {
-      result.push(chars[i])
-    }
-    i = i + 1
-  }
-  (String::from_array(result), i + 1)
-}
-
-///|
-fn hex_char_value(c : Char) -> Int {
-  let code = c.to_uint().reinterpret_as_int()
-  if code >= 48 && code <= 57 {
-    code - 48
-  } else if code >= 97 && code <= 102 {
-    code - 97 + 10
-  } else if code >= 65 && code <= 70 {
-    code - 65 + 10
-  } else {
-    0
-  }
-}
-
-///|
-fn parse_json_value(
-  chars : Array[Char],
-  start : Int,
-) -> (@types.AttrValue, Int) {
-  let mut i = start
-  while i < chars.length() &&
-        (
-          chars[i] == ' ' ||
-          chars[i] == '\t' ||
-          chars[i] == '\n' ||
-          chars[i] == '\r'
-        ) {
-    i = i + 1
-  }
-  if i >= chars.length() {
-    return (Null, i)
-  }
-  match chars[i] {
-    '"' => {
-      let (s, new_i) = parse_json_string(chars, i)
-      (String(s), new_i)
-    }
-    't' => (Bool(true), i + 4)
-    'f' => (Bool(false), i + 5)
-    'n' => (Null, i + 4)
-    '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
-      let num_start = i
-      let mut has_dot = false
-      while i < chars.length() &&
-            (
-              chars[i] == '-' ||
-              chars[i] == '+' ||
-              chars[i] == '.' ||
-              chars[i] == 'e' ||
-              chars[i] == 'E' ||
-              (chars[i] >= '0' && chars[i] <= '9')
-            ) {
-        if chars[i] == '.' || chars[i] == 'e' || chars[i] == 'E' {
-          has_dot = true
-        }
-        i = i + 1
-      }
-      let num_str = String::from_array(chars[num_start:i])
-      if has_dot {
-        let result : Result[Double, _] = try? @strconv.parse_double(num_str)
-        match result {
-          Ok(f) => (Float(f), i)
-          Err(_) => (Null, i)
-        }
-      } else {
-        let result : Result[Int64, _] = try? @strconv.parse_int64(num_str)
-        match result {
-          Ok(n) => (Int(n), i)
-          Err(_) => (Null, i)
-        }
-      }
-    }
-    _ => (Null, i + 1)
-  }
 }

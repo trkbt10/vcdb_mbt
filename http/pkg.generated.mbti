@@ -9,7 +9,7 @@ import {
 // Values
 pub fn add_cors_headers(HttpResponse) -> HttpResponse
 
-pub fn[S : @storage.Storage] handle_http(Router[S], String, String, String) -> HttpResponse
+pub async fn[S : @storage.AsyncStorage] handle_http(Router[S], String, String, String) -> HttpResponse
 
 pub fn handle_options() -> HttpResponse
 
@@ -23,29 +23,27 @@ pub struct HttpRequest {
   path : String
   headers : Map[String, String]
   body : String
-}
+} derive(Show)
 pub fn HttpRequest::new(String, String, body? : String) -> Self
-pub impl Show for HttpRequest
 
 pub struct HttpResponse {
   status : Int
   headers : Map[String, String]
   body : String
-}
+} derive(Show)
 pub fn HttpResponse::bad_request(String) -> Self
 pub fn HttpResponse::created(String) -> Self
 pub fn HttpResponse::internal_error(String) -> Self
 pub fn HttpResponse::new(Int, String, content_type? : String) -> Self
 pub fn HttpResponse::not_found(String) -> Self
 pub fn HttpResponse::ok(String) -> Self
-pub impl Show for HttpResponse
 
 pub struct Router[S] {
   manager : @gateway.CollectionManager[S]
 }
 pub fn[S] Router::get_manager(Self[S]) -> @gateway.CollectionManager[S]
 pub fn[S] Router::new(base_path? : String) -> Self[S]
-pub fn[S : @storage.Storage] Router::route(Self[S], HttpRequest) -> HttpResponse
+pub async fn[S : @storage.AsyncStorage] Router::route(Self[S], HttpRequest) -> HttpResponse
 pub fn[S] Router::with_storage(S, base_path? : String) -> Self[S]
 
 // Type aliases

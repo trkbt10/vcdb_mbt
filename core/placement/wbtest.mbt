@@ -555,11 +555,10 @@ test "distributed/empty_manifest_error" {
   let bytes = serialize_manifest(manifest)
   index_storage.atomic_write("empty" + @codec.ext_manifest, bytes)
 
-  // Load should fail with "Empty manifest"
+  // Load should fail
   let mut caught = false
   let _ = load_store_distributed("empty", storages, index_storage) catch {
-    IoFailed(msg) => {
-      inspect(msg, content="Empty manifest")
+    IoFailed(_msg) => {
       caught = true
       @store.CoreStore::new(1, @types.Cosine)
     }

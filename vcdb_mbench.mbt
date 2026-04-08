@@ -5,7 +5,7 @@ test "bench/add_bruteforce" (b : @bench.T) {
   b.bench(fn() {
     let db = VectorDB::with_dim(128)
     for i in 0..<100 {
-      db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+      let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
     }
     b.keep(db.size())
   })
@@ -19,7 +19,7 @@ test "bench/add_hnsw" (b : @bench.T) {
   let mut i = 0
   b.bench(fn() {
     i = i + 1
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
     b.keep(db.size())
   })
 }
@@ -30,7 +30,7 @@ test "bench/search_bruteforce_1k" (b : @bench.T) {
   let db = VectorDB::with_dim(128)
   let v = Array::make(128, 0.5)
   for i in 0..<1000 {
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let q = Array::make(128, 0.6)
   b.bench(fn() { b.keep(db.search(q, 10, None).length()) })
@@ -42,7 +42,7 @@ test "bench/search_hnsw_1k" (b : @bench.T) {
   let db = VectorDB::with_hnsw(128, metric=@types.Cosine)
   let v = Array::make(128, 0.5)
   for i in 0..<1000 {
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let q = Array::make(128, 0.6)
   b.bench(fn() { b.keep(db.search(q, 10, None).length()) })
@@ -80,7 +80,7 @@ test "bench/serialize_100" (b : @bench.T) {
   let db = VectorDB::with_dim(64)
   for i in 0..<100 {
     let v = Array::make(64, i.to_double() / 100.0)
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   b.bench(fn() { b.keep(db.serialize().length()) })
 }
@@ -91,7 +91,7 @@ test "bench/deserialize_100" (b : @bench.T) {
   let db = VectorDB::with_dim(64)
   for i in 0..<100 {
     let v = Array::make(64, i.to_double() / 100.0)
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let bytes = db.serialize()
   b.bench(fn() { b.keep(VectorDB::deserialize(bytes).size()) })
@@ -103,7 +103,7 @@ test "bench/get_by_id" (b : @bench.T) {
   let db = VectorDB::with_dim(64)
   for i in 0..<1000 {
     let v = Array::make(64, i.to_double() / 1000.0)
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let id = @types.VectorId::from_int(500)
   b.bench(fn() { b.keep(db.get(id) is Some(_)) })
@@ -115,7 +115,7 @@ test "bench/has_check" (b : @bench.T) {
   let db = VectorDB::with_dim(64)
   for i in 0..<1000 {
     let v = Array::make(64, i.to_double() / 1000.0)
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let id = @types.VectorId::from_int(500)
   b.bench(fn() { b.keep(db.has(id)) })
@@ -127,7 +127,7 @@ test "bench/search_bruteforce_10k" (b : @bench.T) {
   let db = VectorDB::with_dim(64)
   let v = Array::make(64, 0.5)
   for i in 0..<10000 {
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let q = Array::make(64, 0.6)
   b.bench(fn() { b.keep(db.search(q, 10, None).length()) })
@@ -139,7 +139,7 @@ test "bench/search_hnsw_10k" (b : @bench.T) {
   let db = VectorDB::with_hnsw(64, metric=@types.Cosine)
   let v = Array::make(64, 0.5)
   for i in 0..<10000 {
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let q = Array::make(64, 0.6)
   b.bench(fn() { b.keep(db.search(q, 10, None).length()) })
@@ -159,7 +159,7 @@ test "bench/search_hnsw_1k_k100" (b : @bench.T) {
   let db = VectorDB::with_hnsw(64, metric=@types.Cosine)
   let v = Array::make(64, 0.5)
   for i in 0..<1000 {
-    db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
+    let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs())
   }
   let q = Array::make(64, 0.6)
   b.bench(fn() { b.keep(db.search(q, 100, None).length()) })

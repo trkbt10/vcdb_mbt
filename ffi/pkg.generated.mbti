@@ -1,0 +1,54 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "trkbt10/vcdb/ffi"
+
+// Values
+pub fn crush_placement_group(Int, Int, Int) -> Int
+
+pub fn distributed_group_upsert(Array[(Int, Int, Array[Double], String)], Int) -> Array[(Int, Array[(Int, Int, Array[Double], String)])]
+
+pub fn distributed_merge_count(Array[(Int, Int, String)]) -> (Int, Array[Int], Array[(Int, String)])
+
+pub fn distributed_merge_scroll(Array[(Int, Array[(Int, Int, String)], String)], Int) -> (Array[(Int, Int, String)], Array[Int], Array[(Int, String)])
+
+pub fn distributed_merge_search(Array[(Int, Array[(Int, Int, Double, String)], String)], Int) -> (Array[(Int, Int, Double, String)], Array[Int], Array[(Int, String)])
+
+pub fn format_int64(Int, Int) -> String
+
+pub fn parse_int64(String) -> (Bool, Int, Int)
+
+pub fn vcdb_add(Int, Int, Int, Array[Double]) -> Int
+
+pub fn vcdb_create(Int) -> Int
+
+pub fn vcdb_create_hnsw(Int) -> Int
+
+pub fn vcdb_create_ivf(Int) -> Int
+
+pub fn vcdb_deserialize(Bytes) -> Int
+
+pub fn vcdb_destroy(Int) -> Unit
+
+pub fn vcdb_dim(Int) -> Int
+
+pub fn vcdb_get(Int, Int, Int) -> (Array[Double], Int)
+
+pub fn vcdb_has(Int, Int, Int) -> Int
+
+pub fn vcdb_remove(Int, Int, Int) -> Int
+
+pub fn vcdb_search(Int, Array[Double], Int) -> Array[(Int, Int, Double)]
+
+pub fn vcdb_serialize(Int) -> Bytes
+
+pub fn vcdb_size(Int) -> Int
+
+pub fn vcdb_upsert(Int, Int, Int, Array[Double]) -> Int
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

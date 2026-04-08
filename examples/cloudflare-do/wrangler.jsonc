@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vcdb-do",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-04-01",
+
+  // R2 bucket for vcdb snapshot storage
+  "r2_buckets": [
+    {
+      "binding": "VCDB_DATA",
+      "bucket_name": "vcdb-data"
+    }
+  ],
+
+  // Durable Objects — each shard is a separate DO instance
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "VCDB_STORE",
+        "class_name": "VcdbStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["VcdbStore"]
+    }
+  ]
+}

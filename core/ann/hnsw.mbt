@@ -315,7 +315,7 @@ fn connect_mutually(
         break
       }
     }
-    if not(found) {
+    if !found {
       la.push(b)
     }
     // Add a to b's neighbors
@@ -330,7 +330,7 @@ fn connect_mutually(
         break
       }
     }
-    if not(found) {
+    if !found {
       lb.push(a)
     }
     // Prune if too many connections - keep top-m by distance
@@ -456,7 +456,7 @@ pub fn hnsw_search(
     // Entry point is invalid, find any valid node
     entry = -1
     for i in 0..<state.tombstone.length() {
-      if i < store.count && not(state.tombstone[i]) {
+      if i < store.count && !state.tombstone[i] {
         entry = i
         break
       }
@@ -494,7 +494,7 @@ pub fn hnsw_search(
     let id = store.ids[c.idx]
     let attrs = store.attrs[c.idx]
     match filter {
-      Some(f) => if not(f(id, attrs)) { continue }
+      Some(f) => if !f(id, attrs) { continue }
       None => ()
     }
     push_search_hit_top_k(out, @types.SearchHit::{ id, score: c.s, attrs }, k)

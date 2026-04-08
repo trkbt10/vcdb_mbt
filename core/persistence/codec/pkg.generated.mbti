@@ -7,7 +7,11 @@ import {
 }
 
 // Values
+pub fn attr_value_to_json(@types.AttrValue) -> Json
+
 pub fn attrs_to_json(@types.Attrs?) -> String
+
+pub fn attrs_to_json_value(@types.Attrs) -> Json
 
 pub fn decode_attrs_json(Bytes) -> @types.Attrs?
 
@@ -33,6 +37,10 @@ pub let header_size : Int
 
 pub fn is_vcdb_file(Bytes) -> Bool
 
+pub fn json_to_attr_value(Json) -> @types.AttrValue?
+
+pub fn json_to_attrs(Json) -> @types.Attrs?
+
 pub fn parse_attrs_json(String) -> @types.Attrs?
 
 pub fn read_header(@binary.BinaryReader) -> (FileType, Byte)?
@@ -50,12 +58,10 @@ pub(all) enum FileType {
   Wal
   Segment
   Index
-}
+} derive(Eq, Show)
 pub fn FileType::extension(Self) -> String
 pub fn FileType::from_byte(Byte) -> Self?
 pub fn FileType::to_byte(Self) -> Byte
-pub impl Eq for FileType
-pub impl Show for FileType
 
 // Type aliases
 

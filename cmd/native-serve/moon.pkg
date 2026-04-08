@@ -1,15 +1,20 @@
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/http" @async_http,
-  "moonbitlang/async/io" @async_io,
-  "moonbitlang/async/socket" @async_socket,
   "moonbitlang/core/env",
   "moonbitlang/core/strconv",
-  "trkbt10/vcdb/core/storage",
+  "moonbitlang/core/string",
+  "moonbitlang/async",
+  "moonbitlang/async/http" @async_http,
+  "moonbitlang/async/socket" @async_socket,
+  "moonbitlang/async/io" @async_io,
   "trkbt10/vcdb/http",
+  "trkbt10/vcdb/core/storage",
 }
 
 options(
   "is-main": true,
-  targets: { "main.mbt": [ "native" ], "wbtest.mbt": [ "native" ] },
+  targets: {
+    "main.mbt": [ "native" ],
+    "main_stub.mbt": [ "wasm", "wasm-gc", "js" ],
+    "wbtest.mbt": [ "native" ],
+  },
 )

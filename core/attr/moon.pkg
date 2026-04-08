@@ -1,6 +1,7 @@
 import {
   "moonbitlang/core/bench",
   "moonbitlang/core/cmp",
+  "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/math",
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/binary",

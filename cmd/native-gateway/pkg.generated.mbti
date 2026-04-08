@@ -1,22 +1,11 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "trkbt10/vcdb/cmd/native-gateway"
 
-import {
-  "trkbt10/vcdb/core/storage",
-  "trkbt10/vcdb/gateway",
-}
-
 // Values
 
 // Errors
 
 // Types and methods
-pub struct NativeGateway {
-  manager : @gateway.CollectionManager[@storage.MemoryStorage]
-}
-pub fn NativeGateway::execute(Self, Array[String]) -> @gateway.ApiResponse
-pub fn NativeGateway::new() -> Self
-pub fn NativeGateway::run(Self, Array[String]) -> String
 
 // Type aliases
 

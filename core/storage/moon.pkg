@@ -1,15 +1,16 @@
 import {
   "trkbt10/vcdb/core/binary",
   "trkbt10/vcdb/core/persistence/codec",
-  "moonbitlang/x/fs" @fs,
-  "moonbitlang/x/path" @path,
+  "moonbitlang/core/hashmap",
   "moonbitlang/async/js_async",
+  "moonbitlang/x/fs",
+  "moonbitlang/x/path",
 }
 
 options(
   targets: {
+    "async_callback.mbt": [ "js" ],
     "native_file_storage.mbt": [ "native" ],
     "native_file_storage_wbtest.mbt": [ "native" ],
-    "async_storage.mbt": [ "js" ],
   },
 )

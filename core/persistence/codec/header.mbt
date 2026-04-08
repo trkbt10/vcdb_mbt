@@ -81,7 +81,7 @@ pub fn read_header(r : @binary.BinaryReader) -> (FileType, Byte)? {
   if r.remaining() < header_size {
     return None
   }
-  if not(verify_magic(r)) {
+  if !verify_magic(r) {
     return None
   }
   let type_byte = r.read_byte()
@@ -112,7 +112,7 @@ pub fn get_file_type(data : Bytes) -> FileType? {
     return None
   }
   let r = @binary.BinaryReader::new(data)
-  if not(verify_magic(r)) {
+  if !verify_magic(r) {
     return None
   }
   FileType::from_byte(r.read_byte())

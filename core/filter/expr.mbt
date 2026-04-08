@@ -129,7 +129,7 @@ pub fn eval_filter(expr : FilterExpr, attrs : @types.Attrs) -> Bool {
     Leaf(leaf) => eval_leaf(leaf, attrs)
     Must(exprs) => {
       for e in exprs {
-        if not(eval_filter(e, attrs)) {
+        if !eval_filter(e, attrs) {
           return false
         }
       }
@@ -216,7 +216,7 @@ pub fn get_candidates_basic(
           None => return None
           Some(candidates) =>
             for id in candidates {
-              if not(seen.contains(id.to_int64())) {
+              if !seen.contains(id.to_int64()) {
                 seen.set(id.to_int64(), true)
                 all.push(id)
               }
@@ -254,7 +254,7 @@ pub fn resolve_candidates_bptree(
       let present = id_set_from(index.exists(key))
       let result : Array[@types.VectorId] = []
       for id in index.all_ids() {
-        if not(present.contains(id.to_int64())) {
+        if !present.contains(id.to_int64()) {
           result.push(id)
         }
       }
@@ -278,7 +278,7 @@ pub fn resolve_candidates_bptree(
       }
       let result : Array[@types.VectorId] = []
       for id in index.all_ids() {
-        if not(excluded.contains(id.to_int64())) {
+        if !excluded.contains(id.to_int64()) {
           result.push(id)
         }
       }
@@ -295,7 +295,7 @@ pub fn resolve_candidates_bptree(
         let seen : Map[Int64, Bool] = {}
         for e in exprs {
           for id in resolve_candidates_bptree(e, index) {
-            if not(seen.contains(id.to_int64())) {
+            if !seen.contains(id.to_int64()) {
               seen.set(id.to_int64(), true)
               all.push(id)
             }

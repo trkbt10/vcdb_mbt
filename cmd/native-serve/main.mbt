@@ -8,6 +8,7 @@ struct ServerOptions {
   mut storage_path : String
   mut in_memory : Bool
   mut help : Bool
+  mut error : String?
 }
 
 ///|
@@ -18,6 +19,7 @@ fn ServerOptions::default() -> ServerOptions {
     storage_path: ".local-storage",
     in_memory: false,
     help: false,
+    error: None,
   }
 }
 
@@ -39,7 +41,13 @@ fn parse_args(args : Array[String]) -> ServerOptions {
       opts.host = args[i + 1]
       i = i + 1
     } else if arg == "--port" && i + 1 < args.length() {
-      let parsed = @strconv.parse_int(args[i + 1]) catch { _ => opts.port }
+      let port_arg = args[i + 1]
+      let parsed = @string.parse_int(port_arg) catch {
+        _ => {
+          opts.error = Some("Invalid port: " + port_arg)
+          return opts
+        }
+      }
       opts.port = parsed
       i = i + 1
     }
@@ -116,7 +124,7 @@ async fn run_server(options : ServerOptions) -> Unit {
 }
 
 ///|
-async fn[S : @storage.Storage] run_server_with_router(
+async fn[S : @storage.AsyncStorage] run_server_with_router(
   options : ServerOptions,
   router : @http.Router[S],
 ) -> Unit {
@@ -155,7 +163,14 @@ async fn[S : @storage.Storage] run_server_with_router(
         return
       }
     }
-    let body_text = body_data.text() catch { _ => "" }
+    let body_text = body_data.text() catch {
+      _ => {
+        conn.send_response(400, "Bad Request")
+        conn.write("{\"error\":\"request body is not valid UTF-8\"}")
+        conn.end_response()
+        return
+      }
+    }
     let response = @http.add_cors_headers(
       router.route(
         @http.HttpRequest::new(http_method, req.path, body=body_text),
@@ -168,6 +183,13 @@ async fn[S : @storage.Storage] run_server_with_router(
 ///|
 async fn main {
   let options = parse_args(command_args())
+  match options.error {
+    Some(err) => {
+      println(err)
+      return
+    }
+    None => ()
+  }
   if options.help {
     print_help()
     return

@@ -1,0 +1,19 @@
+{
+  "name": "vcdb-cloudflare-workers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vcdb/server": "file:../../js"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260401.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.79.0"
+  }
+}

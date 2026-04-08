@@ -52,7 +52,7 @@ fn ensure_dir(path : String) -> Unit raise IOError {
     current.push(ch)
     if ch == '/' {
       let part = String::from_array(current)
-      if part.length() > 0 && part != "/" && not(@fs.path_exists(part)) {
+      if part.length() > 0 && part != "/" && !@fs.path_exists(part) {
         @fs.create_dir(part) catch {
           e => raise_io_error(e)
         }
@@ -62,7 +62,7 @@ fn ensure_dir(path : String) -> Unit raise IOError {
   let final_path = String::from_array(current)
   if final_path.length() > 0 &&
     final_path != "/" &&
-    not(@fs.path_exists(final_path)) {
+    !@fs.path_exists(final_path) {
     @fs.create_dir(final_path) catch {
       e => raise_io_error(e)
     }
@@ -86,7 +86,7 @@ fn walk_dir(
   rel_dir : String,
   files : Array[String],
 ) -> Unit raise IOError {
-  if not(@fs.path_exists(abs_dir)) {
+  if !@fs.path_exists(abs_dir) {
     return
   }
   let entries = @fs.read_dir(abs_dir) catch {
@@ -102,9 +102,23 @@ fn walk_dir(
     } else {
       rel_dir + "/" + entry
     }
-    if (@fs.is_dir(abs_path) catch { _ => false }) {
+    let is_dir = @fs.is_dir(abs_path) catch {
+      e => {
+        raise_io_error(e)
+        false
+      }
+    }
+    if is_dir {
       walk_dir(abs_path, rel_path, files)
-    } else if (@fs.is_file(abs_path) catch { _ => false }) {
+      continue
+    }
+    let is_file = @fs.is_file(abs_path) catch {
+      e => {
+        raise_io_error(e)
+        false
+      }
+    }
+    if is_file {
       files.push(rel_path)
     }
   }
@@ -149,7 +163,10 @@ pub fn NativeFileStorage::append(
   let full = self.full_path(path, kind)
   let existing = if @fs.path_exists(full) {
     @fs.read_file_to_bytes(full) catch {
-      _ => Bytes::new(0)
+      e => {
+        raise_io_error(e)
+        Bytes::new(0)
+      }
     }
   } else {
     Bytes::new(0)
@@ -192,12 +209,10 @@ pub fn NativeFileStorage::exists(
 pub fn NativeFileStorage::list(
   self : NativeFileStorage,
   kind : StorageKind,
-) -> Array[String] {
+) -> Array[String] raise IOError {
   let files : Array[String] = []
   let root = join_path(self.root_dir, kind_dir(kind))
-  walk_dir(root, "", files) catch {
-    _ => ()
-  }
+  walk_dir(root, "", files)
   files
 }
 
@@ -234,4 +249,114 @@ pub impl Storage for NativeFileStorage with exists(self, path, kind) {
 ///|
 pub impl Storage for NativeFileStorage with list(self, kind) {
   self.list(kind)
+}
+
+///|
+fn io_error_message(e : IOError) -> String {
+  match e {
+    NotFound(s) => "Not found: " + s
+    PermissionDenied(s) => "Permission denied: " + s
+    IoFailed(s) => "IO failed: " + s
+  }
+}
+
+///|
+/// AsyncStorage implementation for NativeFileStorage.
+/// Wraps synchronous filesystem I/O — resolve is called immediately.
+/// This enables NativeFileStorage to be used with PersistentVectorDB
+/// and all async persistence infrastructure on native targets.
+pub impl AsyncStorage for NativeFileStorage with async_read(
+  self,
+  path,
+  kind,
+  resolve,
+  reject,
+) {
+  let data = self.read(path, kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve(data)
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_write(
+  self,
+  path,
+  data,
+  kind,
+  resolve,
+  reject,
+) {
+  self.write(path, data, kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_atomic_write(
+  self,
+  path,
+  data,
+  kind,
+  resolve,
+  reject,
+) {
+  self.atomic_write(path, data, kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_del(
+  self,
+  path,
+  kind,
+  resolve,
+  reject,
+) {
+  self.del(path, kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_exists(
+  self,
+  path,
+  kind,
+  resolve,
+  _reject,
+) {
+  resolve(self.exists(path, kind))
+}
+
+///|
+pub impl AsyncStorage for NativeFileStorage with async_list(
+  self,
+  kind,
+  resolve,
+  reject,
+) {
+  let files = self.list(kind) catch {
+    e => {
+      reject(io_error_message(e))
+      return
+    }
+  }
+  resolve(files)
 }

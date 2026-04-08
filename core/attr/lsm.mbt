@@ -68,7 +68,7 @@ fn lsm_encode_memtable_key(
 ) -> Bytes {
   let w = @binary.BinaryWriter::new()
   // Write attr_key as full UTF-8 to preserve Unicode
-  w.push_bytes(attr_key.to_bytes())
+  w.push_bytes(@utf8.encode(attr_key.view()))
   // Separator
   w.push_byte(b'\x00')
   // Write encoded value
@@ -81,10 +81,10 @@ fn lsm_encode_memtable_key(
 fn lsm_encode_exists_key(attr_key : String) -> Bytes {
   let w = @binary.BinaryWriter::new()
   w.push_byte(b'\xFF')
-  w.push_bytes("exists".to_bytes())
+  w.push_bytes(@utf8.encode("exists".view()))
   w.push_byte(b'\x00')
   // Write attr_key as full UTF-8 to preserve Unicode
-  w.push_bytes(attr_key.to_bytes())
+  w.push_bytes(@utf8.encode(attr_key.view()))
   w.concat()
 }
 
@@ -133,7 +133,7 @@ fn memtable_add_id(mt : Memtable, key : Bytes, id : Int64) -> Unit {
               break
             }
           }
-          if not(found) {
+          if !found {
             list.push(id)
           }
         }
@@ -275,7 +275,7 @@ pub fn LSMAttrIndex::range(
         match attr_value_to_number(value) {
           None => continue
           Some(num) =>
-            if range.matches(num) && not(seen.contains(id_val)) {
+            if range.matches(num) && !seen.contains(id_val) {
               seen.set(id_val, true)
               result.push(@types.VectorId(id_val))
             }

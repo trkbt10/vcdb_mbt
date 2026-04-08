@@ -25,7 +25,7 @@ pub trait Storage {
   atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
   del(Self, String, StorageKind) -> Unit raise IOError
   exists(Self, String, StorageKind) -> Bool
-  list(Self, StorageKind) -> Array[String]
+  list(Self, StorageKind) -> Array[String] raise IOError
 }
 
 ///|
@@ -151,4 +151,85 @@ pub impl Storage for MemoryStorage with exists(self, path, _kind) {
 ///|
 pub impl Storage for MemoryStorage with list(self, _kind) {
   self.list()
+}
+
+///|
+/// AsyncStorage trait implementation for MemoryStorage.
+/// Since all operations are in-memory, resolve is called synchronously.
+/// This enables MemoryStorage to be used with PersistentVectorDB, AsyncWalRuntime,
+/// and all async persistence infrastructure — critical for testing.
+pub impl AsyncStorage for MemoryStorage with async_read(
+  self,
+  path,
+  _kind,
+  resolve,
+  reject,
+) {
+  match self.data.get(path) {
+    None => reject("Not found: " + path)
+    Some(data) => resolve(data)
+  }
+}
+
+///|
+pub impl AsyncStorage for MemoryStorage with async_write(
+  self,
+  path,
+  data,
+  _kind,
+  resolve,
+  _reject,
+) {
+  self.write(path, data)
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for MemoryStorage with async_atomic_write(
+  self,
+  path,
+  data,
+  _kind,
+  resolve,
+  _reject,
+) {
+  self.atomic_write(path, data)
+  resolve()
+}
+
+///|
+pub impl AsyncStorage for MemoryStorage with async_del(
+  self,
+  path,
+  _kind,
+  resolve,
+  reject,
+) {
+  if self.data.contains(path) {
+    self.data.remove(path)
+    resolve()
+  } else {
+    reject("Not found: " + path)
+  }
+}
+
+///|
+pub impl AsyncStorage for MemoryStorage with async_exists(
+  self,
+  path,
+  _kind,
+  resolve,
+  _reject,
+) {
+  resolve(self.exists(path))
+}
+
+///|
+pub impl AsyncStorage for MemoryStorage with async_list(
+  self,
+  _kind,
+  resolve,
+  _reject,
+) {
+  resolve(self.list())
 }

@@ -1,21 +1,43 @@
 /**
- * @vcdb/server - Vector database server package
+ * @vcdb/server — Vector database server package.
  *
- * For storage backends, use subpath imports to enable tree-shaking:
- *
- * - `@vcdb/server/storage/memory` - In-memory storage
- * - `@vcdb/server/storage/node` - Node.js filesystem
- * - `@vcdb/server/storage/indexeddb` - Browser IndexedDB
- * - `@vcdb/server/storage/opfs` - Browser OPFS
- * - `@vcdb/server/storage/local-storage` - Browser localStorage
- * - `@vcdb/server/storage/cache` - Browser Cache API
- * - `@vcdb/server/wasm` - MoonBit WASM VectorDB
+ * This file is the single source of truth for all public domain types.
+ * Storage adapters and DB classes are imported via subpath exports.
  */
 
-// Only export types from the main entry point
-export {
-  StorageKind,
-  type StorageAdapter,
-  type StorageKindType,
-  toUint8,
-} from "./storage/types.js";
+/* ── Domain types (SoT) ─────────────────────────────────────── */
+
+/** Unique identifier for a vector. Uses bigint for full Int64 range. */
+export type VectorId = bigint;
+
+/** Distance/similarity metric. */
+export type Metric = "cosine" | "l2" | "dot";
+
+/** ANN (Approximate Nearest Neighbor) indexing strategy. */
+export type Strategy = "bruteforce" | "hnsw" | "ivf";
+
+/** A single search result (score only, no payload). */
+export interface SearchResult {
+  readonly id: VectorId;
+  readonly score: number;
+}
+
+/** A search result with optional payload. */
+export interface SearchHit {
+  readonly id: VectorId;
+  readonly score: number;
+  readonly payload: Record<string, unknown> | null;
+}
+
+/** A point record retrieved by ID. */
+export interface PointRecord {
+  readonly found: boolean;
+  readonly vector: number[];
+  readonly payload: Record<string, unknown> | null;
+}
+
+/** An entry from scroll (cursor-based iteration). */
+export interface ScrollEntry {
+  readonly id: VectorId;
+  readonly payload: Record<string, unknown> | null;
+}

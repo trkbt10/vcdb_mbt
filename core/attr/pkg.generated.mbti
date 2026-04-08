@@ -23,15 +23,6 @@ pub fn upper_bound(Array[NumEntry], Double) -> Int
 // Errors
 
 // Types and methods
-pub enum AttrIndexStrategy {
-  Basic
-  Bitmap
-  BPTree
-  LSM
-}
-pub impl Eq for AttrIndexStrategy
-pub impl Show for AttrIndexStrategy
-
 type BPTree
 
 pub struct BPTreeAttrIndex {
@@ -40,6 +31,7 @@ pub struct BPTreeAttrIndex {
   data : Map[Int64, @types.Attrs]
   order : Int
 }
+pub fn BPTreeAttrIndex::all_ids(Self) -> Array[@types.VectorId]
 pub fn BPTreeAttrIndex::deserialize(Bytes) -> Self
 pub fn BPTreeAttrIndex::eq(Self, String, @types.AttrValue) -> Array[@types.VectorId]
 pub fn BPTreeAttrIndex::exists(Self, String) -> Array[@types.VectorId]
@@ -113,9 +105,8 @@ type Memtable
 pub struct NumEntry {
   value : Double
   id : Int64
-}
+} derive(Show)
 pub fn NumEntry::compare(Self, Self) -> Int
-pub impl Show for NumEntry
 
 pub struct SSTable {
   records : Array[SSTableRecord]

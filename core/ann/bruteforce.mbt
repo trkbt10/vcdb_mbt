@@ -39,7 +39,7 @@ pub fn bf_search(
     let attrs = store.attrs[i]
     // Apply filter if provided
     match filter {
-      Some(f) => if not(f(id, attrs)) { continue }
+      Some(f) => if !f(id, attrs) { continue }
       None => ()
     }
     let base = i * store.dim

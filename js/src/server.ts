@@ -3,20 +3,20 @@
  * vcdb HTTP Server
  *
  * Thin HTTP layer over MoonBit gateway implementation.
- * Uses CachedStorage for async storage with WASM compatibility.
+ * Uses CachedStorage for async storage with sync gateway compatibility.
  */
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
+import { loadModule } from "./ffi/loader.js";
 import {
-  loadWasm,
   gatewayRequest,
   registerStorageCallbacks,
   type GatewayResponse,
-} from "./wasm/vcdb.js";
+} from "./gateway.js";
 import { createNodeStorage } from "./storage/node.js";
-import { CachedStorage } from "./storage/wasm-bridge.js";
+import { CachedStorage } from "./storage/cached-storage.js";
 
 let cachedStorage: CachedStorage | null = null;
 
@@ -43,7 +43,7 @@ function createApp() {
       }
     }
 
-    const response = gatewayRequest(method, pathSegments, body);
+    const response = await gatewayRequest(method, pathSegments, body);
 
     // Flush after mutations
     if (cachedStorage?.hasDirty()) {
@@ -127,7 +127,7 @@ async function main() {
   }
 
   console.log("Loading WASM module...");
-  await loadWasm();
+  await loadModule();
 
   console.log("Loading data from storage...");
   const adapter = createNodeStorage({ baseDir: config.storage });

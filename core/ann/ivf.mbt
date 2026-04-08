@@ -190,7 +190,7 @@ pub fn ivf_search(
           let attrs = store.attrs[at]
           // Apply filter
           match filter {
-            Some(f) => if not(f(id, attrs)) { continue }
+            Some(f) => if !f(id, attrs) { continue }
             None => ()
           }
           let base = at * dim

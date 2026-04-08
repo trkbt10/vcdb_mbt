@@ -1,19 +1,25 @@
 ///|
 /// Command handlers for gateway API
 /// These handlers implement the business logic for CLI and HTTP operations
+///
+/// Write operations are async (WAL-before-state via PersistentVectorDB).
+/// Read operations are sync (in-memory VectorDB).
 
 ///|
-/// Handle search in a collection
-pub fn handle_search(
-  db : @vcdb.VectorDB,
+/// Handle search in a collection (sync — reads from in-memory engine)
+pub fn[W, S] handle_search(
+  db : @vcdb.PersistentDB[W, S],
   req : SearchRequest,
 ) -> Result[SearchResponse, GatewayError] {
   let dim = db.dim()
   if req.vector.length() != dim {
     return Err(DimensionMismatch(expected=dim, got=req.vector.length()))
   }
-  // Note: filter is not yet implemented (would need to parse JSON filter to FilterExpr)
-  let hits = db.search(req.vector, req.limit, None)
+  let filter = match req.filter {
+    Some(json) => @filter.parse_filter_json(json.stringify())
+    None => None
+  }
+  let hits = db.search(req.vector, req.limit, filter)
   let results : Array[SearchHitResponse] = []
   for hit in hits {
     let payload = if req.with_payload { Some(hit.attrs) } else { None }
@@ -31,9 +37,9 @@ pub fn handle_search(
 }
 
 ///|
-/// Handle get point by ID
-pub fn handle_get_point(
-  db : @vcdb.VectorDB,
+/// Handle get point by ID (sync)
+pub fn[W, S] handle_get_point(
+  db : @vcdb.PersistentDB[W, S],
   id : Int64,
 ) -> Result[PointResponse, GatewayError] {
   let vec_id = @types.VectorId::from_int64(id)
@@ -44,9 +50,9 @@ pub fn handle_get_point(
 }
 
 ///|
-/// Handle scrolling points in a collection.
-pub fn handle_scroll(
-  db : @vcdb.VectorDB,
+/// Handle scrolling points in a collection (sync).
+pub fn[W, S] handle_scroll(
+  db : @vcdb.PersistentDB[W, S],
   req : ScrollRequest,
 ) -> Result[ScrollResponse, GatewayError] {
   let entries = db.scroll(offset=req.offset, limit=req.limit)
@@ -80,8 +86,8 @@ pub fn handle_scroll(
 }
 
 ///|
-/// Handle collection creation
-pub fn[S : @storage.Storage] handle_create_collection(
+/// Handle collection creation (async — writes to storage)
+pub async fn[S : @storage.AsyncStorage] handle_create_collection(
   manager : CollectionManager[S],
   config : CollectionConfig,
 ) -> Result[Unit, GatewayError] {
@@ -89,8 +95,8 @@ pub fn[S : @storage.Storage] handle_create_collection(
 }
 
 ///|
-/// Handle collection deletion
-pub fn[S : @storage.Storage] handle_delete_collection(
+/// Handle collection deletion (async — writes to storage)
+pub async fn[S : @storage.AsyncStorage] handle_delete_collection(
   manager : CollectionManager[S],
   name : String,
 ) -> Result[Unit, GatewayError] {
@@ -98,51 +104,51 @@ pub fn[S : @storage.Storage] handle_delete_collection(
 }
 
 ///|
-/// Handle list collections
-pub fn[S : @storage.Storage] handle_list_collections(
+/// Handle list collections (async — may load from storage)
+pub async fn[S : @storage.AsyncStorage] handle_list_collections(
   manager : CollectionManager[S],
-) -> CollectionsResponse {
-  { collections: manager.list_info() }
-}
-
-///|
-/// Handle get collection info
-pub fn[S : @storage.Storage] handle_get_collection(
-  manager : CollectionManager[S],
-  name : String,
-) -> Result[CollectionInfo, GatewayError] {
-  match manager.get_info(name) {
-    Some(info) => Ok(info)
-    None => Err(CollectionNotFound(name))
+) -> Result[CollectionsResponse, GatewayError] {
+  match manager.list_info() {
+    Ok(collections) => Ok({ collections, })
+    Err(err) => Err(err)
   }
 }
 
 ///|
-/// Convenience: Handle request with collection name
-pub fn[S : @storage.Storage, T] with_collection(
+/// Handle get collection info (async — may load from storage)
+pub async fn[S : @storage.AsyncStorage] handle_get_collection(
   manager : CollectionManager[S],
   name : String,
-  handler : (@vcdb.VectorDB) -> Result[T, GatewayError],
+) -> Result[CollectionInfo, GatewayError] {
+  manager.get_info(name)
+}
+
+///|
+/// Convenience: Handle request with collection name (async)
+pub async fn[S : @storage.AsyncStorage, T] with_collection(
+  manager : CollectionManager[S],
+  name : String,
+  handler : (@vcdb.PersistentDB[S, S]) -> Result[T, GatewayError],
 ) -> Result[T, GatewayError] {
   match manager.get(name) {
-    Some(db) => handler(db)
-    None => Err(CollectionNotFound(name))
+    Ok(db) => handler(db)
+    Err(err) => Err(err)
   }
 }
 
 ///|
 /// Handle health check
-pub fn handle_health() -> JsonValue {
-  json_object([("status", JString("ok"))])
+pub fn handle_health() -> Json {
+  json_object([("status", "ok".to_json())])
 }
 
 ///|
 /// Handle service info
-pub fn handle_service_info() -> JsonValue {
+pub fn handle_service_info() -> Json {
   json_object([
-    ("name", JString("vcdb")),
-    ("version", JString("0.1.0")),
-    ("description", JString("MoonBit vector database")),
+    ("name", "vcdb".to_json()),
+    ("version", "0.1.0".to_json()),
+    ("description", "MoonBit vector database".to_json()),
   ])
 }
 
@@ -164,8 +170,9 @@ fn error_to_string(e : GatewayError) -> String {
 }
 
 ///|
-/// Parse and execute an API request, returning JSON response
-pub fn[S : @storage.Storage] execute_request(
+/// Parse and execute an API request, returning JSON response.
+/// All operations are now async since collection loading and writes require I/O.
+pub async fn[S : @storage.AsyncStorage] execute_request(
   manager : CollectionManager[S],
   http_method : String,
   path : Array[String],
@@ -174,23 +181,24 @@ pub fn[S : @storage.Storage] execute_request(
   match (http_method, path) {
     ("GET", []) => ApiResponse::ok(handle_service_info())
     ("GET", ["healthz"]) => ApiResponse::ok(handle_health())
-    ("GET", ["collections"]) => {
-      let resp = handle_list_collections(manager)
-      ApiResponse::ok(resp.to_json())
-    }
+    ("GET", ["collections"]) =>
+      match handle_list_collections(manager) {
+        Ok(resp) => ApiResponse::ok(resp.to_json())
+        Err(e) => ApiResponse::err(error_to_string(e))
+      }
     ("POST", ["collections", name]) => {
       let config = match parse_json(body) {
         Some(json) => {
-          let base = CollectionConfig::from_json(json).unwrap_or(
-            CollectionConfig::default(name, 128),
-          )
-          // Create new config with the URL name
+          let base = match CollectionConfig::from_json(json) {
+            Ok(parsed) => parsed
+            Err(msg) => return ApiResponse::err("Invalid request body: " + msg)
+          }
           { ..base, name, }
         }
-        None => CollectionConfig::default(name, 128)
+        None => return ApiResponse::err("Invalid JSON")
       }
       match handle_create_collection(manager, config) {
-        Ok(_) => ApiResponse::ok(JBool(true))
+        Ok(_) => ApiResponse::ok(true.to_json())
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     }
@@ -201,7 +209,7 @@ pub fn[S : @storage.Storage] execute_request(
       }
     ("DELETE", ["collections", name]) =>
       match handle_delete_collection(manager, name) {
-        Ok(_) => ApiResponse::ok(JBool(true))
+        Ok(_) => ApiResponse::ok(true.to_json())
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     ("PUT", ["collections", name, "points"]) => {
@@ -213,17 +221,18 @@ pub fn[S : @storage.Storage] execute_request(
           }
         None => return ApiResponse::err("Invalid JSON")
       }
-      let points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = req
-        .points
-        .map(fn(p) {
+      let points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = req.points.map(fn(
+          p,
+        ) {
           (@types.VectorId::from_int64(p.id), p.vector, p.payload)
-        })
+        },
+      )
       match manager.upsert_points(name, points) {
         Ok(count) =>
           ApiResponse::ok(
             json_object([
-              ("status", JString("ok")),
-              ("upserted", JNumber(count.to_double())),
+              ("status", "ok".to_json()),
+              ("upserted", count.to_double().to_json()),
             ]),
           )
         Err(e) => ApiResponse::err(error_to_string(e))
@@ -262,7 +271,7 @@ pub fn[S : @storage.Storage] execute_request(
       }
     }
     ("GET", ["collections", name, "points", id_str]) => {
-      let parse_result : Result[Int64, _] = try? @strconv.parse_int64(id_str)
+      let parse_result : Result[Int64, _] = try? @string.parse_int64(id_str)
       let id : Int64 = match parse_result {
         Ok(i) => i
         Err(_) => return ApiResponse::err("Invalid point ID")
@@ -274,13 +283,13 @@ pub fn[S : @storage.Storage] execute_request(
       }
     }
     ("DELETE", ["collections", name, "points", id_str]) => {
-      let parse_result : Result[Int64, _] = try? @strconv.parse_int64(id_str)
+      let parse_result : Result[Int64, _] = try? @string.parse_int64(id_str)
       let id : Int64 = match parse_result {
         Ok(i) => i
         Err(_) => return ApiResponse::err("Invalid point ID")
       }
       match manager.remove_point(name, @types.VectorId::from_int64(id)) {
-        Ok(_) => ApiResponse::ok(JBool(true))
+        Ok(_) => ApiResponse::ok(true.to_json())
         Err(e) => ApiResponse::err(error_to_string(e))
       }
     }

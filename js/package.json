@@ -13,6 +13,37 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+
+    "./ffi/types": {
+      "types": "./dist/ffi/types.d.ts",
+      "import": "./dist/ffi/types.js"
+    },
+    "./loader": {
+      "types": "./dist/ffi/loader.d.ts",
+      "import": "./dist/ffi/loader.js"
+    },
+    "./wasm/lib.js": {
+      "types": "./dist/wasm/lib.d.ts",
+      "default": "./dist/wasm/lib.js"
+    },
+
+    "./persistent": {
+      "types": "./dist/persistent.d.ts",
+      "import": "./dist/persistent.js"
+    },
+    "./db": {
+      "types": "./dist/db.d.ts",
+      "import": "./dist/db.js"
+    },
+    "./distributed": {
+      "types": "./dist/distributed.d.ts",
+      "import": "./dist/distributed.js"
+    },
+    "./gateway": {
+      "types": "./dist/gateway.d.ts",
+      "import": "./dist/gateway.js"
+    },
+
     "./storage/memory": {
       "types": "./dist/storage/memory.d.ts",
       "import": "./dist/storage/memory.js"
@@ -20,6 +51,10 @@
     "./storage/node": {
       "types": "./dist/storage/node.d.ts",
       "import": "./dist/storage/node.js"
+    },
+    "./storage/cached": {
+      "types": "./dist/storage/cached-storage.d.ts",
+      "import": "./dist/storage/cached-storage.js"
     },
     "./storage/indexeddb": {
       "types": "./dist/storage/indexeddb.d.ts",
@@ -37,21 +72,18 @@
       "types": "./dist/storage/service-worker.d.ts",
       "import": "./dist/storage/service-worker.js"
     },
-    "./storage/wasm-bridge": {
-      "types": "./dist/storage/wasm-bridge.d.ts",
-      "import": "./dist/storage/wasm-bridge.js"
+    "./storage/r2": {
+      "types": "./dist/storage/r2.d.ts",
+      "import": "./dist/storage/r2.js"
     },
-    "./wasm": {
-      "types": "./dist/wasm/index.d.ts",
-      "import": "./dist/wasm/index.js"
-    },
-    "./wasm/lib.js": {
-      "default": "./dist/wasm/lib.js"
+    "./storage/do-kv": {
+      "types": "./dist/storage/do-kv.d.ts",
+      "import": "./dist/storage/do-kv.js"
     }
   },
   "scripts": {
-    "build:moon": "cd .. && moon build --target js lib",
-    "copy:moon": "cp ../_build/js/debug/build/lib/lib.js dist/wasm/ && cp ../_build/js/debug/build/lib/moonbit.d.ts dist/wasm/",
+    "build:moon": "cd .. && moon build --target js ffi",
+    "copy:moon": "cp ../_build/js/debug/build/ffi/ffi.js dist/wasm/lib.js && cp ../_build/js/debug/build/ffi/moonbit.d.ts dist/wasm/",
     "build:ts": "tsc",
     "build": "npm run build:moon && npm run build:ts && npm run copy:moon",
     "start": "node dist/server.js",
@@ -62,7 +94,7 @@
     "test:smoke": "node test/smoke.test.mjs",
     "test:spec": "npx tsx spec/node.runner.ts",
     "test:spec:browser": "npx tsx spec/browser.runner.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.typecheck.json"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

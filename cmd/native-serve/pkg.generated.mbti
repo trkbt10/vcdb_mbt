@@ -6,7 +6,6 @@ package "trkbt10/vcdb/cmd/native-serve"
 // Errors
 
 // Types and methods
-type ServerOptions
 
 // Type aliases
 

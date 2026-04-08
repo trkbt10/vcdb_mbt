@@ -133,8 +133,8 @@ pub fn[S] Router::get_manager(
 }
 
 ///|
-/// Route an HTTP request to the appropriate handler
-pub fn[S : @storage.Storage] Router::route(
+/// Route an HTTP request to the appropriate handler (async)
+pub async fn[S : @storage.AsyncStorage] Router::route(
   self : Router[S],
   request : HttpRequest,
 ) -> HttpResponse {
@@ -146,7 +146,7 @@ pub fn[S : @storage.Storage] Router::route(
   )
 
   // Convert gateway response to HTTP response
-  let json_body = response.to_json().to_string()
+  let json_body = response.to_json().stringify()
   if response.status == "ok" {
     HttpResponse::ok(json_body)
   } else {
@@ -166,8 +166,8 @@ pub fn[S : @storage.Storage] Router::route(
 }
 
 ///|
-/// Convenience method to handle a raw HTTP request
-pub fn[S : @storage.Storage] handle_http(
+/// Convenience method to handle a raw HTTP request (async)
+pub async fn[S : @storage.AsyncStorage] handle_http(
   router : Router[S],
   http_method : String,
   path : String,

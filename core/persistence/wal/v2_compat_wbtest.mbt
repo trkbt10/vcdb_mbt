@@ -34,10 +34,9 @@ test "v2/timestamp_zero_is_valid" {
   let r = @binary.BinaryReader::new(encoded)
   let decoded = decode_wal_record(r)
   match decoded {
-    Some(rec) => {
+    Some(rec) =>
       // timestamp=0 but flags still has has_timestamp bit set (v2 format)
       inspect(rec.timestamp, content="0")
-    }
     None => inspect(false, content="true")
   }
 }

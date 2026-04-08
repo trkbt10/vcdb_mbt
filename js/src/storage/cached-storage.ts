@@ -1,13 +1,15 @@
 /**
- * @file Cached storage wrapper
+ * @file Cached storage adapter.
  *
- * Wraps an async StorageAdapter with an in-memory cache for WASM compatibility.
+ * Wraps an async StorageAdapter with an in-memory cache.
  * - prefetch(): Load data from storage into cache
  * - flush(): Write dirty entries back to storage
- * - getCallbacks(): Sync callbacks for WASM (operates on cache)
+ * - getCallbacks(): Synchronous read/write callbacks (for any sync consumer)
+ *
+ * This has no dependency on WASM or FFI — it is a pure storage concern.
  */
 import type { StorageAdapter, StorageKindType } from "./types.js";
-import type { WasmStorageCallbacks } from "../wasm/vcdb.js";
+import type { SyncStorageCallbacks } from "../ffi/types.js";
 import { StorageKind } from "./types.js";
 
 export interface CachedStorageOptions {
@@ -25,7 +27,7 @@ interface CacheEntry {
 export class CachedStorage {
   private adapter: StorageAdapter;
   private cache = new Map<string, CacheEntry>();
-  private deleted = new Set<string>(); // Track deletions for flush
+  private deleted = new Set<string>();
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private flushing = false;
 
@@ -50,10 +52,6 @@ export class CachedStorage {
     return { path, kind };
   }
 
-  /**
-   * Load all data from storage into cache.
-   * Call this before using WASM callbacks.
-   */
   async prefetch(): Promise<void> {
     const kinds: StorageKindType[] = [
       StorageKind.Config,
@@ -74,10 +72,6 @@ export class CachedStorage {
     }
   }
 
-  /**
-   * Load specific paths into cache.
-   * More efficient than full prefetch for partial loads.
-   */
   async prefetchPaths(
     paths: Array<{ path: string; kind: StorageKindType }>
   ): Promise<void> {
@@ -94,13 +88,8 @@ export class CachedStorage {
     );
   }
 
-  /**
-   * Write all dirty entries back to storage.
-   * Returns list of paths that failed to flush.
-   */
   async flush(): Promise<string[]> {
     if (this.flushing) {
-      // Avoid concurrent flushes
       return [];
     }
 
@@ -108,7 +97,6 @@ export class CachedStorage {
     const failed: string[] = [];
 
     try {
-      // Process deletions first
       const deletePromises = Array.from(this.deleted).map(async (key) => {
         const { path, kind } = this.parseKey(key);
         try {
@@ -121,7 +109,6 @@ export class CachedStorage {
       });
       await Promise.all(deletePromises);
 
-      // Process dirty writes
       const writePromises: Promise<void>[] = [];
       for (const [key, entry] of this.cache) {
         if (entry.dirty) {
@@ -147,9 +134,6 @@ export class CachedStorage {
     return failed;
   }
 
-  /**
-   * Flush and throw if any failures occurred.
-   */
   async flushOrThrow(): Promise<void> {
     const failed = await this.flush();
     if (failed.length > 0) {
@@ -157,9 +141,6 @@ export class CachedStorage {
     }
   }
 
-  /**
-   * Check if there are unflushed changes.
-   */
   hasDirty(): boolean {
     if (this.deleted.size > 0) return true;
     for (const entry of this.cache.values()) {
@@ -169,10 +150,12 @@ export class CachedStorage {
   }
 
   /**
-   * Get synchronous callbacks for WASM gateway.
-   * These operate on the in-memory cache.
+   * Get synchronous callbacks operating on the in-memory cache.
+   *
+   * The returned shape matches SyncStorageCallbacks from ffi/types,
+   * suitable for passing to gateway registration or any other sync consumer.
    */
-  getCallbacks(): WasmStorageCallbacks {
+  getCallbacks(): SyncStorageCallbacks {
     return {
       read: (path: string, kind: number): Uint8Array => {
         const entry = this.cache.get(this.makeKey(path, kind as StorageKindType));
@@ -182,7 +165,7 @@ export class CachedStorage {
       write: (path: string, data: Uint8Array, kind: number): void => {
         const key = this.makeKey(path, kind as StorageKindType);
         this.cache.set(key, { data: new Uint8Array(data), dirty: true });
-        this.deleted.delete(key); // In case it was marked for deletion
+        this.deleted.delete(key);
       },
 
       exists: (path: string, kind: number): boolean => {
@@ -211,9 +194,6 @@ export class CachedStorage {
     };
   }
 
-  /**
-   * Stop auto-flush timer and perform final flush.
-   */
   async close(): Promise<void> {
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
@@ -222,9 +202,6 @@ export class CachedStorage {
     await this.flushOrThrow();
   }
 
-  /**
-   * Clear cache without flushing. Use with caution.
-   */
   clear(): void {
     this.cache.clear();
     this.deleted.clear();

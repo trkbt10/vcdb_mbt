@@ -28,7 +28,7 @@ pub fn CollectionConfig::default(name : String, dim : Int) -> CollectionConfig {
     name,
     dim,
     metric: @types.Cosine,
-    strategy: @types.HNSW(@types.HNSWParams::default()),
+    strategy: @types.Strategy::default_hnsw(),
   }
 }
 
@@ -37,54 +37,91 @@ pub fn CollectionConfig::default(name : String, dim : Int) -> CollectionConfig {
 /// Supports both formats:
 /// - {"dim": 4, "metric": "Cosine"}
 /// - {"vectors": {"size": 4, "distance": "Cosine"}} (Qdrant-compatible)
-pub fn CollectionConfig::from_json(json : JsonValue) -> CollectionConfig? {
+pub fn CollectionConfig::from_json(
+  json : Json,
+) -> Result[CollectionConfig, String] {
   match json {
-    JObject(_) => {
+    Object(_) => {
       let name = get_string(json, "name").unwrap_or("")
-      // Support both formats for dimension
-      let dim = match get_object(json, "vectors") {
-        Some(vectors) => get_int(JObject(vectors), "size").unwrap_or(128)
-        None => get_int(json, "dim").unwrap_or(128)
+      let dim = match parse_collection_dim(json) {
+        Ok(v) => v
+        Err(err) => return Err(err)
       }
-      // Support both formats for metric
-      let metric_str = match get_object(json, "vectors") {
-        Some(vectors) => get_string(JObject(vectors), "distance")
-        None => get_string(json, "metric")
+      let metric = match parse_collection_metric(json) {
+        Ok(v) => v
+        Err(err) => return Err(err)
       }
-      let metric = match metric_str {
-        Some("l2") | Some("L2") => @types.L2
-        Some("dot") | Some("Dot") => @types.Dot
-        _ => @types.Cosine
+      let strategy = match parse_collection_strategy(json) {
+        Ok(v) => v
+        Err(err) => return Err(err)
       }
-      let strategy = match get_string(json, "strategy") {
-        Some("bruteforce") | Some("Bruteforce") => @types.Bruteforce
-        Some("ivf") | Some("IVF") => @types.IVF(@types.IVFParams::default())
-        _ => @types.HNSW(@types.HNSWParams::default())
-      }
-      Some({ name, dim, metric, strategy })
+      Ok({ name, dim, metric, strategy })
     }
-    _ => None
+    _ => Err("expected JSON object")
+  }
+}
+
+///|
+fn parse_collection_dim(json : Json) -> Result[Int, String] {
+  match get_object(json, "vectors") {
+    Some(vectors) =>
+      match get_int(Json::object(vectors), "size") {
+        Some(dim) =>
+          if dim > 0 {
+            Ok(dim)
+          } else {
+            Err("vectors.size must be > 0")
+          }
+        None => Err("vectors.size is required")
+      }
+    None =>
+      match get_int(json, "dim") {
+        Some(dim) => if dim > 0 { Ok(dim) } else { Err("dim must be > 0") }
+        None => Err("dim is required")
+      }
+  }
+}
+
+///|
+fn parse_collection_metric(json : Json) -> Result[@types.Metric, String] {
+  let metric_str = match get_object(json, "vectors") {
+    Some(vectors) => get_string(Json::object(vectors), "distance")
+    None => get_string(json, "metric")
+  }
+  match metric_str {
+    None => Ok(@types.Cosine)
+    Some(s) =>
+      match @types.Metric::from_name(s) {
+        Some(m) => Ok(m)
+        None => Err("unsupported metric: " + s)
+      }
+  }
+}
+
+///|
+fn parse_collection_strategy(
+  json : Json,
+) -> Result[@types.Strategy, String] {
+  match get_string(json, "strategy") {
+    None => Ok(@types.Strategy::default_hnsw())
+    Some(s) =>
+      match @types.Strategy::from_name(s) {
+        Some(st) => Ok(st)
+        None => Err("unsupported strategy: " + s)
+      }
   }
 }
 
 ///|
 /// Convert collection config to JSON
-pub fn CollectionConfig::to_json(self : CollectionConfig) -> JsonValue {
-  let metric_str = match self.metric {
-    @types.Cosine => "Cosine"
-    @types.L2 => "L2"
-    @types.Dot => "Dot"
-  }
-  let strategy_str = match self.strategy {
-    @types.Bruteforce => "Bruteforce"
-    @types.HNSW(_) => "HNSW"
-    @types.IVF(_) => "IVF"
-  }
+pub fn CollectionConfig::to_json(self : CollectionConfig) -> Json {
+  let metric_str = self.metric.to_name()
+  let strategy_str = self.strategy.to_name()
   json_object([
-    ("name", JString(self.name)),
-    ("dim", JNumber(self.dim.to_double())),
-    ("metric", JString(metric_str)),
-    ("strategy", JString(strategy_str)),
+    ("name", self.name.to_json()),
+    ("dim", self.dim.to_double().to_json()),
+    ("metric", metric_str.to_json()),
+    ("strategy", strategy_str.to_json()),
   ])
 }
 
@@ -98,9 +135,9 @@ pub struct PointData {
 
 ///|
 /// Parse point from JSON
-pub fn PointData::from_json(json : JsonValue) -> PointData? {
+pub fn PointData::from_json(json : Json) -> PointData? {
   match json {
-    JObject(_) => {
+    Object(_) => {
       let id = match get_int64(json, "id") {
         Some(i) => i
         None => return None
@@ -109,12 +146,16 @@ pub fn PointData::from_json(json : JsonValue) -> PointData? {
         Some(arr) => arr
         None => return None
       }
-      let vector = match json_to_vector(JArray(vector_json)) {
+      let vector = match json_to_vector(Json::array(vector_json)) {
         Some(v) => v
         None => return None
       }
       let payload = match get_object(json, "payload") {
-        Some(obj) => json_to_attrs(JObject(obj)).unwrap_or(@types.empty_attrs())
+        Some(obj) =>
+          match json_to_attrs(Json::object(obj)) {
+            Some(attrs) => attrs
+            None => return None
+          }
         None => @types.empty_attrs()
       }
       Some({ id, vector, payload })
@@ -125,9 +166,9 @@ pub fn PointData::from_json(json : JsonValue) -> PointData? {
 
 ///|
 /// Convert point to JSON
-pub fn PointData::to_json(self : PointData) -> JsonValue {
+pub fn PointData::to_json(self : PointData) -> Json {
   json_object([
-    ("id", JNumber(self.id.to_double())),
+    ("id", self.id.to_double().to_json()),
     ("vector", vector_to_json(self.vector)),
     ("payload", attrs_to_json(self.payload)),
   ])
@@ -141,9 +182,9 @@ pub struct UpsertRequest {
 
 ///|
 /// Parse upsert request from JSON
-pub fn UpsertRequest::from_json(json : JsonValue) -> UpsertRequest? {
+pub fn UpsertRequest::from_json(json : Json) -> UpsertRequest? {
   match json {
-    JObject(_) => {
+    Object(_) => {
       let points_json = match get_array(json, "points") {
         Some(arr) => arr
         None => return None
@@ -166,29 +207,29 @@ pub fn UpsertRequest::from_json(json : JsonValue) -> UpsertRequest? {
 pub struct SearchRequest {
   vector : Array[Double]
   limit : Int
-  filter : JsonValue? // Optional filter expression as JSON
+  filter : Json?
   with_payload : Bool
   with_vector : Bool
 } derive(Show)
 
 ///|
 /// Parse search request from JSON
-pub fn SearchRequest::from_json(json : JsonValue) -> SearchRequest? {
+pub fn SearchRequest::from_json(json : Json) -> SearchRequest? {
   match json {
-    JObject(_) => {
+    Object(_) => {
       let vector_json = match get_array(json, "vector") {
         Some(arr) => arr
         None => return None
       }
-      let vector = match json_to_vector(JArray(vector_json)) {
+      let vector = match json_to_vector(Json::array(vector_json)) {
         Some(v) => v
         None => return None
       }
       let limit = get_int(json, "limit").unwrap_or(10)
       let with_payload = get_bool(json, "with_payload").unwrap_or(true)
       let with_vector = get_bool(json, "with_vector").unwrap_or(false)
-      let filter = match get_object(json, "filter") {
-        Some(f) => Some(JObject(f))
+      let filter : Json? = match get_object(json, "filter") {
+        Some(f) => Some(Json::object(f))
         None => None
       }
       Some({ vector, limit, filter, with_payload, with_vector })
@@ -208,10 +249,10 @@ pub struct SearchHitResponse {
 
 ///|
 /// Convert search hit to JSON
-pub fn SearchHitResponse::to_json(self : SearchHitResponse) -> JsonValue {
-  let parts : Array[(String, JsonValue)] = [
-    ("id", JNumber(self.id.to_double())),
-    ("score", JNumber(self.score)),
+pub fn SearchHitResponse::to_json(self : SearchHitResponse) -> Json {
+  let parts : Array[(String, Json)] = [
+    ("id", self.id.to_double().to_json()),
+    ("score", self.score.to_json()),
   ]
   match self.payload {
     Some(p) => parts.push(("payload", attrs_to_json(p)))
@@ -233,9 +274,9 @@ pub struct SearchResponse {
 
 ///|
 /// Convert search response to JSON
-pub fn SearchResponse::to_json(self : SearchResponse) -> JsonValue {
-  let results = JArray(self.result.map(fn(h) { h.to_json() }))
-  json_object([("result", results), ("time", JNumber(self.time_ms))])
+pub fn SearchResponse::to_json(self : SearchResponse) -> Json {
+  let results = Json::array(self.result.map(fn(h) { h.to_json() }))
+  json_object([("result", results), ("time", self.time_ms.to_json())])
 }
 
 ///|
@@ -248,9 +289,9 @@ pub struct PointResponse {
 
 ///|
 /// Convert point response to JSON
-pub fn PointResponse::to_json(self : PointResponse) -> JsonValue {
+pub fn PointResponse::to_json(self : PointResponse) -> Json {
   json_object([
-    ("id", JNumber(self.id.to_double())),
+    ("id", self.id.to_double().to_json()),
     ("payload", attrs_to_json(self.payload)),
     ("vector", vector_to_json(self.vector)),
   ])
@@ -266,9 +307,9 @@ pub struct ScrollRequest {
 } derive(Show)
 
 ///|
-pub fn ScrollRequest::from_json(json : JsonValue) -> ScrollRequest? {
+pub fn ScrollRequest::from_json(json : Json) -> ScrollRequest? {
   match json {
-    JObject(_) =>
+    Object(_) =>
       Some({
         offset: get_int64(json, "offset"),
         limit: get_int(json, "limit").unwrap_or(10),
@@ -287,9 +328,9 @@ pub struct ScrollPointResponse {
 } derive(Show)
 
 ///|
-pub fn ScrollPointResponse::to_json(self : ScrollPointResponse) -> JsonValue {
-  let parts : Array[(String, JsonValue)] = [
-    ("id", JNumber(self.id.to_double())),
+pub fn ScrollPointResponse::to_json(self : ScrollPointResponse) -> Json {
+  let parts : Array[(String, Json)] = [
+    ("id", self.id.to_double().to_json()),
   ]
   match self.payload {
     Some(payload) => parts.push(("payload", attrs_to_json(payload)))
@@ -309,13 +350,13 @@ pub struct ScrollResponse {
 } derive(Show)
 
 ///|
-pub fn ScrollResponse::to_json(self : ScrollResponse) -> JsonValue {
-  let parts : Array[(String, JsonValue)] = [
-    ("points", JArray(self.points.map(fn(point) { point.to_json() }))),
+pub fn ScrollResponse::to_json(self : ScrollResponse) -> Json {
+  let parts : Array[(String, Json)] = [
+    ("points", Json::array(self.points.map(fn(point) { point.to_json() }))),
   ]
   match self.next_page_offset {
     Some(offset) =>
-      parts.push(("next_page_offset", JNumber(offset.to_double())))
+      parts.push(("next_page_offset", offset.to_double().to_json()))
     None => ()
   }
   json_object(parts)
@@ -333,13 +374,13 @@ pub struct CollectionInfo {
 
 ///|
 /// Convert collection info to JSON
-pub fn CollectionInfo::to_json(self : CollectionInfo) -> JsonValue {
+pub fn CollectionInfo::to_json(self : CollectionInfo) -> Json {
   json_object([
-    ("name", JString(self.name)),
-    ("vectors_count", JNumber(self.vectors_count.to_double())),
-    ("dim", JNumber(self.dim.to_double())),
-    ("metric", JString(self.metric)),
-    ("strategy", JString(self.strategy)),
+    ("name", self.name.to_json()),
+    ("vectors_count", self.vectors_count.to_double().to_json()),
+    ("dim", self.dim.to_double().to_json()),
+    ("metric", self.metric.to_json()),
+    ("strategy", self.strategy.to_json()),
   ])
 }
 
@@ -351,8 +392,8 @@ pub struct CollectionsResponse {
 
 ///|
 /// Convert collections list to JSON
-pub fn CollectionsResponse::to_json(self : CollectionsResponse) -> JsonValue {
-  let collections = JArray(self.collections.map(fn(c) { c.to_json() }))
+pub fn CollectionsResponse::to_json(self : CollectionsResponse) -> Json {
+  let collections = Json::array(self.collections.map(fn(c) { c.to_json() }))
   json_object([("collections", collections)])
 }
 
@@ -360,13 +401,13 @@ pub fn CollectionsResponse::to_json(self : CollectionsResponse) -> JsonValue {
 /// Generic API response wrapper
 pub struct ApiResponse {
   status : String
-  result : JsonValue?
+  result : Json?
   error : String?
 } derive(Show)
 
 ///|
 /// Create success response
-pub fn ApiResponse::ok(result : JsonValue) -> ApiResponse {
+pub fn ApiResponse::ok(result : Json) -> ApiResponse {
   { status: "ok", result: Some(result), error: None }
 }
 
@@ -378,14 +419,14 @@ pub fn ApiResponse::err(message : String) -> ApiResponse {
 
 ///|
 /// Convert API response to JSON
-pub fn ApiResponse::to_json(self : ApiResponse) -> JsonValue {
-  let parts : Array[(String, JsonValue)] = [("status", JString(self.status))]
+pub fn ApiResponse::to_json(self : ApiResponse) -> Json {
+  let parts : Array[(String, Json)] = [("status", self.status.to_json())]
   match self.result {
     Some(r) => parts.push(("result", r))
     None => ()
   }
   match self.error {
-    Some(e) => parts.push(("error", JString(e)))
+    Some(e) => parts.push(("error", e.to_json()))
     None => ()
   }
   json_object(parts)
