@@ -69,6 +69,8 @@ pub(all) enum Metric {
   L2
   Dot
 } derive(Eq, Show)
+pub fn Metric::from_name(String) -> Self?
+pub fn Metric::to_name(Self) -> String
 
 pub(all) struct NumericRange {
   gt : Double?
@@ -95,6 +97,10 @@ pub(all) enum Strategy {
   HNSW(HNSWParams)
   IVF(IVFParams)
 } derive(Show)
+pub fn Strategy::default_hnsw() -> Self
+pub fn Strategy::default_ivf() -> Self
+pub fn Strategy::from_name(String) -> Self?
+pub fn Strategy::to_name(Self) -> String
 
 pub(all) struct VectorId(Int64) derive(Compare, Eq, Hash, Show)
 pub fn VectorId::from_int(Int) -> Self

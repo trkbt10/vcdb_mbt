@@ -186,7 +186,7 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::create(
     Ok(())
   } catch {
     @storage.AsyncIOFailed(msg) => Err(StorageError(msg))
-    e => abort(e.to_string())
+    e => Err(StorageError(e.to_string()))
   }
 }
 
@@ -256,7 +256,7 @@ async fn[S : @storage.AsyncStorage] CollectionManager::load_collection_from_stor
     Ok(Some({ config, db }))
   } catch {
     @storage.AsyncIOFailed(msg) => Err(StorageError(msg))
-    e => abort(e.to_string())
+    e => Err(StorageError(e.to_string()))
   }
 }
 
@@ -373,7 +373,7 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::delete(
     Ok(())
   } catch {
     @storage.AsyncIOFailed(msg) => Err(StorageError(msg))
-    e => abort(e.to_string())
+    e => Err(StorageError(e.to_string()))
   }
 }
 
@@ -429,7 +429,7 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::list(
     Ok(names)
   } catch {
     @storage.AsyncIOFailed(msg) => Err(StorageError(msg))
-    e => abort(e.to_string())
+    e => Err(StorageError(e.to_string()))
   }
 }
 

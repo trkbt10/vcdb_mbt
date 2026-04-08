@@ -2,37 +2,32 @@
 package "trkbt10/vcdb/cli"
 
 import {
-  "trkbt10/vcdb/gateway",
+  "moonbitlang/core/argparse",
+  "trkbt10/vcdb/core/types",
 }
 
 // Values
-pub fn parse_args(Array[String]) -> ParsedArgs
+pub fn get_int_value(@argparse.Matches, String) -> Int?
 
-pub fn parse_payload(String) -> @gateway.JsonValue
+pub fn get_int_value_or(@argparse.Matches, String, Int) -> Int
+
+pub fn get_value(@argparse.Matches, String) -> String?
+
+pub fn get_value_or(@argparse.Matches, String, String) -> String
+
+pub fn parse_metric(String) -> @types.Metric?
+
+pub fn parse_payload(String) -> Json
+
+pub fn parse_strategy(String) -> @types.Strategy?
 
 pub fn parse_vector(String) -> Array[Double]?
 
-pub fn print_help() -> String
-
-pub fn print_version() -> String
+pub fn vcdb_command() -> @argparse.Command
 
 // Errors
 
 // Types and methods
-pub struct ParsedArgs {
-  mut command : String
-  mut subcommand : String
-  positional : Array[String]
-  flags : Map[String, String]
-  bool_flags : Map[String, Bool]
-} derive(Show)
-pub fn ParsedArgs::empty() -> Self
-pub fn ParsedArgs::get_flag(Self, String) -> String?
-pub fn ParsedArgs::get_flag_or(Self, String, String) -> String
-pub fn ParsedArgs::get_int_flag(Self, String) -> Int?
-pub fn ParsedArgs::get_int_flag_or(Self, String, Int) -> Int
-pub fn ParsedArgs::get_positional(Self, Int) -> String?
-pub fn ParsedArgs::has_flag(Self, String) -> Bool
 
 // Type aliases
 

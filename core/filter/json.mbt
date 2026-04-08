@@ -232,13 +232,6 @@ fn LeafExpr::to_json(self : LeafExpr) -> Json {
 }
 
 ///|
-fn json_null() -> Json {
-  @json.parse("null") catch {
-    _ => abort("failed to construct JSON null")
-  }
-}
-
-///|
 fn @types.AttrValue::to_json(self : @types.AttrValue) -> Json {
   @codec.attr_value_to_json(self)
 }

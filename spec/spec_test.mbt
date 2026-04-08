@@ -32,25 +32,25 @@ test "spec/metric/dot_exact" {
     // v2 = [0, 1, 0] -> dot = 1*0 + 2*1 + 3*0 = 2.0
     // v3 = [0, 0, 1] -> dot = 1*0 + 2*0 + 3*1 = 3.0
     // v4 = [1, 1, 1] -> dot = 1*1 + 2*1 + 3*1 = 6.0
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(3),
       [0.0, 0.0, 1.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(4),
       [1.0, 1.0, 1.0],
       @types.empty_attrs(),
@@ -83,10 +83,10 @@ test "spec/metric/l2_exact" {
     // v2 = [1, 0] -> L2^2 = 1
     // v3 = [0, 2] -> L2^2 = 4
     // v4 = [3, 4] -> L2^2 = 25
-    db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(3), [0.0, 2.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(4), [3.0, 4.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [0.0, 2.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(4), [3.0, 4.0], @types.empty_attrs(), 0L)
     let results = db.search([0.0, 0.0], 4, None)
     // Expected order by -L2^2: v1 (0) > v2 (-1) > v3 (-4) > v4 (-25)
     inspect(results[0].id.to_int64(), content="1")
@@ -111,9 +111,9 @@ test "spec/metric/cosine_normalization" {
     )
     // Vectors with same direction but different magnitudes
     // [1, 0] and [2, 0] should have the same cosine similarity to [1, 0]
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [2.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(3), [100.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [2.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [100.0, 0.0], @types.empty_attrs(), 0L)
     let results = db.search([1.0, 0.0], 3, None)
     // All should have cosine similarity = 1.0 (same direction)
     // Verify they are indistinguishable (all score 1.0)
@@ -133,8 +133,8 @@ test "spec/metric/cosine_orthogonal" {
       strategy=@types.Bruteforce,
     )
     // Orthogonal vectors should have cosine = 0
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
     let results = db.search([1.0, 0.0], 2, None)
     // v1 should be perfect match (cos=1), v2 orthogonal (cos=0)
     inspect(results[0].id.to_int64(), content="1")
@@ -154,8 +154,8 @@ test "spec/metric/cosine_opposite" {
       strategy=@types.Bruteforce,
     )
     // Opposite vectors should have cosine = -1
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [-1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [-1.0, 0.0], @types.empty_attrs(), 0L)
     let results = db.search([1.0, 0.0], 2, None)
     inspect(results[0].id.to_int64(), content="1")
     inspect(results[0].score, content="1")
@@ -174,19 +174,19 @@ test "spec/metric/cosine_opposite" {
 test "spec/search/k1_best_match" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(1),
       [0.9, 0.1, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     ) // Best match
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(3),
       [0.8, 0.2, 0.0],
       @types.empty_attrs(),
@@ -203,8 +203,8 @@ test "spec/search/k1_best_match" {
 test "spec/search/k_exceeds_size" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
     let results = db.search([1.0, 0.0], 100, None)
     inspect(results.length(), content="2")
   })
@@ -218,7 +218,7 @@ test "spec/search/filter_reduces" {
     for i in 1..<=10 {
       let attrs = @types.empty_attrs()
       attrs.set("even", @types.Bool(i % 2 == 0))
-      db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
+      let _ = db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
     }
     let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
       match attrs.get("even") {
@@ -245,11 +245,11 @@ test "spec/search/sorted_descending" {
       strategy=@types.Bruteforce,
     )
     // Add in random order
-    db.add(@types.VectorId::from_int(3), [3.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(1), [1.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(5), [5.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [2.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(4), [4.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [3.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(5), [5.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [2.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(4), [4.0], @types.empty_attrs(), 0L)
     let results = db.search([1.0], 5, None)
     // Should be sorted by dot product: 5, 4, 3, 2, 1
     inspect(results[0].id.to_int64(), content="5")
@@ -280,8 +280,8 @@ test "spec/recall/hnsw_top1_in_top3" {
         ((i + 2) % 5).to_double(),
         ((i + 3) % 5).to_double(),
       ]
-      bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
-      hnsw_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = hnsw_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     // Test multiple queries - HNSW top-1 should be in Bruteforce top-3
     let queries = [
@@ -322,8 +322,8 @@ test "spec/recall/ivf_trained_recall" {
         1 => [0.0, 1.0, 0.0, 0.0]
         _ => [0.0, 0.0, 1.0, 0.0]
       }
-      bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
-      ivf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = ivf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     ivf_db.train(iterations=10)
     // Query for cluster 0 center
@@ -364,9 +364,9 @@ test "spec/recall/exact_match_all_strategies" {
           (i.to_double() + 2.0) % 5.0,
         ]
       }
-      bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
-      hnsw_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
-      ivf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = hnsw_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = ivf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     // All should find id=7 as top result (dot = 100, others max dot with [10,0,0] is <50)
     let bf_result = bf_db.find(query, None)
@@ -390,7 +390,7 @@ test "spec/crud/add_remove_add" {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
     let id = @types.VectorId::from_int(42)
     // Add
-    db.add(id, [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(id, [1.0, 0.0], @types.empty_attrs(), 0L)
     inspect(db.has(id), content="true")
     let r1 = db.get(id).unwrap()
     inspect(r1.vector[0], content="1")
@@ -399,7 +399,7 @@ test "spec/crud/add_remove_add" {
     inspect(removed, content="true")
     inspect(db.has(id), content="false")
     // Re-add with different vector
-    db.add(id, [0.0, 1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(id, [0.0, 1.0], @types.empty_attrs(), 0L)
     inspect(db.has(id), content="true")
     let r2 = db.get(id).unwrap()
     inspect(r2.vector[0], content="0")
@@ -413,8 +413,8 @@ test "spec/crud/upsert_search_correctness" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
     // Add vectors
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
     // Initial search: [1,0] should find id=1
     let r1 = db.find([1.0, 0.0], None)
     inspect(r1.unwrap().id.to_int64(), content="1")
@@ -444,7 +444,7 @@ test "spec/crud/remove_excludes_from_search" {
       strategy=@types.Bruteforce,
     )
     for i in 1..<=5 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double(), 0.0],
         @types.empty_attrs(),
@@ -477,13 +477,13 @@ test "spec/edge/zero_vector_l2" {
       strategy=@types.Bruteforce,
     )
     // Zero vector should have L2 distance 0 to itself
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(1),
       [0.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
@@ -504,14 +504,14 @@ test "spec/edge/small_differences" {
       metric=@types.Dot,
       strategy=@types.Bruteforce,
     )
-    db.add(@types.VectorId::from_int(1), [1.0], @types.empty_attrs(), 0L)
-    db.add(
+    let _ = db.add(@types.VectorId::from_int(1), [1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [1.0000000001],
       @types.empty_attrs(),
       0L,
     )
-    db.add(@types.VectorId::from_int(3), [1.00001], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [1.00001], @types.empty_attrs(), 0L)
     let results = db.search([1.0], 3, None)
     // Should be ordered by score descending: 3 > 2 > 1
     inspect(results[0].id.to_int64(), content="3")
@@ -534,7 +534,7 @@ test "spec/edge/sparse_high_dim" {
     for i in 0..<10 {
       let v : Array[Double] = Array::make(dim, 0.0)
       v[i] = 1.0 // Single hot encoding
-      db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     // Query with single hot at position 5
     let query : Array[Double] = Array::make(dim, 0.0)
@@ -552,9 +552,9 @@ test "spec/edge/duplicate_vectors" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
     // Add same vector with different IDs
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(3), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [1.0, 0.0], @types.empty_attrs(), 0L)
     let results = db.search([1.0, 0.0], 3, None)
     // All should have same score
     inspect(results[0].score, content="1")
@@ -590,7 +590,7 @@ test "spec/edge/empty_db_search" {
 test "spec/edge/k_zero" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
     let results = db.search([1.0, 0.0], 0, None)
     inspect(results.length(), content="0")
   })
@@ -614,7 +614,7 @@ test "spec/serialization/search_preserved" {
         ((i + 2) % 4).to_double(),
         ((i + 3) % 4).to_double(),
       ]
-      db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     // Search before serialization
     let query = [1.0, 2.0, 3.0, 0.0]
@@ -646,7 +646,7 @@ test "spec/serialization/attrs_preserved" {
     attrs.set("count", @types.Int(42L))
     attrs.set("score", @types.Float(3.14159))
     attrs.set("active", @types.Bool(true))
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
     // Serialize and deserialize
     let db2 = @vcdb.PersistentDB::deserialize(db.serialize_snapshot())
     // Verify attributes
@@ -677,7 +677,7 @@ test "spec/serialization/hnsw_graph_preserved" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
     for i in 0..<30 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [
           (i % 3).to_double(),
@@ -722,7 +722,7 @@ test "spec/filter/and_logic" {
       let attrs = @types.empty_attrs()
       attrs.set("value", @types.Int(i.to_int64()))
       attrs.set("even", @types.Bool(i % 2 == 0))
-      db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
+      let _ = db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
     }
     // Filter: value >= 5 AND even = true
     // Should match: 6, 8, 10
@@ -758,7 +758,7 @@ test "spec/filter/or_logic" {
         "category",
         @types.String(if i <= 3 { "A" } else if i <= 6 { "B" } else { "C" }),
       )
-      db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
+      let _ = db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
     }
     // Filter: category = "A" OR category = "C"
     // Should match: 1,2,3,7,8,9,10 (7 results)
@@ -781,7 +781,7 @@ test "spec/filter/no_match" {
     for i in 1..<=5 {
       let attrs = @types.empty_attrs()
       attrs.set("type", @types.String("normal"))
-      db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
+      let _ = db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
     }
     // Filter for non-existent type
     let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
@@ -806,7 +806,7 @@ test "spec/stress/interleaved_operations" {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
     // Add initial vectors
     for i in 1..<=20 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double(), 0.0],
         @types.empty_attrs(),
@@ -819,7 +819,7 @@ test "spec/stress/interleaved_operations" {
     }
     // Add more
     for i in 21..<=25 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double(), 0.0],
         @types.empty_attrs(),
@@ -849,7 +849,7 @@ test "spec/stress/many_upserts" {
     )
     let id = @types.VectorId::from_int(1)
     // Add initial
-    db.add(id, [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(id, [1.0, 0.0], @types.empty_attrs(), 0L)
     // Upsert 50 times
     for i in 1..<=50 {
       db.upsert([(id, [i.to_double(), 0.0], @types.empty_attrs())], 0L)
@@ -910,7 +910,7 @@ test "spec/hnsw/tombstone_exclusion" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_hnsw(2, metric=@types.Dot)
     for i in 1..<=10 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double(), 0.0],
         @types.empty_attrs(),
@@ -932,14 +932,14 @@ test "spec/hnsw/readd_after_tombstone" {
     let db = @vcdb.PersistentDB::in_memory_hnsw(2, metric=@types.Dot)
     let id = @types.VectorId::from_int(1)
     // Add, remove, re-add with different vector
-    db.add(id, [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(id, [1.0, 0.0], @types.empty_attrs(), 0L)
     let _ = db.remove(id, 0L)
-    db.add(id, [0.0, 10.0], @types.empty_attrs(), 0L)
+    let _ = db.add(id, [0.0, 10.0], @types.empty_attrs(), 0L)
     // Search for [0, 10] should find id=1
     let results = db.search([0.0, 10.0], 1, None)
     inspect(results[0].id.to_int64(), content="1")
     // Search for [1, 0] should NOT find id=1 as best
-    db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
     let results2 = db.search([1.0, 0.0], 1, None)
     inspect(results2[0].id.to_int64(), content="2")
   })
@@ -955,7 +955,7 @@ test "spec/ivf/untrained_search" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_ivf(3, metric=@types.Dot)
     for i in 1..<=10 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double(), 0.0, 0.0],
         @types.empty_attrs(),
@@ -984,7 +984,7 @@ test "spec/ivf/training_clusters" {
         2 => [0.0, 0.0, 1.0, 0.0]
         _ => [0.0, 0.0, 0.0, 1.0]
       }
-      db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     db.train(iterations=15)
     // Query for cluster 2 center - should find cluster 2 vectors (ids 20-29)

@@ -234,6 +234,8 @@ pub(all) struct TransportPoint {
   vector : Array[Double]
   attrs : @types.Attrs
 }
+pub fn TransportPoint::from_jsonl(String) -> Self?
+pub fn TransportPoint::to_jsonl(Self) -> String
 
 pub(all) struct WalShipment {
   source_shard : Int

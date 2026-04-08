@@ -117,8 +117,8 @@ pub fn vcdb_add(
       }
       let attrs = @types.empty_attrs()
       run_async(async fn() noraise {
-        db.add(id, vector, attrs, 0L) catch {
-          _ => ()
+        let _ = db.add(id, vector, attrs, 0L) catch {
+          _ => false
         }
       })
       0

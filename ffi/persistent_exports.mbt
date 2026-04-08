@@ -54,18 +54,24 @@ fn snapshot_callback_name(instance_id : Int) -> String {
 }
 
 ///|
-fn parse_metric_name(metric : String) -> @types.Metric {
+fn parse_metric_name(metric : String) -> @types.Metric!Error {
   match @types.Metric::from_name(metric) {
     Some(m) => m
-    None => abort("Unsupported metric for persistent_init: " + metric)
+    None =>
+      raise @storage.AsyncIOFailed(
+        "Unsupported metric for persistent_init: " + metric,
+      )
   }
 }
 
 ///|
-fn parse_strategy_name(strategy : String) -> @types.Strategy {
+fn parse_strategy_name(strategy : String) -> @types.Strategy!Error {
   match @types.Strategy::from_name(strategy) {
     Some(s) => s
-    None => abort("Unsupported strategy for persistent_init: " + strategy)
+    None =>
+      raise @storage.AsyncIOFailed(
+        "Unsupported strategy for persistent_init: " + strategy,
+      )
   }
 }
 
@@ -160,6 +166,8 @@ pub fn persistent_init(
     let snapshot_storage = @storage.JsAsyncCallbackStorage::new(
       snapshot_callback_name(instance_id),
     )
+    let parsed_metric = parse_metric_name!(metric)
+    let parsed_strategy = parse_strategy_name!(strategy)
     let pdb = @vcdb.PersistentDB::init(
       wal_storage,
       snapshot_storage,
@@ -167,8 +175,8 @@ pub fn persistent_init(
       collection_name,
       dim,
       capacity,
-      metric=parse_metric_name(metric),
-      strategy=parse_strategy_name(strategy),
+      metric=parsed_metric,
+      strategy=parsed_strategy,
     )
     persistent_instances[instance_id] = pdb
   })
@@ -180,14 +188,26 @@ fn get_persistent_db(
 ) -> @vcdb.PersistentDB[
   @storage.JsAsyncCallbackStorage,
   @storage.JsAsyncCallbackStorage,
-] {
+]!Error {
   match persistent_instances.get(instance_id) {
     Some(pdb) => pdb
     None =>
-      abort(
-        "Persistent DB instance " + instance_id.to_string() + " not initialized",
+      raise @storage.AsyncIOFailed(
+        "Persistent DB instance " +
+        instance_id.to_string() +
+        " not initialized",
       )
   }
+}
+
+///|
+fn try_get_persistent_db(
+  instance_id : Int,
+) -> @vcdb.PersistentDB[
+  @storage.JsAsyncCallbackStorage,
+  @storage.JsAsyncCallbackStorage,
+]? {
+  persistent_instances.get(instance_id)
 }
 
 ///|
@@ -200,7 +220,7 @@ pub fn persistent_upsert(
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db(instance_id)
+    let db = get_persistent_db!(instance_id)
     let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = points.map(fn(
         p,
       ) {
@@ -224,7 +244,7 @@ pub fn persistent_remove(
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Bool] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db(instance_id)
+    let db = get_persistent_db!(instance_id)
     db.remove(vid_from_pair(id_hi, id_lo), timestamp_ns)
   })
 }
@@ -239,7 +259,7 @@ pub fn persistent_update_attrs(
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Bool] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db(instance_id)
+    let db = get_persistent_db!(instance_id)
     let attrs = parse_json_to_attrs(attrs_json)
     db.update_attrs(vid_from_pair(id_hi, id_lo), attrs, timestamp_ns)
   })
@@ -249,7 +269,7 @@ pub fn persistent_update_attrs(
 /// Force a checkpoint (snapshot + WAL truncate).
 pub fn persistent_checkpoint(instance_id : Int) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db(instance_id)
+    let db = get_persistent_db!(instance_id)
     db.checkpoint()
   })
 }
@@ -258,7 +278,7 @@ pub fn persistent_checkpoint(instance_id : Int) -> @js_async.Promise[Unit] {
 /// Compact HNSW index. Returns removed count.
 pub fn persistent_compact(instance_id : Int) -> @js_async.Promise[Int] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db(instance_id)
+    let db = get_persistent_db!(instance_id)
     db.compact()
   })
 }
@@ -282,7 +302,10 @@ pub fn persistent_search(
   with_payload : Bool,
   filter_json : String,
 ) -> Array[(Int, Int, Double, String)] {
-  let db = get_persistent_db(instance_id)
+  let db = match try_get_persistent_db(instance_id) {
+    Some(db) => db
+    None => return []
+  }
   let filter = @filter.parse_filter_json(filter_json)
   let hits = db.search(query, k, filter)
   let results : Array[(Int, Int, Double, String)] = []
@@ -309,7 +332,10 @@ pub fn persistent_get(
   id_lo : Int,
   with_payload : Bool,
 ) -> (Bool, Array[Double], String) {
-  let db = get_persistent_db(instance_id)
+  let db = match try_get_persistent_db(instance_id) {
+    Some(db) => db
+    None => return (false, [], "")
+  }
   let vid = vid_from_pair(id_hi, id_lo)
   match db.get(vid) {
     Some(record) => {
@@ -326,7 +352,10 @@ pub fn persistent_get(
 
 ///|
 pub fn persistent_has(instance_id : Int, id_hi : Int, id_lo : Int) -> Bool {
-  get_persistent_db(instance_id).has(vid_from_pair(id_hi, id_lo))
+  match try_get_persistent_db(instance_id) {
+    Some(db) => db.has(vid_from_pair(id_hi, id_lo))
+    None => false
+  }
 }
 
 ///|
@@ -338,7 +367,10 @@ pub fn persistent_scroll(
   limit : Int,
   with_payload : Bool,
 ) -> Array[(Int, Int, String)] {
-  let db = get_persistent_db(instance_id)
+  let db = match try_get_persistent_db(instance_id) {
+    Some(db) => db
+    None => return []
+  }
   let offset_i64 : Int64? = if has_offset {
     Some(vid_from_pair(offset_hi, offset_lo).to_int64())
   } else {
@@ -369,7 +401,10 @@ pub fn persistent_scroll_filtered(
   limit : Int,
   with_payload : Bool,
 ) -> Array[(Int, Int, String)] {
-  let db = get_persistent_db(instance_id)
+  let db = match try_get_persistent_db(instance_id) {
+    Some(db) => db
+    None => return []
+  }
   let offset_i64 : Int64? = if has_offset {
     Some(vid_from_pair(offset_hi, offset_lo).to_int64())
   } else {
@@ -396,22 +431,34 @@ pub fn persistent_count_filtered(
   instance_id : Int,
   filter_json : String,
 ) -> Int {
-  let db = get_persistent_db(instance_id)
+  let db = match try_get_persistent_db(instance_id) {
+    Some(db) => db
+    None => return 0
+  }
   let filter = @filter.parse_filter_json(filter_json)
   db.count_filtered(expr=filter)
 }
 
 ///|
 pub fn persistent_db_size(instance_id : Int) -> Int {
-  get_persistent_db(instance_id).size()
+  match try_get_persistent_db(instance_id) {
+    Some(db) => db.size()
+    None => 0
+  }
 }
 
 ///|
 pub fn persistent_db_raw_size(instance_id : Int) -> Int {
-  get_persistent_db(instance_id).raw_size()
+  match try_get_persistent_db(instance_id) {
+    Some(db) => db.raw_size()
+    None => 0
+  }
 }
 
 ///|
 pub fn persistent_db_dim(instance_id : Int) -> Int {
-  get_persistent_db(instance_id).dim()
+  match try_get_persistent_db(instance_id) {
+    Some(db) => db.dim()
+    None => 0
+  }
 }

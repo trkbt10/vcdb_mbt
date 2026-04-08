@@ -26,7 +26,7 @@ pub struct PersistentDB[W, S] {
   checkpoint_threshold : Int
   checkpoint_bytes : Int
 }
-pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::add(Self[W, S], @types.VectorId, Array[Double], @types.Attrs, Int64) -> Unit
+pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::add(Self[W, S], @types.VectorId, Array[Double], @types.Attrs, Int64) -> Bool
 pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::checkpoint(Self[W, S]) -> Unit
 pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::compact(Self[W, S]) -> Int
 pub fn[W, S] PersistentDB::count_filtered(Self[W, S], expr? : @filter.FilterExpr?) -> Int
@@ -72,6 +72,7 @@ pub fn VectorDB::compact(Self) -> (Self, Int)
 pub fn VectorDB::count_filtered(Self, expr? : @filter.FilterExpr?) -> Int
 pub fn VectorDB::deserialize(Bytes) -> Self
 pub fn VectorDB::dim(Self) -> Int
+pub fn VectorDB::export_jsonl(Self) -> Array[String]
 pub fn VectorDB::find(Self, Array[Double], ((@types.VectorId, @types.Attrs) -> Bool)?) -> @types.SearchHit?
 pub fn VectorDB::from_store(@store.CoreStore, @types.DatabaseOptions) -> Self
 pub fn VectorDB::get(Self, @types.VectorId) -> @types.VectorRecord?

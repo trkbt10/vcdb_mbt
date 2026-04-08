@@ -77,7 +77,8 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
 
     // Determine which segments to fetch from the index
     let decoded = match @segment.decode_index_file(index_bytes) {
-      None => abort("Invalid index file")
+      None =>
+        raise @storage.AsyncIOFailed("Invalid index file: " + index_path)
       Some(d) => d
     }
     let needed : Map[String, Bool] = {}
@@ -97,7 +98,10 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
 
     match reconstruct_from_index(index_bytes, manifest_bytes, segment_data) {
       Some(result) => return result.store
-      None => abort("Failed to reconstruct from index")
+      None =>
+        raise @storage.AsyncIOFailed(
+          "Failed to reconstruct from index: " + base_name,
+        )
     }
   }
 
@@ -108,7 +112,8 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
     @storage.Index,
   )
   let manifest = match deserialize_manifest(manifest_bytes) {
-    None => abort("Invalid manifest")
+    None =>
+      raise @storage.AsyncIOFailed("Invalid manifest: " + base_name)
     Some(m) => m
   }
 
@@ -124,6 +129,9 @@ pub async fn[S : @storage.AsyncStorage] async_load_segmented(
 
   match reconstruct_from_segments(manifest_bytes, segment_data) {
     Some(result) => result.store
-    None => abort("Failed to reconstruct from segments")
+    None =>
+      raise @storage.AsyncIOFailed(
+        "Failed to reconstruct from segments: " + base_name,
+      )
   }
 }

@@ -80,10 +80,11 @@ pub fn JsAsyncCallbackStorage::new(name : String) -> JsAsyncCallbackStorage {
 ///|
 fn JsAsyncCallbackStorage::get_callbacks(
   self : JsAsyncCallbackStorage,
-) -> JsAsyncStorageCallbacks {
+) -> Result[JsAsyncStorageCallbacks, String] {
   match js_async_callbacks.get(self.name) {
-    Some(cb) => cb
-    None => abort("JS async storage callbacks not registered: " + self.name)
+    Some(cb) => Ok(cb)
+    None =>
+      Err("JS async storage callbacks not registered: " + self.name)
   }
 }
 
@@ -139,7 +140,10 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_read(
   resolve,
   reject,
 ) {
-  let cb = self.get_callbacks()
+  let cb = match self.get_callbacks() {
+    Ok(cb) => cb
+    Err(msg) => return reject(msg)
+  }
   await_promise((cb.read)(path, kind), resolve, reject)
 }
 
@@ -152,7 +156,10 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_write(
   resolve,
   reject,
 ) {
-  let cb = self.get_callbacks()
+  let cb = match self.get_callbacks() {
+    Ok(cb) => cb
+    Err(msg) => return reject(msg)
+  }
   await_promise_unit((cb.write)(path, data, kind), resolve, reject)
 }
 
@@ -165,7 +172,10 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_atomic_write(
   resolve,
   reject,
 ) {
-  let cb = self.get_callbacks()
+  let cb = match self.get_callbacks() {
+    Ok(cb) => cb
+    Err(msg) => return reject(msg)
+  }
   await_promise_unit((cb.atomic_write)(path, data, kind), resolve, reject)
 }
 
@@ -177,7 +187,10 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_del(
   resolve,
   reject,
 ) {
-  let cb = self.get_callbacks()
+  let cb = match self.get_callbacks() {
+    Ok(cb) => cb
+    Err(msg) => return reject(msg)
+  }
   await_promise_unit((cb.del)(path, kind), resolve, reject)
 }
 
@@ -189,7 +202,10 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_exists(
   resolve,
   reject,
 ) {
-  let cb = self.get_callbacks()
+  let cb = match self.get_callbacks() {
+    Ok(cb) => cb
+    Err(msg) => return reject(msg)
+  }
   await_promise((cb.exists)(path, kind), resolve, reject)
 }
 
@@ -200,6 +216,9 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_list(
   resolve,
   reject,
 ) {
-  let cb = self.get_callbacks()
+  let cb = match self.get_callbacks() {
+    Ok(cb) => cb
+    Err(msg) => return reject(msg)
+  }
   await_promise((cb.list)(kind), resolve, reject)
 }

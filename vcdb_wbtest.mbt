@@ -3,9 +3,9 @@
 ///|
 test "vectordb/bruteforce" {
   let db = VectorDB::with_dim(3)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
   inspect(db.size(), content="3")
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
@@ -20,9 +20,9 @@ test "vectordb/bruteforce" {
 ///|
 test "vectordb/hnsw" {
   let db = VectorDB::with_hnsw(3, metric=@types.Dot)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
   inspect(db.size(), content="3")
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
@@ -33,9 +33,9 @@ test "vectordb/hnsw" {
 ///|
 test "vectordb/ivf" {
   let db = VectorDB::with_ivf(3, metric=@types.Dot)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
   inspect(db.size(), content="3")
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
@@ -48,8 +48,8 @@ test "vectordb/serialization" {
   let db = VectorDB::with_dim(3)
   let attrs = @types.empty_attrs()
   attrs.set("tag", @types.String("test"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
   // Serialize
   let bytes = db.serialize()
   inspect(bytes.length() > 0, content="true")
@@ -69,8 +69,8 @@ test "vectordb/serialization_preserves_metadata_index" {
   attrs_a.set("category", @types.String("A"))
   let attrs_b = @types.empty_attrs()
   attrs_b.set("category", @types.String("B"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs_a)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs_b)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs_a)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs_b)
   let bytes = db.serialize()
   let db2 = VectorDB::deserialize(bytes)
   let expr = @filter.FilterExpr::match_("category", @types.String("B"))
@@ -116,9 +116,9 @@ test "vectordb/search_with_expr_postfilter" {
   attrs_a.set("category", @types.String("A"))
   let attrs_b = @types.empty_attrs()
   attrs_b.set("category", @types.String("B"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs_a) // Best match, cat A
-  db.add(@types.VectorId::from_int(2), [0.9, 0.1], attrs_b) // Second, cat B
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs_a) // Third, cat A
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs_a) // Best match, cat A
+  let _ = db.add(@types.VectorId::from_int(2), [0.9, 0.1], attrs_b) // Second, cat B
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs_a) // Third, cat A
   // Search with PostFilter: only category B
   let expr = @filter.FilterExpr::match_("category", @types.String("B"))
   let results = db.search_with_expr(
@@ -140,7 +140,7 @@ test "vectordb/search_with_expr_prefilter" {
     let attrs = @types.empty_attrs()
     attrs.set("score", @types.Int(i.to_int64() * 10L))
     let id = @types.VectorId::from_int(i)
-    db.add(id, [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0], attrs)
+    let _ = db.add(id, [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0], attrs)
   }
   // Search with PreFilter: score >= 50 (IDs 5-10)
   let range = @types.NumericRange::gte(50.0)
@@ -174,7 +174,7 @@ test "vectordb/search_with_expr_auto" {
       attrs.set("tag", @types.String("common"))
     }
     let id = @types.VectorId::from_int(i)
-    db.add(id, [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0], attrs)
+    let _ = db.add(id, [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0], attrs)
   }
   // Search with Auto strategy: should use pre-filter (2/10 < 50%)
   let expr = @filter.FilterExpr::match_("tag", @types.String("rare"))
@@ -206,7 +206,7 @@ test "vectordb/has_and_get" {
   inspect(db.get(id) is None, content="true")
   let attrs = @types.empty_attrs()
   attrs.set("name", @types.String("test"))
-  db.add(id, [1.0, 0.0], attrs)
+  let _ = db.add(id, [1.0, 0.0], attrs)
   inspect(db.has(id), content="true")
   match db.get(id) {
     Some(record) => {
@@ -226,8 +226,8 @@ test "vectordb/find" {
   // Find on empty db
   inspect(db.find([1.0, 0.0], None) is None, content="true")
   // Add vectors
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   // Find best match
   match db.find([1.0, 0.0], None) {
     Some(hit) => inspect(hit.id.to_int64(), content="1")
@@ -242,7 +242,7 @@ test "vectordb/update_attrs" {
   // Can't update non-existent
   inspect(db.update_attrs(id, @types.empty_attrs()), content="false")
   // Add and update
-  db.add(id, [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id, [1.0, 0.0], @types.empty_attrs())
   let new_attrs = @types.empty_attrs()
   new_attrs.set("version", @types.Int(2L))
   inspect(db.update_attrs(id, new_attrs), content="true")
@@ -263,7 +263,7 @@ test "vectordb/update_attrs_updates_metadata_index" {
   let id = @types.VectorId::from_int(1)
   let attrs = @types.empty_attrs()
   attrs.set("status", @types.String("draft"))
-  db.add(id, [1.0, 0.0], attrs)
+  let _ = db.add(id, [1.0, 0.0], attrs)
   let new_attrs = @types.empty_attrs()
   new_attrs.set("status", @types.String("published"))
   inspect(db.update_attrs(id, new_attrs), content="true")
@@ -297,9 +297,9 @@ test "vectordb/hnsw_remove" {
   let id1 = @types.VectorId::from_int(1)
   let id2 = @types.VectorId::from_int(2)
   let id3 = @types.VectorId::from_int(3)
-  db.add(id1, [1.0, 0.0], @types.empty_attrs())
-  db.add(id2, [0.0, 1.0], @types.empty_attrs())
-  db.add(id3, [0.5, 0.5], @types.empty_attrs())
+  let _ = db.add(id1, [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id2, [0.0, 1.0], @types.empty_attrs())
+  let _ = db.add(id3, [0.5, 0.5], @types.empty_attrs())
   inspect(db.size(), content="3")
   // Remove id1 (tombstone only for HNSW)
   let removed = db.remove(id1)
@@ -318,8 +318,8 @@ test "vectordb/ivf_remove" {
   let db = VectorDB::with_ivf(2, metric=@types.Dot)
   let id1 = @types.VectorId::from_int(1)
   let id2 = @types.VectorId::from_int(2)
-  db.add(id1, [1.0, 0.0], @types.empty_attrs())
-  db.add(id2, [0.0, 1.0], @types.empty_attrs())
+  let _ = db.add(id1, [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id2, [0.0, 1.0], @types.empty_attrs())
   inspect(db.size(), content="2")
   // Remove id1
   let removed = db.remove(id1)
@@ -333,7 +333,7 @@ test "vectordb/train" {
   let db = VectorDB::with_ivf(3, metric=@types.Dot)
   // Add some vectors
   for i in 1..<=10 {
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(i),
       [
         (i % 3).to_double(),
@@ -353,8 +353,8 @@ test "vectordb/train" {
 ///|
 test "vectordb/hnsw_serialization" {
   let db = VectorDB::with_hnsw(3, metric=@types.Cosine)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
   // Serialize
   let bytes = db.serialize()
   inspect(bytes.length() > 0, content="true")
@@ -375,8 +375,8 @@ test "vectordb/hnsw_serialization_preserves_metadata_visibility" {
   drop_attrs.set("group", @types.String("drop"))
   let keep_id = @types.VectorId::from_int(1)
   let drop_id = @types.VectorId::from_int(2)
-  db.add(keep_id, [1.0, 0.0], keep_attrs)
-  db.add(drop_id, [0.0, 1.0], drop_attrs)
+  let _ = db.add(keep_id, [1.0, 0.0], keep_attrs)
+  let _ = db.add(drop_id, [0.0, 1.0], drop_attrs)
   let _ = db.remove(drop_id)
   let bytes = db.serialize()
   let db2 = VectorDB::deserialize(bytes)
@@ -395,8 +395,8 @@ test "vectordb/hnsw_serialization_preserves_metadata_visibility" {
 ///|
 test "vectordb/ivf_serialization" {
   let db = VectorDB::with_ivf(3, metric=@types.Dot)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
   // Serialize
   let bytes = db.serialize()
   inspect(bytes.length() > 0, content="true")
@@ -411,8 +411,8 @@ test "vectordb/ivf_serialization" {
 ///|
 test "vectordb/search_with_expr_none" {
   let db = VectorDB::with_dim(2)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   // Search with no expr
   let results = db.search_with_expr([1.0, 0.0], 2, None, None, @filter.Auto)
   inspect(results.length(), content="2")
@@ -431,7 +431,7 @@ test "vectordb/upsert_vs_add" {
   let id1 = @types.VectorId::from_int(1)
   let id2 = @types.VectorId::from_int(2)
   // First add works
-  db.add(id1, [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id1, [1.0, 0.0], @types.empty_attrs())
   inspect(db.size(), content="1")
   // Use upsert for updates
   let _ = db.upsert(id1, [0.0, 1.0], @types.empty_attrs())
@@ -442,7 +442,7 @@ test "vectordb/upsert_vs_add" {
     None => inspect(false, content="true")
   }
   // Add different id
-  db.add(id2, [0.5, 0.5], @types.empty_attrs())
+  let _ = db.add(id2, [0.5, 0.5], @types.empty_attrs())
   inspect(db.size(), content="2")
 }
 
@@ -452,8 +452,8 @@ test "vectordb/upsert_reindex_hnsw" {
   let db = VectorDB::with_hnsw(2, metric=@types.Dot)
   let id = @types.VectorId::from_int(1)
   // Add vector pointing in one direction
-  db.add(id, [1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
+  let _ = db.add(id, [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   // Search for [1, 0] should find id=1 as best
   let results1 = db.search([1.0, 0.0], 1, None)
   inspect(results1[0].id.to_int64(), content="1")
@@ -478,8 +478,8 @@ test "vectordb/upsert_reindex_ivf" {
   let db = VectorDB::with_ivf(2, metric=@types.Dot)
   let id = @types.VectorId::from_int(1)
   // Add vector pointing in one direction
-  db.add(id, [1.0, 0.0], @types.empty_attrs())
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
+  let _ = db.add(id, [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   // Upsert to change id=1 to point in opposite direction
   let _ = db.upsert(id, [0.0, 1.0], @types.empty_attrs())
   // Search for [0, 1] should find the updated vector
@@ -505,7 +505,7 @@ test "vectordb/serialize_hnsw_params" {
     strategy: @types.HNSW(params),
   }
   let db = VectorDB::new(options)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
   // Serialize and deserialize
   let bytes = db.serialize()
   let db2 = VectorDB::deserialize(bytes)
@@ -535,7 +535,7 @@ test "vectordb/serialize_ivf_params" {
     strategy: @types.IVF(params),
   }
   let db = VectorDB::new(options)
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
   // Serialize and deserialize
   let bytes = db.serialize()
   let db2 = VectorDB::deserialize(bytes)
@@ -557,10 +557,10 @@ test "vectordb/search_dimension_validation" {
   // Add vectors
   let attrs1 = @types.empty_attrs()
   attrs1.set("status", @types.String("active"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs1)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs1)
   let attrs2 = @types.empty_attrs()
   attrs2.set("status", @types.String("active"))
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], attrs2)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], attrs2)
   // Search with wrong dimension (2 instead of 3) using pre-filter
   let expr = @filter.FilterExpr::match_("status", @types.String("active"))
   let results = db.search_with_expr(
@@ -581,7 +581,7 @@ test "vectordb/search_dimension_correct" {
   // Add vectors
   let attrs1 = @types.empty_attrs()
   attrs1.set("status", @types.String("active"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs1)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs1)
   // Search with correct dimension
   let expr = @filter.FilterExpr::match_("status", @types.String("active"))
   let results = db.search_with_expr(
@@ -602,7 +602,7 @@ test "vectordb/hnsw_tombstone_delete_add" {
   let db = VectorDB::with_hnsw(3, metric=@types.Dot)
   let id = @types.VectorId::from_int(1)
   // Add a vector
-  db.add(id, [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id, [1.0, 0.0, 0.0], @types.empty_attrs())
   inspect(db.has(id), content="true")
   inspect(db.get(id) is Some(_), content="true")
   // Remove it (marks as tombstone in HNSW)
@@ -612,7 +612,7 @@ test "vectordb/hnsw_tombstone_delete_add" {
   inspect(db.has(id), content="false")
   inspect(db.get(id) is None, content="true")
   // Re-add with new vector should work
-  db.add(id, [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id, [0.0, 1.0, 0.0], @types.empty_attrs())
   inspect(db.has(id), content="true")
   // Search should find the new vector
   let results = db.search([0.0, 1.0, 0.0], 1, None)
@@ -626,11 +626,11 @@ test "vectordb/bruteforce_delete_add" {
   let db = VectorDB::with_dim(3)
   let id = @types.VectorId::from_int(1)
   // Add and remove
-  db.add(id, [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id, [1.0, 0.0, 0.0], @types.empty_attrs())
   inspect(db.remove(id), content="true")
   inspect(db.has(id), content="false")
   // Re-add should work
-  db.add(id, [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id, [0.0, 1.0, 0.0], @types.empty_attrs())
   inspect(db.has(id), content="true")
 }
 
@@ -640,17 +640,17 @@ test "vectordb/hnsw_multiple_delete_add" {
   let db = VectorDB::with_hnsw(2, metric=@types.Dot)
   let id = @types.VectorId::from_int(42)
   // Cycle 1
-  db.add(id, [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id, [1.0, 0.0], @types.empty_attrs())
   inspect(db.has(id), content="true")
   let _ = db.remove(id)
   inspect(db.has(id), content="false")
   // Cycle 2
-  db.add(id, [0.0, 1.0], @types.empty_attrs())
+  let _ = db.add(id, [0.0, 1.0], @types.empty_attrs())
   inspect(db.has(id), content="true")
   let _ = db.remove(id)
   inspect(db.has(id), content="false")
   // Cycle 3
-  db.add(id, [0.5, 0.5], @types.empty_attrs())
+  let _ = db.add(id, [0.5, 0.5], @types.empty_attrs())
   inspect(db.has(id), content="true")
 }
 
@@ -659,7 +659,7 @@ test "vectordb/hnsw_multiple_delete_add" {
 test "vectordb/hnsw_double_remove" {
   let db = VectorDB::with_hnsw(2, metric=@types.Dot)
   let id = @types.VectorId::from_int(1)
-  db.add(id, [1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(id, [1.0, 0.0], @types.empty_attrs())
   // First remove should succeed
   let first = db.remove(id)
   inspect(first, content="true")
@@ -679,8 +679,8 @@ test "vectordb/prefilter_excludes_tombstoned" {
   attrs1.set("type", @types.String("test"))
   let attrs2 = @types.empty_attrs()
   attrs2.set("type", @types.String("test"))
-  db.add(id1, [1.0, 0.0], attrs1)
-  db.add(id2, [0.0, 1.0], attrs2)
+  let _ = db.add(id1, [1.0, 0.0], attrs1)
+  let _ = db.add(id2, [0.0, 1.0], attrs2)
   // Remove id1 (tombstone in HNSW)
   let _ = db.remove(id1)
   // Pre-filter search should NOT return id1
@@ -705,9 +705,9 @@ test "vectordb/scroll_filtered_basic" {
   cat_a.set("category", @types.String("科学"))
   let cat_b = @types.empty_attrs()
   cat_b.set("category", @types.String("歴史"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
   let expr = @filter.FilterExpr::match_("category", @types.String("科学"))
   let results = db.scroll_filtered(expr=Some(expr), limit=10)
   inspect(results.length(), content="2")
@@ -725,7 +725,7 @@ test "vectordb/scroll_filtered_pagination" {
   let attrs = @types.empty_attrs()
   attrs.set("_type", @types.String("question"))
   for i in 1..<=5 {
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(i),
       [i.to_double() / 5.0, 1.0 - i.to_double() / 5.0],
       attrs,
@@ -765,7 +765,7 @@ test "vectordb/scroll_filtered_empty" {
   let db = VectorDB::with_dim(2)
   let attrs = @types.empty_attrs()
   attrs.set("category", @types.String("科学"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
   let expr = @filter.FilterExpr::match_("category", @types.String("料理"))
   let results = db.scroll_filtered(expr=Some(expr), limit=10)
   inspect(results.length(), content="0")
@@ -779,9 +779,9 @@ test "vectordb/scroll_filtered_must_not" {
   cat_a.set("_type", @types.String("question"))
   let cat_b = @types.empty_attrs()
   cat_b.set("_type", @types.String("top"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
   // "NOT top" should return questions only
   let expr = @filter.FilterExpr::must_not([
     @filter.FilterExpr::match_("_type", @types.String("top")),
@@ -802,8 +802,8 @@ test "vectordb/scroll_filtered_is_null" {
   with_cat.set("category", @types.String("科学"))
   let without_cat = @types.empty_attrs()
   without_cat.set("other", @types.String("value"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], with_cat)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], without_cat)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], with_cat)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], without_cat)
   // IsNull("category") should return ID 2 (no category attr)
   let expr = @filter.FilterExpr::is_null("category")
   let results = db.scroll_filtered(expr=Some(expr), limit=10)
@@ -826,9 +826,9 @@ test "vectordb/scroll_filtered_should_min2" {
   // ID 3: has tag2=X only
   let attrs3 = @types.empty_attrs()
   attrs3.set("tag2", @types.String("X"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs1)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs2)
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs3)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs1)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs2)
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs3)
   // Should match at least 2 of [tag=A, tag2=X] → only ID 1
   let expr = @filter.FilterExpr::should(
     [
@@ -851,9 +851,9 @@ test "vectordb/count_filtered" {
   cat_a.set("category", @types.String("科学"))
   let cat_b = @types.empty_attrs()
   cat_b.set("category", @types.String("歴史"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], cat_a)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], cat_b)
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], cat_a)
   let expr_a = @filter.FilterExpr::match_("category", @types.String("科学"))
   inspect(db.count_filtered(expr=Some(expr_a)), content="2")
   let expr_b = @filter.FilterExpr::match_("category", @types.String("歴史"))
@@ -868,8 +868,8 @@ test "vectordb/count_filtered_hnsw_tombstone" {
   let db = VectorDB::with_hnsw(2, metric=@types.Dot)
   let attrs = @types.empty_attrs()
   attrs.set("_type", @types.String("q"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs)
   let _ = db.remove(@types.VectorId::from_int(1))
   let expr = @filter.FilterExpr::match_("_type", @types.String("q"))
   inspect(db.count_filtered(expr=Some(expr)), content="1")
@@ -881,9 +881,9 @@ test "vectordb/scroll_filtered_hnsw_tombstone" {
   let db = VectorDB::with_hnsw(2, metric=@types.Dot)
   let attrs = @types.empty_attrs()
   attrs.set("category", @types.String("科学"))
-  db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
-  db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs)
-  db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs)
+  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs)
+  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs)
+  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs)
   // Tombstone ID 2
   let _ = db.remove(@types.VectorId::from_int(2))
   let expr = @filter.FilterExpr::match_("category", @types.String("科学"))
@@ -901,7 +901,7 @@ test "vectordb/ivf_upsert_no_centroid_growth" {
   let db = VectorDB::with_ivf(2, metric=@types.Dot)
   // Add vectors and train
   for i in 1..<=5 {
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(i),
       [i.to_double(), 0.0],
       @types.empty_attrs(),

@@ -244,13 +244,22 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB:
 /// Add a single vector. Fails if the ID already exists (not tombstoned).
 ///
 /// This is the WAL-backed equivalent of VectorDB::add.
+/// Existence check is performed BEFORE WAL append to prevent orphaned
+/// WAL records when the ID already exists.
 pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::add(
   self : PersistentDB[W, S],
   id : @types.VectorId,
   vector : Array[Double],
   attrs : @types.Attrs,
   timestamp_ns : Int64,
-) -> Unit {
+) -> Bool {
+  // Step 0: Pre-check — reject duplicates BEFORE touching WAL.
+  // engine.has() returns false for tombstoned IDs, so re-adding
+  // a tombstoned ID is allowed (same semantics as VectorDB::add).
+  if self.engine.has(id) {
+    return false
+  }
+
   // Step 1: Encode WAL record (upsert in WAL — add semantics enforced in-memory)
   let records = [
     @wal.WalRecord::upsert(id, vector, attrs, timestamp=timestamp_ns),
@@ -266,6 +275,7 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB:
   if self.should_checkpoint() {
     self.checkpoint()
   }
+  true
 }
 
 ///|

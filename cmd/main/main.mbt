@@ -35,7 +35,7 @@ async fn demo_bruteforce() -> Unit {
     let (id, name, vec) = item
     let attrs = @types.empty_attrs()
     attrs.set("name", @types.String(name))
-    db.add(@types.VectorId::from_int(id), vec, attrs, 0L)
+    let _ = db.add(@types.VectorId::from_int(id), vec, attrs, 0L)
   }
 
   println("Added \{db.size()} items to database")
@@ -72,7 +72,7 @@ async fn demo_hnsw() -> Unit {
     ]
     let attrs = @types.empty_attrs()
     attrs.set("index", @types.Int(i.to_int64()))
-    db.add(@types.VectorId::from_int(i), v, attrs, 0L)
+    let _ = db.add(@types.VectorId::from_int(i), v, attrs, 0L)
   }
 
   println("Added \{db.size()} vectors with HNSW index")
@@ -116,7 +116,7 @@ async fn demo_filtered_search() -> Unit {
     let attrs = @types.empty_attrs()
     attrs.set("name", @types.String(name))
     attrs.set("category", @types.String(category))
-    db.add(@types.VectorId::from_int(id), vec, attrs, 0L)
+    let _ = db.add(@types.VectorId::from_int(id), vec, attrs, 0L)
   }
 
   println("Added \{db.size()} products")
@@ -154,7 +154,7 @@ async fn demo_serialization() -> Unit {
   for i in 1..<=10 {
     let attrs = @types.empty_attrs()
     attrs.set("label", @types.String("item-\{i}"))
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(i),
       [i.to_double() / 10.0, (10 - i).to_double() / 10.0, 0.5],
       attrs,
@@ -223,9 +223,9 @@ async fn demo_metrics() -> Unit {
 
   for vec in vectors {
     let (id, v) = vec
-    db_cosine.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
-    db_dot.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
-    db_l2.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
+    let _ = db_cosine.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
+    let _ = db_dot.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
+    let _ = db_l2.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
   }
 
   println("Vectors: id=1 [1,0,0], id=2 [2,0,0], id=3 [0,1,0]")

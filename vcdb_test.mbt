@@ -19,19 +19,19 @@ test "api/bruteforce_basic" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
     // Add vectors
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(3),
       [0.0, 0.0, 1.0],
       @types.empty_attrs(),
@@ -55,25 +55,25 @@ test "api/bruteforce_basic" {
 test "api/hnsw_search" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [0.9, 0.1, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(3),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(4),
       [0.0, 0.0, 1.0],
       @types.empty_attrs(),
@@ -93,25 +93,25 @@ test "api/ivf_training" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_ivf(3, metric=@types.Dot)
     // Add vectors in different clusters
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [0.9, 0.1, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(3),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(4),
       [0.1, 0.9, 0.0],
       @types.empty_attrs(),
@@ -135,7 +135,7 @@ test "api/cosine_normalization" {
       strategy=@types.Bruteforce,
     )
     // Add non-normalized vector [3, 4] - should be normalized to [0.6, 0.8]
-    db.add(@types.VectorId::from_int(1), [3.0, 4.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [3.0, 4.0], @types.empty_attrs(), 0L)
     let record = db.get(@types.VectorId::from_int(1))
     let v = record.unwrap().vector
     // Check normalization: [3,4] -> [0.6, 0.8]
@@ -153,9 +153,9 @@ test "api/l2_metric" {
       metric=@types.L2,
       strategy=@types.Bruteforce,
     )
-    db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(3), [10.0, 10.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [10.0, 10.0], @types.empty_attrs(), 0L)
     // Search from origin - closest should be id=1
     let results = db.search([0.0, 0.0], 3, None)
     inspect(results[0].id.to_int64(), content="1")
@@ -175,7 +175,7 @@ test "api/attributes" {
     attrs.set("count", @types.Int(42L))
     attrs.set("score", @types.Float(3.14))
     attrs.set("active", @types.Bool(true))
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs, 0L)
     // Retrieve and check
     let record = db.get(@types.VectorId::from_int(1))
     let a = record.unwrap().attrs
@@ -199,9 +199,9 @@ test "api/search_filter" {
     attrs1.set("category", @types.String("A"))
     let attrs2 = @types.empty_attrs()
     attrs2.set("category", @types.String("B"))
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs1, 0L) // Best match, category A
-    db.add(@types.VectorId::from_int(2), [0.9, 0.1], attrs2, 0L) // Second best, category B
-    db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs1, 0L) // Third, category A
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs1, 0L) // Best match, category A
+    let _ = db.add(@types.VectorId::from_int(2), [0.9, 0.1], attrs2, 0L) // Second best, category B
+    let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs1, 0L) // Third, category A
     // Search with filter: only category B
     let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
       match attrs.get("category") {
@@ -245,9 +245,9 @@ test "api/upsert" {
 test "api/remove" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(3), [0.5, 0.5], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], @types.empty_attrs(), 0L)
     inspect(db.size(), content="3")
     // Remove middle element
     let removed = db.remove(@types.VectorId::from_int(2), 0L)
@@ -267,14 +267,14 @@ test "api/serialization_roundtrip" {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
     let attrs = @types.empty_attrs()
     attrs.set("tag", @types.String("important"))
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs, 0L)
-    db.add(
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs, 0L)
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(3),
       [0.0, 0.0, 1.0],
       @types.empty_attrs(),
@@ -306,13 +306,13 @@ test "api/serialization_roundtrip" {
 test "api/hnsw_serialization" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
@@ -347,8 +347,8 @@ test "api/recall_validation" {
         ((i + 2) % 4).to_double(),
         ((i + 3) % 4).to_double(),
       ]
-      bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
-      hnsw_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = hnsw_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     // Search both
     let query = [1.0, 2.0, 3.0, 0.0]
@@ -390,8 +390,8 @@ test "api/empty_db" {
 test "api/find" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
-    db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
     // Find best match
     let result = db.find([1.0, 0.0], None)
     inspect(result is None, content="false")
@@ -422,7 +422,7 @@ test "api/large_dataset" {
       let v = [base[0] + jitter, base[1] + jitter, base[2], base[3]]
       let attrs = @types.empty_attrs()
       attrs.set("cluster", @types.Int(cluster.to_int64()))
-      db.add(@types.VectorId::from_int(i), v, attrs, 0L)
+      let _ = db.add(@types.VectorId::from_int(i), v, attrs, 0L)
     }
     inspect(db.size(), content="200")
     // Search for cluster 0 center
@@ -454,7 +454,7 @@ test "api/hnsw_large" {
         ((i + 2) % 4).to_double(),
         ((i + 3) % 4).to_double(),
       ]
-      db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     inspect(db.size(), content="100")
     // Search
@@ -480,21 +480,21 @@ test "api/ivf_clustered" {
       let jitter = (i % 5).to_double() * 0.02
       let attrs = @types.empty_attrs()
       attrs.set("cluster", @types.String("A"))
-      db.add(@types.VectorId::from_int(i), [1.0, jitter, 0.0, 0.0], attrs, 0L)
+      let _ = db.add(@types.VectorId::from_int(i), [1.0, jitter, 0.0, 0.0], attrs, 0L)
     }
     // Cluster B: around [0, 1, 0, 0]
     for i in 30..<60 {
       let jitter = (i % 5).to_double() * 0.02
       let attrs = @types.empty_attrs()
       attrs.set("cluster", @types.String("B"))
-      db.add(@types.VectorId::from_int(i), [0.0, 1.0, jitter, 0.0], attrs, 0L)
+      let _ = db.add(@types.VectorId::from_int(i), [0.0, 1.0, jitter, 0.0], attrs, 0L)
     }
     // Cluster C: around [0, 0, 1, 0]
     for i in 60..<90 {
       let jitter = (i % 5).to_double() * 0.02
       let attrs = @types.empty_attrs()
       attrs.set("cluster", @types.String("C"))
-      db.add(@types.VectorId::from_int(i), [0.0, 0.0, 1.0, jitter], attrs, 0L)
+      let _ = db.add(@types.VectorId::from_int(i), [0.0, 0.0, 1.0, jitter], attrs, 0L)
     }
     // Train IVF
     db.train(iterations=10)
@@ -522,7 +522,7 @@ test "api/mixed_operations" {
     for i in 1..<=10 {
       let attrs = @types.empty_attrs()
       attrs.set("version", @types.Int(1L))
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0, 0.0],
         attrs,
@@ -578,7 +578,7 @@ test "api/complex_filter" {
       attrs.set("score", @types.Int((i * 5).to_int64()))
       attrs.set("active", @types.Bool(i % 2 == 0))
       attrs.set("category", @types.String(if i <= 10 { "A" } else { "B" }))
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double() / 20.0, 1.0 - i.to_double() / 20.0],
         attrs,
@@ -628,55 +628,55 @@ test "api/metrics_comparison" {
       strategy=@types.Bruteforce,
     )
     // Add vectors
-    db_cosine.add(
+    let _ = db_cosine.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db_cosine.add(
+    let _ = db_cosine.add(
       @types.VectorId::from_int(2),
       [2.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     ) // Same direction, different magnitude
-    db_cosine.add(
+    let _ = db_cosine.add(
       @types.VectorId::from_int(3),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
       0L,
     ) // Orthogonal
-    db_dot.add(
+    let _ = db_dot.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db_dot.add(
+    let _ = db_dot.add(
       @types.VectorId::from_int(2),
       [2.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db_dot.add(
+    let _ = db_dot.add(
       @types.VectorId::from_int(3),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db_l2.add(
+    let _ = db_l2.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db_l2.add(
+    let _ = db_l2.add(
       @types.VectorId::from_int(2),
       [2.0, 0.0, 0.0],
       @types.empty_attrs(),
       0L,
     )
-    db_l2.add(
+    let _ = db_l2.add(
       @types.VectorId::from_int(3),
       [0.0, 1.0, 0.0],
       @types.empty_attrs(),
@@ -706,7 +706,7 @@ test "api/bulk_add" {
     for i in 1..<=50 {
       let attrs = @types.empty_attrs()
       attrs.set("batch", @types.Int(1L))
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [
           (i % 3).to_double(),
@@ -722,7 +722,7 @@ test "api/bulk_add" {
     for i in 51..<=100 {
       let attrs = @types.empty_attrs()
       attrs.set("batch", @types.Int(2L))
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [
           (i % 3).to_double(),
@@ -747,7 +747,7 @@ test "api/bulk_upsert" {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
     // Initial adds
     for i in 1..<=20 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double() / 20.0, 1.0 - i.to_double() / 20.0],
         @types.empty_attrs(),
@@ -782,7 +782,7 @@ test "api/bulk_remove" {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
     // Add 50 vectors
     for i in 1..<=50 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [i.to_double() / 50.0, 1.0 - i.to_double() / 50.0],
         @types.empty_attrs(),
@@ -815,7 +815,7 @@ test "api/search_range_prefilter" {
       let attrs = @types.empty_attrs()
       attrs.set("price", @types.Int(i.to_int64() * 10L))
       let id = @types.VectorId::from_int(i)
-      db.add(
+      let _ = db.add(
         id,
         [i.to_double() / 100.0, 1.0 - i.to_double() / 100.0],
         attrs,
@@ -846,7 +846,7 @@ test "api/hnsw_remove_search" {
     let db = @vcdb.PersistentDB::in_memory_hnsw(3, metric=@types.Dot)
     // Add vectors
     for i in 1..<=20 {
-      db.add(
+      let _ = db.add(
         @types.VectorId::from_int(i),
         [
           (i % 3).to_double(),
@@ -894,7 +894,7 @@ test "api/high_dimensional" {
       // Set some dimensions based on ID
       v[i % dim] = 1.0
       v[i * 7 % dim] = 0.5
-      db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
     }
     inspect(db.size(), content="50")
     // Create query vector
@@ -921,7 +921,7 @@ test "api/complex_expr_search" {
       attrs.set("score", @types.Int(i.to_int64() * 5L))
       attrs.set("category", @types.String(if i <= 10 { "X" } else { "Y" }))
       let id = @types.VectorId::from_int(i)
-      db.add(id, [i.to_double() / 20.0, 1.0 - i.to_double() / 20.0], attrs, 0L)
+      let _ = db.add(id, [i.to_double() / 20.0, 1.0 - i.to_double() / 20.0], attrs, 0L)
     }
     // Must: category=X AND active=true
     let expr = @filter.FilterExpr::must([
@@ -946,7 +946,7 @@ test "api/unified_crud" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(3)
     // set single
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(1),
       [1.0, 0.0, 0.0],
       {
@@ -991,7 +991,7 @@ test "api/unified_crud" {
       None => inspect(false, content="true")
     }
     // add multiple
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(2),
       [0.0, 1.0, 0.0],
       {
@@ -1001,7 +1001,7 @@ test "api/unified_crud" {
       },
       0L,
     )
-    db.add(
+    let _ = db.add(
       @types.VectorId::from_int(3),
       [0.0, 0.0, 1.0],
       @types.empty_attrs(),
