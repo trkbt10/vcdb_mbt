@@ -1,4 +1,21 @@
 import {
   "moonbitlang/core/string",
+  "moonbitlang/core/json",
+  "moonbitlang/core/buffer",
   "moonbitlang/core/argparse",
+  "moonbitlang/async/fs" @async_fs,
+  "moonbitlang/x/fs",
+  "trkbt10/vcdb",
+  "trkbt10/vcdb/core/types",
+  "trkbt10/vcdb/core/storage",
+  "trkbt10/vcdb/core/persistence/codec",
+  "trkbt10/vcdb/core/placement",
+  "trkbt10/vcdb/core/distributed",
 }
+
+options(
+  targets: {
+    "dump.mbt": [ "native" ],
+    "load.mbt": [ "native" ],
+  },
+)

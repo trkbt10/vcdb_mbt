@@ -28,7 +28,7 @@ pub fn CollectionConfig::default(name : String, dim : Int) -> CollectionConfig {
     name,
     dim,
     metric: @types.Cosine,
-    strategy: @types.HNSW(@types.HNSWParams::default()),
+    strategy: @types.Strategy::default_hnsw(),
   }
 }
 
@@ -89,10 +89,12 @@ fn parse_collection_metric(json : Json) -> Result[@types.Metric, String] {
     None => get_string(json, "metric")
   }
   match metric_str {
-    None | Some("cosine") | Some("Cosine") => Ok(@types.Cosine)
-    Some("l2") | Some("L2") => Ok(@types.L2)
-    Some("dot") | Some("Dot") => Ok(@types.Dot)
-    Some(metric) => Err("unsupported metric: " + metric)
+    None => Ok(@types.Cosine)
+    Some(s) =>
+      match @types.Metric::from_name(s) {
+        Some(m) => Ok(m)
+        None => Err("unsupported metric: " + s)
+      }
   }
 }
 
@@ -101,27 +103,20 @@ fn parse_collection_strategy(
   json : Json,
 ) -> Result[@types.Strategy, String] {
   match get_string(json, "strategy") {
-    None | Some("hnsw") | Some("HNSW") =>
-      Ok(@types.HNSW(@types.HNSWParams::default()))
-    Some("bruteforce") | Some("Bruteforce") => Ok(@types.Bruteforce)
-    Some("ivf") | Some("IVF") => Ok(@types.IVF(@types.IVFParams::default()))
-    Some(strategy) => Err("unsupported strategy: " + strategy)
+    None => Ok(@types.Strategy::default_hnsw())
+    Some(s) =>
+      match @types.Strategy::from_name(s) {
+        Some(st) => Ok(st)
+        None => Err("unsupported strategy: " + s)
+      }
   }
 }
 
 ///|
 /// Convert collection config to JSON
 pub fn CollectionConfig::to_json(self : CollectionConfig) -> Json {
-  let metric_str = match self.metric {
-    @types.Cosine => "Cosine"
-    @types.L2 => "L2"
-    @types.Dot => "Dot"
-  }
-  let strategy_str = match self.strategy {
-    @types.Bruteforce => "Bruteforce"
-    @types.HNSW(_) => "HNSW"
-    @types.IVF(_) => "IVF"
-  }
+  let metric_str = self.metric.to_name()
+  let strategy_str = self.strategy.to_name()
   json_object([
     ("name", self.name.to_json()),
     ("dim", self.dim.to_double().to_json()),

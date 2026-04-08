@@ -231,11 +231,7 @@ fn parse_json_to_attrs(json : String) -> @types.Attrs {
   if json.length() == 0 || json == "{}" {
     return @types.empty_attrs()
   }
-  let bytes = @codec.encode_utf8(json)
-  match @codec.decode_attrs_json(bytes) {
-    Some(attrs) => attrs
-    None => @types.empty_attrs()
-  }
+  @codec.parse_attrs_json(json).unwrap_or(@types.empty_attrs())
 }
 
 // ============================================================================

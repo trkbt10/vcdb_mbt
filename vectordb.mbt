@@ -81,7 +81,7 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB:
   dim : Int,
   capacity : Int,
   metric? : @types.Metric = @types.Cosine,
-  strategy? : @types.Strategy = @types.HNSW(@types.HNSWParams::default()),
+  strategy? : @types.Strategy = @types.Strategy::default_hnsw(),
   checkpoint_threshold? : Int = 50,
   checkpoint_bytes? : Int = default_checkpoint_bytes,
 ) -> PersistentDB[W, S] {
@@ -151,7 +151,7 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB:
 pub async fn PersistentDB::in_memory(
   dim : Int,
   metric? : @types.Metric = @types.Cosine,
-  strategy? : @types.Strategy = @types.HNSW(@types.HNSWParams::default()),
+  strategy? : @types.Strategy = @types.Strategy::default_hnsw(),
   capacity? : Int = 1024,
 ) -> PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage] {
   let storage = @storage.MemoryStorage::new()
@@ -178,7 +178,7 @@ pub async fn PersistentDB::in_memory_hnsw(
   PersistentDB::in_memory(
     dim,
     metric~,
-    strategy=@types.HNSW(@types.HNSWParams::default()),
+    strategy=@types.Strategy::default_hnsw(),
   )
 }
 
@@ -191,7 +191,7 @@ pub async fn PersistentDB::in_memory_ivf(
   PersistentDB::in_memory(
     dim,
     metric~,
-    strategy=@types.IVF(@types.IVFParams::default()),
+    strategy=@types.Strategy::default_ivf(),
   )
 }
 

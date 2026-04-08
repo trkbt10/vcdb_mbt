@@ -240,11 +240,5 @@ fn json_null() -> Json {
 
 ///|
 fn @types.AttrValue::to_json(self : @types.AttrValue) -> Json {
-  match self {
-    @types.String(s) => s.to_json()
-    @types.Int(n) => n.to_double().to_json()
-    @types.Float(f) => f.to_json()
-    @types.Bool(b) => b.to_json()
-    @types.Null => json_null()
-  }
+  @codec.attr_value_to_json(self)
 }

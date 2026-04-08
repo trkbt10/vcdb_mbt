@@ -55,21 +55,17 @@ fn snapshot_callback_name(instance_id : Int) -> String {
 
 ///|
 fn parse_metric_name(metric : String) -> @types.Metric {
-  match metric {
-    "cosine" | "Cosine" => @types.Cosine
-    "l2" | "L2" => @types.L2
-    "dot" | "Dot" => @types.Dot
-    _ => abort("Unsupported metric for persistent_init: " + metric)
+  match @types.Metric::from_name(metric) {
+    Some(m) => m
+    None => abort("Unsupported metric for persistent_init: " + metric)
   }
 }
 
 ///|
 fn parse_strategy_name(strategy : String) -> @types.Strategy {
-  match strategy {
-    "hnsw" | "HNSW" => @types.HNSW(@types.HNSWParams::default())
-    "ivf" | "IVF" => @types.IVF(@types.IVFParams::default())
-    "bruteforce" | "Bruteforce" => @types.Bruteforce
-    _ => abort("Unsupported strategy for persistent_init: " + strategy)
+  match @types.Strategy::from_name(strategy) {
+    Some(s) => s
+    None => abort("Unsupported strategy for persistent_init: " + strategy)
   }
 }
 

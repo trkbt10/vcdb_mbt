@@ -10,6 +10,27 @@ pub(all) enum Metric {
 } derive(Eq, Show)
 
 ///|
+/// Canonical string representation of a Metric.
+pub fn Metric::to_name(self : Metric) -> String {
+  match self {
+    Cosine => "cosine"
+    L2 => "l2"
+    Dot => "dot"
+  }
+}
+
+///|
+/// Parse a Metric from its string representation.
+pub fn Metric::from_name(s : String) -> Metric? {
+  match s {
+    "cosine" | "Cosine" => Some(Cosine)
+    "l2" | "L2" => Some(L2)
+    "dot" | "Dot" => Some(Dot)
+    _ => None
+  }
+}
+
+///|
 /// Vector ID type - Int64 for large-scale support
 pub(all) struct VectorId(Int64) derive(Eq, Show, Hash, Compare)
 
@@ -89,6 +110,27 @@ pub(all) enum Strategy {
 } derive(Show)
 
 ///|
+/// Canonical string representation of a Strategy (name only, no params).
+pub fn Strategy::to_name(self : Strategy) -> String {
+  match self {
+    Bruteforce => "bruteforce"
+    HNSW(_) => "hnsw"
+    IVF(_) => "ivf"
+  }
+}
+
+///|
+/// Parse a Strategy from its string representation (uses default params).
+pub fn Strategy::from_name(s : String) -> Strategy? {
+  match s {
+    "bruteforce" | "Bruteforce" => Some(Bruteforce)
+    "hnsw" | "HNSW" => Some(Strategy::default_hnsw())
+    "ivf" | "IVF" => Some(Strategy::default_ivf())
+    _ => None
+  }
+}
+
+///|
 /// Database construction options
 pub(all) struct DatabaseOptions {
   dim : Int
@@ -114,6 +156,18 @@ pub fn HNSWParams::default() -> HNSWParams {
 /// Create default IVF params
 pub fn IVFParams::default() -> IVFParams {
   { nlist: 64, nprobe: 8 }
+}
+
+///|
+/// Default HNSW strategy (most common use case).
+pub fn Strategy::default_hnsw() -> Strategy {
+  HNSW(HNSWParams::default())
+}
+
+///|
+/// Default IVF strategy.
+pub fn Strategy::default_ivf() -> Strategy {
+  IVF(IVFParams::default())
 }
 
 ///|

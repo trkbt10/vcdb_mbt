@@ -344,16 +344,8 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::get_info(
 
 ///|
 fn[S] collection_to_info(c : Collection[S]) -> CollectionInfo {
-  let metric_str = match c.config.metric {
-    @types.Cosine => "Cosine"
-    @types.L2 => "L2"
-    @types.Dot => "Dot"
-  }
-  let strategy_str = match c.config.strategy {
-    @types.Bruteforce => "Bruteforce"
-    @types.HNSW(_) => "HNSW"
-    @types.IVF(_) => "IVF"
-  }
+  let metric_str = c.config.metric.to_name()
+  let strategy_str = c.config.strategy.to_name()
   {
     name: c.config.name,
     vectors_count: c.db.size(),

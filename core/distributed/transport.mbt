@@ -13,16 +13,6 @@
 /// The transport is responsible for routing to the correct shard instance.
 
 ///|
-/// A single point for upsert transport.
-pub(all) struct TransportPoint {
-  id : @types.VectorId
-  vector : Array[Double]
-  attrs : @types.Attrs
-}
-
-///|
-/// Shard transport — the only thing platform adapters need to implement
-/// for distributed vcdb.
 pub(open) trait ShardTransport {
   /// Upsert points into a specific shard.
   shard_upsert(

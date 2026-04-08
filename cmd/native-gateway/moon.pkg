@@ -1,12 +1,20 @@
 import {
   "moonbitlang/core/env",
   "moonbitlang/core/argparse",
+  "moonbitlang/async",
   "trkbt10/vcdb/cli",
-  "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/types",
+  "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/gateway",
 }
 
 options(
   "is-main": true,
+  targets: {
+    "main.mbt": [ "native" ],
+    "dump.mbt": [ "native" ],
+    "load.mbt": [ "native" ],
+    "main_stub.mbt": [ "wasm", "wasm-gc", "js" ],
+    "wbtest.mbt": [ "native" ],
+  },
 )

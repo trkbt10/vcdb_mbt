@@ -19,25 +19,66 @@ pub fn decode_attrs_json(bytes : Bytes) -> @types.Attrs? {
 pub fn attrs_to_json(attrs : @types.Attrs?) -> String {
   match attrs {
     None => "null"
-    Some(a) => {
-      let keys = a.keys()
-      if keys.length() == 0 {
-        return "{}"
-      }
-      let obj : Map[String, Json] = {}
-      for key in keys {
-        match a.get(key) {
-          None => continue
-          Some(value) => obj[key] = attr_value_to_json(value)
-        }
-      }
-      Json::object(obj).stringify()
-    }
+    Some(a) => attrs_to_json_value(a).stringify()
   }
 }
 
 ///|
-fn attr_value_to_json(value : @types.AttrValue) -> Json {
+/// Convert Attrs to a Json value (for API responses).
+pub fn attrs_to_json_value(attrs : @types.Attrs) -> Json {
+  let obj : Map[String, Json] = {}
+  for key in attrs.keys() {
+    match attrs.get(key) {
+      None => continue
+      Some(value) => obj[key] = attr_value_to_json(value)
+    }
+  }
+  Json::object(obj)
+}
+
+
+///|
+/// Convert Json to AttrValue.
+pub fn json_to_attr_value(json : Json) -> @types.AttrValue? {
+  match json {
+    Null => Some(@types.Null)
+    True => Some(@types.Bool(true))
+    False => Some(@types.Bool(false))
+    Number(n, ..) => {
+      let int_val = n.to_int64()
+      if n == int_val.to_double() && n.abs() < 9007199254740992.0 {
+        Some(@types.Int(int_val))
+      } else {
+        Some(@types.Float(n))
+      }
+    }
+    String(s) => Some(@types.String(s))
+    Array(_) => None
+    Object(_) => None
+  }
+}
+
+///|
+/// Convert Json object to Attrs.
+pub fn json_to_attrs(json : Json) -> @types.Attrs? {
+  match json {
+    Object(obj) => {
+      let attrs = @types.empty_attrs()
+      for kv in obj {
+        let (key, value) = kv
+        match json_to_attr_value(value) {
+          Some(attr) => attrs.set(key, attr)
+          None => return None
+        }
+      }
+      Some(attrs)
+    }
+    _ => None
+  }
+}
+
+///|
+pub fn attr_value_to_json(value : @types.AttrValue) -> Json {
   match value {
     Null => Json::null()
     Bool(b) => b.to_json()
@@ -68,26 +109,6 @@ pub fn parse_attrs_json(json : String) -> @types.Attrs? {
       Some(attrs)
     }
     _ => None
-  }
-}
-
-///|
-fn json_to_attr_value(json : Json) -> @types.AttrValue? {
-  match json {
-    Null => Some(@types.Null)
-    True => Some(@types.Bool(true))
-    False => Some(@types.Bool(false))
-    Number(n, ..) => {
-      let int_val = n.to_int64()
-      if n == int_val.to_double() && n.abs() < 9007199254740992.0 {
-        Some(@types.Int(int_val))
-      } else {
-        Some(@types.Float(n))
-      }
-    }
-    String(s) => Some(@types.String(s))
-    Array(_) => None
-    Object(_) => None
   }
 }
 

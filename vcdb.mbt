@@ -116,7 +116,7 @@ pub fn VectorDB::with_hnsw(
     dim,
     metric,
     capacity: 1024,
-    strategy: HNSW(@types.HNSWParams::default()),
+    strategy: @types.Strategy::default_hnsw(),
   }
   VectorDB::new(options)
 }
@@ -140,7 +140,7 @@ pub fn VectorDB::with_ivf(
     dim,
     metric,
     capacity: 1024,
-    strategy: IVF(@types.IVFParams::default()),
+    strategy: @types.Strategy::default_ivf(),
   }
   VectorDB::new(options)
 }

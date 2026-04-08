@@ -1,5 +1,6 @@
 import {
   "moonbitlang/core/bench",
+  "moonbitlang/core/json",
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/vecmath",
   "trkbt10/vcdb/core/store",
@@ -10,4 +11,5 @@ import {
   "trkbt10/vcdb/core/filter",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/persistence/wal",
+  "trkbt10/vcdb/core/distributed",
 }

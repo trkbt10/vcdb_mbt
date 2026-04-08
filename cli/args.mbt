@@ -134,6 +134,48 @@ pub fn vcdb_command() -> @argparse.Command {
           @argparse.OptionArg("body", about="Optional JSON request body"),
         ],
       ),
+      @argparse.Command(
+        "dump",
+        about="Dump a snapshot file to JSONL (stdout)",
+        positionals=[
+          @argparse.PositionArg("file", about="Path to .data.bin snapshot file"),
+        ],
+      ),
+      @argparse.Command(
+        "load",
+        about="Load JSONL into sharded persistent snapshots",
+        positionals=[
+          @argparse.PositionArg("input", about="Path to .jsonl input file"),
+          @argparse.PositionArg("output", about="Output directory for sharded snapshots"),
+        ],
+        options=[
+          @argparse.OptionArg(
+            "dim",
+            about="Vector dimension",
+            default_values=["1024"],
+          ),
+          @argparse.OptionArg(
+            "metric",
+            about="Distance metric (cosine|l2|dot)",
+            default_values=["cosine"],
+          ),
+          @argparse.OptionArg(
+            "strategy",
+            about="ANN strategy (hnsw|ivf|bruteforce)",
+            default_values=["hnsw"],
+          ),
+          @argparse.OptionArg(
+            "shards",
+            about="Number of shards (CRUSH placement groups)",
+            default_values=["1"],
+          ),
+          @argparse.OptionArg(
+            "collection",
+            about="Collection name",
+            default_values=["db"],
+          ),
+        ],
+      ),
       @argparse.Command("healthz", about="Health check"),
     ],
   )
@@ -269,4 +311,14 @@ fn split_by_equals(s : String) -> Array[String] {
   }
   parts.push(String::from_array(current))
   parts
+}
+
+///|
+pub fn parse_metric(s : String) -> @types.Metric? {
+  @types.Metric::from_name(s)
+}
+
+///|
+pub fn parse_strategy(s : String) -> @types.Strategy? {
+  @types.Strategy::from_name(s)
 }

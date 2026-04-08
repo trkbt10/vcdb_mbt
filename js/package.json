@@ -14,6 +14,10 @@
       "import": "./dist/index.js"
     },
 
+    "./ffi/types": {
+      "types": "./dist/ffi/types.d.ts",
+      "import": "./dist/ffi/types.js"
+    },
     "./loader": {
       "types": "./dist/ffi/loader.d.ts",
       "import": "./dist/ffi/loader.js"
@@ -23,6 +27,10 @@
       "default": "./dist/wasm/lib.js"
     },
 
+    "./persistent": {
+      "types": "./dist/persistent.d.ts",
+      "import": "./dist/persistent.js"
+    },
     "./db": {
       "types": "./dist/db.d.ts",
       "import": "./dist/db.js"

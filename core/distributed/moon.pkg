@@ -1,5 +1,7 @@
 import {
+  "moonbitlang/core/json",
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/placement",
   "trkbt10/vcdb/core/persistence/wal",
+  "trkbt10/vcdb/core/persistence/codec",
 }

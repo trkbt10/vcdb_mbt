@@ -3,6 +3,7 @@ import {
   "trkbt10/vcdb/core/types",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/filter",
+  "trkbt10/vcdb/core/persistence/codec",
   "moonbitlang/core/string",
   "moonbitlang/core/json",
 }

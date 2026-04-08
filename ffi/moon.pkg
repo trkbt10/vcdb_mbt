@@ -6,8 +6,10 @@ import {
   "trkbt10/vcdb/core/placement",
   "trkbt10/vcdb/core/distributed",
   "trkbt10/vcdb/gateway",
+  "trkbt10/vcdb/core/filter",
   "moonbitlang/core/hashmap",
   "moonbitlang/core/string",
+  "moonbitlang/async/js_async",
 }
 
 options(

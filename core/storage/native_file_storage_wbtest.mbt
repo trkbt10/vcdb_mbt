@@ -4,9 +4,6 @@ fn test_join_path(base : String, child : String) -> String {
 }
 
 ///|
-fn run_async_blocking(f : async () -> Unit noraise) -> Unit = "%async.run"
-
-///|
 fn remove_tree(path : String) -> Unit {
   if !@fs.path_exists(path) {
     return
@@ -92,8 +89,8 @@ test "native file storage list propagates traversal failure" {
 
   let storage = NativeFileStorage::new(root)
   let mut failed = false
-  storage.list(Data) catch {
-    _ => failed = true
+  let _ = storage.list(Data) catch {
+    _ => { failed = true; [] }
   }
 
   assert_true(failed)

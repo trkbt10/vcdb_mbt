@@ -1,6 +1,13 @@
 import {
   "moonbitlang/core/env",
   "moonbitlang/core/strconv",
+  "moonbitlang/core/string",
+  "moonbitlang/async",
+  "moonbitlang/async/http" as @async_http,
+  "moonbitlang/async/socket" as @async_socket,
+  "moonbitlang/async/io" as @async_io,
+  "trkbt10/vcdb/http",
+  "trkbt10/vcdb/core/storage",
 }
 
 options(

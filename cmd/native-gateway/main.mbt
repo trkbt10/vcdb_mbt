@@ -4,8 +4,7 @@
 /// This package is the MoonBit-native entrypoint for executing vcdb gateway
 /// requests without the JavaScript runtime adapter.
 
-///|
-fn run_async_main(f : async () -> Unit noraise) -> Unit = "%async.run"
+// Uses `async fn main` — moonbitlang/async event loop is started automatically.
 
 ///|
 pub struct NativeGateway {
@@ -30,6 +29,20 @@ pub async fn NativeGateway::execute(
     Some(("points", sub_matches)) => self.execute_points(sub_matches)
     Some(("request", sub_matches)) => self.execute_raw_request(sub_matches)
     _ => @gateway.ApiResponse::err("Unknown command")
+  }
+}
+
+///|
+/// Check if the command is a direct CLI command (dump/load) that
+/// bypasses the gateway and writes its own output.
+pub async fn NativeGateway::try_execute_direct(
+  _self : NativeGateway,
+  matches : @argparse.Matches,
+) -> Bool {
+  match matches.subcommand {
+    Some(("dump", sub)) => { execute_dump(sub); true }
+    Some(("load", sub)) => { execute_load(sub); true }
+    _ => false
   }
 }
 
@@ -82,16 +95,20 @@ pub async fn NativeGateway::run(
   let matches = cmd.parse(argv=args, env={}) catch {
     e => return e.to_string()
   }
+  // Direct commands (dump/load) handle their own output
+  if self.try_execute_direct(matches) {
+    return ""
+  }
   self.execute(matches).to_json().stringify()
 }
 
 ///|
-fn main {
+async fn main {
   let app = NativeGateway::new()
-  run_async_main(async fn() noraise {
-    let result = app.run(command_args()) catch { e => e.to_string() }
+  let result = app.run(command_args()) catch { e => e.to_string() }
+  if result.length() > 0 {
     println(result)
-  })
+  }
 }
 
 ///|
@@ -108,25 +125,6 @@ fn command_args() -> Array[String] {
   }
 }
 
-///|
-fn parse_metric(metric : String) -> @types.Metric? {
-  match metric {
-    "cosine" | "Cosine" => Some(@types.Cosine)
-    "l2" | "L2" => Some(@types.L2)
-    "dot" | "Dot" => Some(@types.Dot)
-    _ => None
-  }
-}
-
-///|
-fn parse_strategy(strategy : String) -> @types.Strategy? {
-  match strategy {
-    "hnsw" | "HNSW" => Some(@types.HNSW(@types.HNSWParams::default()))
-    "ivf" | "IVF" => Some(@types.IVF(@types.IVFParams::default()))
-    "bruteforce" | "Bruteforce" => Some(@types.Bruteforce)
-    _ => None
-  }
-}
 
 ///|
 fn build_upsert_body(
@@ -158,24 +156,6 @@ fn build_search_body(vector : Array[Double], limit : Int) -> String {
 }
 
 ///|
-fn metric_name(metric : @types.Metric) -> String {
-  match metric {
-    @types.Cosine => "Cosine"
-    @types.L2 => "L2"
-    @types.Dot => "Dot"
-  }
-}
-
-///|
-fn strategy_name(strategy : @types.Strategy) -> String {
-  match strategy {
-    @types.Bruteforce => "Bruteforce"
-    @types.HNSW(_) => "HNSW"
-    @types.IVF(_) => "IVF"
-  }
-}
-
-///|
 fn build_collection_body(
   dim : Int,
   metric : @types.Metric,
@@ -183,8 +163,8 @@ fn build_collection_body(
 ) -> String {
   @gateway.json_object([
     ("dim", dim.to_double().to_json()),
-    ("metric", metric_name(metric).to_json()),
-    ("strategy", strategy_name(strategy).to_json()),
+    ("metric", metric.to_name().to_json()),
+    ("strategy", strategy.to_name().to_json()),
   ]).stringify()
 }
 
@@ -210,7 +190,7 @@ async fn NativeGateway::create_collection(
   let dim = @cli.get_int_value_or(matches, "dim", 128)
   let metric = match @cli.get_value(matches, "metric") {
     Some(value) =>
-      match parse_metric(value) {
+      match @cli.parse_metric(value) {
         Some(it) => it
         None => return @gateway.ApiResponse::err("Invalid metric")
       }
@@ -218,11 +198,11 @@ async fn NativeGateway::create_collection(
   }
   let strategy = match @cli.get_value(matches, "strategy") {
     Some(value) =>
-      match parse_strategy(value) {
+      match @cli.parse_strategy(value) {
         Some(it) => it
         None => return @gateway.ApiResponse::err("Invalid strategy")
       }
-    None => @types.HNSW(@types.HNSWParams::default())
+    None => @types.Strategy::default_hnsw()
   }
   let body = build_collection_body(dim, metric, strategy)
   self.request("POST", "/collections/" + name, body)
