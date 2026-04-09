@@ -27,11 +27,17 @@ jobs:
       - name: Format check
         run: moon fmt --check
 
-      - name: Type check
+      - name: Type check (wasm-gc)
         run: moon check
 
-      - name: Run tests with coverage
+      - name: Type check (js)
+        run: moon check --target js
+
+      - name: Run tests (wasm-gc)
         run: moon test --enable-coverage
+
+      - name: Run tests (js target)
+        run: moon test --target js
 
       - name: Generate coverage report
         run: moon coverage report -f summary
