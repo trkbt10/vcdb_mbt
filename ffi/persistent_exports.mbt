@@ -45,6 +45,10 @@ let persistent_counter : PersistentCounter = { value: 1 }
 ///|
 /// Allocate a unique persistent instance ID.
 /// JS must call this before persistent_register_*_storage and persistent_init.
+///
+/// Thread safety: relies on single-threaded execution (JS event loop).
+/// NOT safe for concurrent calls from multiple threads (wasm-gc shared memory,
+/// native multi-threading). Use explicit instanceId in those environments.
 pub fn persistent_allocate_id() -> Int {
   let id = persistent_counter.value
   persistent_counter.value = persistent_counter.value + 1

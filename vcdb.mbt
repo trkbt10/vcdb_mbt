@@ -784,6 +784,9 @@ pub fn VectorDB::compact(self : VectorDB) -> (VectorDB, Int) {
 /// Returns: Binary representation of the database
 pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
   let w = @binary.BinaryWriter::new()
+  // Snapshot header: magic "VCDB" + version 2
+  w.push_u32(0x56434442U) // "VCDB" magic
+  w.push_u32(2U) // snapshot format version
   // Write strategy type and params
   match self.strategy {
     Bruteforce => w.push_u32(0U)
@@ -850,7 +853,20 @@ pub fn VectorDB::serialize(self : VectorDB) -> Bytes {
 /// Returns: The restored VectorDB instance
 pub fn VectorDB::deserialize(data : Bytes) -> VectorDB {
   let r = @binary.BinaryReader::new(data)
-  let strategy_type = r.read_u32()
+  // Detect format: v2+ starts with magic 0x56434442 ("VCDB"),
+  // v1 (legacy) starts with strategy_type (0, 1, or 2).
+  let first_u32 = r.read_u32()
+  let _snapshot_version = if first_u32 == 0x56434442U {
+    let ver = r.read_u32()
+    ver
+  } else {
+    1U // legacy format — first_u32 is strategy_type, no version header
+  }
+  let strategy_type = if first_u32 == 0x56434442U {
+    r.read_u32()
+  } else {
+    first_u32
+  }
   let (hnsw_params, ivf_params) : (@types.HNSWParams?, @types.IVFParams?) = match
     strategy_type {
     0U => (None, None)

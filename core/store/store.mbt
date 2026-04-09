@@ -309,6 +309,9 @@ pub fn CoreStore::normalize_query(
 /// Serialize CoreStore to bytes
 pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
   let w = @binary.BinaryWriter::new()
+  // Store version: magic 0x53544F52 ("STOR") + version 2
+  w.push_u32(0x53544F52U)
+  w.push_u32(2U)
   // Write header: dim, metric, count
   w.push_u32(self.dim.reinterpret_as_uint())
   w.push_u32(
@@ -319,34 +322,11 @@ pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
     },
   )
   w.push_u32(self.count.reinterpret_as_uint())
-  // Write ids: tag(1) + payload(8 or 16 bytes)
-  // tag 0x00 = Int64Id (8 bytes), tag 0x01 = Bytes16Id (16 bytes)
+  // Write ids: length-prefixed wire bytes (SoT: VectorId::to_wire_bytes)
   for i in 0..<self.count {
-    match self.ids[i] {
-      @types.Int64Id(v) => {
-        w.push_byte(b'\x00')
-        w.push_u64(v.reinterpret_as_uint64())
-      }
-      @types.Bytes16Id(b) => {
-        w.push_byte(b'\x01')
-        w.push_byte(b.b0)
-        w.push_byte(b.b1)
-        w.push_byte(b.b2)
-        w.push_byte(b.b3)
-        w.push_byte(b.b4)
-        w.push_byte(b.b5)
-        w.push_byte(b.b6)
-        w.push_byte(b.b7)
-        w.push_byte(b.b8)
-        w.push_byte(b.b9)
-        w.push_byte(b.b10)
-        w.push_byte(b.b11)
-        w.push_byte(b.b12)
-        w.push_byte(b.b13)
-        w.push_byte(b.b14)
-        w.push_byte(b.b15)
-      }
-    }
+    let wire = self.ids[i].to_wire_bytes()
+    w.push_u32(wire.length().reinterpret_as_uint())
+    w.push_bytes(wire)
   }
   // Write data
   for i in 0..<(self.count * self.dim) {
@@ -398,8 +378,19 @@ pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
 /// Deserialize CoreStore from bytes
 pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
   let r = @binary.BinaryReader::new(data)
+  // Detect format: v2+ starts with magic 0x53544F52 ("STOR")
+  let first_u32 = r.read_u32()
+  let store_version : UInt = if first_u32 == 0x53544F52U {
+    r.read_u32()
+  } else {
+    1U // legacy format — first_u32 is dim
+  }
   // Read header
-  let dim = r.read_u32().reinterpret_as_int()
+  let dim = if first_u32 == 0x53544F52U {
+    r.read_u32().reinterpret_as_int()
+  } else {
+    first_u32.reinterpret_as_int()
+  }
   let metric = match r.read_u32() {
     0U => @types.Cosine
     1U => @types.L2
@@ -407,48 +398,32 @@ pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
   }
   let count = r.read_u32().reinterpret_as_int()
   let store = CoreStore::new(dim, metric, capacity=count)
-  // Read ids: tag(1) + payload(8 or 16 bytes)
+  // Read ids
   for i in 0..<count {
-    let tag = r.read_byte()
-    let id = match tag {
-      b'\x01' => {
-        let b0 = r.read_byte()
-        let b1 = r.read_byte()
-        let b2 = r.read_byte()
-        let b3 = r.read_byte()
-        let b4 = r.read_byte()
-        let b5 = r.read_byte()
-        let b6 = r.read_byte()
-        let b7 = r.read_byte()
-        let b8 = r.read_byte()
-        let b9 = r.read_byte()
-        let b10 = r.read_byte()
-        let b11 = r.read_byte()
-        let b12 = r.read_byte()
-        let b13 = r.read_byte()
-        let b14 = r.read_byte()
-        let b15 = r.read_byte()
-        @types.Bytes16Id(@types.Bytes16::{
-          b0,
-          b1,
-          b2,
-          b3,
-          b4,
-          b5,
-          b6,
-          b7,
-          b8,
-          b9,
-          b10,
-          b11,
-          b12,
-          b13,
-          b14,
-          b15,
-        })
+    let id = if store_version <= 1U {
+      // v1: tag(1) + payload(8 or 16 bytes)
+      let tag = r.read_byte()
+      if tag == b'\x01' {
+        // Bytes16Id: 16 raw bytes
+        let wire = r.read_bytes(16)
+        match @types.VectorId::from_wire_bytes(wire) {
+          Some(v) => v
+          None => @types.Int64Id(0L)
+        }
+      } else {
+        @types.Int64Id(
+          // Int64Id: 8 bytes
+          r.read_u64().reinterpret_as_int64(),
+        )
       }
-      // tag 0x00 (Int64Id) or unknown (treat as Int64Id for forward compat)
-      _ => @types.Int64Id(r.read_u64().reinterpret_as_int64())
+    } else {
+      // v2+: length-prefixed wire bytes (SoT: VectorId::from_wire_bytes)
+      let wire_len = r.read_u32().reinterpret_as_int()
+      let wire = r.read_bytes(wire_len)
+      match @types.VectorId::from_wire_bytes(wire) {
+        Some(v) => v
+        None => @types.Int64Id(0L)
+      }
     }
     store.ids[i] = id
     store.pos.set(id, i)
