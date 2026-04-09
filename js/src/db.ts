@@ -33,9 +33,6 @@ import {
   nowNs,
 } from "./ffi/vector-id.js";
 
-/** Generate a unique instance ID using random values to avoid collisions across workers. */
-const generateInstanceId = (): number =>
-  Math.floor(Math.random() * 0x7FFFFFFF) + 1;
 
 const parsePayload = (json: string): Record<string, unknown> | null => {
   if (!json) return null;
@@ -169,7 +166,7 @@ export class VectorDB {
 /* ══════════════════════════════════════════════════════════════ */
 
 export interface PersistentDBOptions {
-  /** Explicit instance ID. If omitted, auto-assigned. Useful when a stable ID is needed (e.g. Durable Objects). */
+  /** Explicit instance ID. If omitted, allocated by MoonBit runtime. Useful when a stable ID is needed (e.g. Durable Objects). */
   instanceId?: number;
   dim: number;
   capacity: number;
@@ -189,7 +186,7 @@ export class PersistentDB {
 
   static async create(options: PersistentDBOptions): Promise<PersistentDB> {
     const ffi = getPersistentFfi();
-    const instanceId = options.instanceId ?? generateInstanceId();
+    const instanceId = options.instanceId ?? ffi.persistent_allocate_id();
     const {
       dim,
       capacity,

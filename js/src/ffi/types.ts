@@ -98,6 +98,8 @@ export interface AsyncStorageCallbacks {
  * Scroll result: (idBytes: Uint8Array(16), payloadJson)
  */
 export interface PersistentFfi {
+  /** Allocate a unique instance ID. SoT for ID generation — JS must not generate IDs independently. */
+  persistent_allocate_id(): number;
   persistent_register_wal_storage(
     instanceId: number,
     read: AsyncStorageCallbacks["read"],

@@ -32,6 +32,25 @@ let persistent_instances : @hashmap.HashMap[
   ],
 ] = @hashmap.new()
 
+///|
+/// Monotonic counter for persistent instance ID allocation.
+/// SoT for instance ID generation — JS must not generate IDs independently.
+priv struct PersistentCounter {
+  mut value : Int
+}
+
+///|
+let persistent_counter : PersistentCounter = { value: 1 }
+
+///|
+/// Allocate a unique persistent instance ID.
+/// JS must call this before persistent_register_*_storage and persistent_init.
+pub fn persistent_allocate_id() -> Int {
+  let id = persistent_counter.value
+  persistent_counter.value = persistent_counter.value + 1
+  id
+}
+
 // ── Callback name derivation (SoT) ──────────────────────────
 
 ///|
