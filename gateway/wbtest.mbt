@@ -13,10 +13,10 @@ test "json/parse_bool" {
 
 ///|
 test "json/parse_number" {
-  assert_eq(parse_json("42"), Some((42.0).to_json()))
+  assert_eq(parse_json("42"), Some(42.0.to_json()))
   assert_eq(parse_json("-123"), Some((-123.0).to_json()))
-  assert_eq(parse_json("3.14"), Some((3.14).to_json()))
-  assert_eq(parse_json("1e10"), Some((10000000000.0).to_json()))
+  assert_eq(parse_json("3.14"), Some(3.14.to_json()))
+  assert_eq(parse_json("1e10"), Some(10000000000.0.to_json()))
 }
 
 ///|
@@ -31,7 +31,7 @@ test "json/parse_array" {
   let result = parse_json("[1, 2, 3]")
   assert_eq(
     result,
-    Some(Json::array([(1.0).to_json(), (2.0).to_json(), (3.0).to_json()])),
+    Some(Json::array([1.0.to_json(), 2.0.to_json(), 3.0.to_json()])),
   )
 
   let empty = parse_json("[]")
@@ -76,7 +76,7 @@ test "json/parse_nested" {
 test "json/to_string" {
   let obj = json_object([
     ("name", "test".to_json()),
-    ("value", (42.0).to_json()),
+    ("value", 42.0.to_json()),
     ("active", true.to_json()),
   ])
   let s = obj.stringify()
@@ -118,9 +118,9 @@ test "json/attrs_conversion" {
 test "json/get_helpers" {
   let obj = json_object([
     ("name", "test".to_json()),
-    ("count", (42.0).to_json()),
+    ("count", 42.0.to_json()),
     ("active", true.to_json()),
-    ("items", json_array([(1.0).to_json(), (2.0).to_json()])),
+    ("items", json_array([1.0.to_json(), 2.0.to_json()])),
   ])
 
   assert_eq(get_string(obj, "name"), Some("test"))

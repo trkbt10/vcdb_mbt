@@ -3,9 +3,21 @@
 ///|
 test "vectordb/bruteforce" {
   let db = VectorDB::with_dim(3)
-  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
-  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
+  let _ = db.add(
+    @types.VectorId::from_int(1),
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+  )
+  let _ = db.add(
+    @types.VectorId::from_int(2),
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+  )
+  let _ = db.add(
+    @types.VectorId::from_int(3),
+    [0.5, 0.5, 0.0],
+    @types.empty_attrs(),
+  )
   inspect(db.size(), content="3")
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
@@ -20,9 +32,21 @@ test "vectordb/bruteforce" {
 ///|
 test "vectordb/hnsw" {
   let db = VectorDB::with_hnsw(3, metric=@types.Dot)
-  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
-  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
+  let _ = db.add(
+    @types.VectorId::from_int(1),
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+  )
+  let _ = db.add(
+    @types.VectorId::from_int(2),
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+  )
+  let _ = db.add(
+    @types.VectorId::from_int(3),
+    [0.5, 0.5, 0.0],
+    @types.empty_attrs(),
+  )
   inspect(db.size(), content="3")
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
@@ -33,9 +57,21 @@ test "vectordb/hnsw" {
 ///|
 test "vectordb/ivf" {
   let db = VectorDB::with_ivf(3, metric=@types.Dot)
-  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
-  let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5, 0.0], @types.empty_attrs())
+  let _ = db.add(
+    @types.VectorId::from_int(1),
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+  )
+  let _ = db.add(
+    @types.VectorId::from_int(2),
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+  )
+  let _ = db.add(
+    @types.VectorId::from_int(3),
+    [0.5, 0.5, 0.0],
+    @types.empty_attrs(),
+  )
   inspect(db.size(), content="3")
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
@@ -49,7 +85,11 @@ test "vectordb/serialization" {
   let attrs = @types.empty_attrs()
   attrs.set("tag", @types.String("test"))
   let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], attrs)
-  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(
+    @types.VectorId::from_int(2),
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+  )
   // Serialize
   let bytes = db.serialize()
   inspect(bytes.length() > 0, content="true")
@@ -140,7 +180,11 @@ test "vectordb/search_with_expr_prefilter" {
     let attrs = @types.empty_attrs()
     attrs.set("score", @types.Int(i.to_int64() * 10L))
     let id = @types.VectorId::from_int(i)
-    let _ = db.add(id, [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0], attrs)
+    let _ = db.add(
+      id,
+      [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0],
+      attrs,
+    )
   }
   // Search with PreFilter: score >= 50 (IDs 5-10)
   let range = @types.NumericRange::gte(50.0)
@@ -174,7 +218,11 @@ test "vectordb/search_with_expr_auto" {
       attrs.set("tag", @types.String("common"))
     }
     let id = @types.VectorId::from_int(i)
-    let _ = db.add(id, [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0], attrs)
+    let _ = db.add(
+      id,
+      [i.to_double() / 10.0, 1.0 - i.to_double() / 10.0],
+      attrs,
+    )
   }
   // Search with Auto strategy: should use pre-filter (2/10 < 50%)
   let expr = @filter.FilterExpr::match_("tag", @types.String("rare"))
@@ -353,8 +401,16 @@ test "vectordb/train" {
 ///|
 test "vectordb/hnsw_serialization" {
   let db = VectorDB::with_hnsw(3, metric=@types.Cosine)
-  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(
+    @types.VectorId::from_int(1),
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+  )
+  let _ = db.add(
+    @types.VectorId::from_int(2),
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+  )
   // Serialize
   let bytes = db.serialize()
   inspect(bytes.length() > 0, content="true")
@@ -395,8 +451,16 @@ test "vectordb/hnsw_serialization_preserves_metadata_visibility" {
 ///|
 test "vectordb/ivf_serialization" {
   let db = VectorDB::with_ivf(3, metric=@types.Dot)
-  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
-  let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0, 0.0], @types.empty_attrs())
+  let _ = db.add(
+    @types.VectorId::from_int(1),
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+  )
+  let _ = db.add(
+    @types.VectorId::from_int(2),
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+  )
   // Serialize
   let bytes = db.serialize()
   inspect(bytes.length() > 0, content="true")
@@ -505,7 +569,11 @@ test "vectordb/serialize_hnsw_params" {
     strategy: @types.HNSW(params),
   }
   let db = VectorDB::new(options)
-  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(
+    @types.VectorId::from_int(1),
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+  )
   // Serialize and deserialize
   let bytes = db.serialize()
   let db2 = VectorDB::deserialize(bytes)
@@ -535,7 +603,11 @@ test "vectordb/serialize_ivf_params" {
     strategy: @types.IVF(params),
   }
   let db = VectorDB::new(options)
-  let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0, 0.0], @types.empty_attrs())
+  let _ = db.add(
+    @types.VectorId::from_int(1),
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+  )
   // Serialize and deserialize
   let bytes = db.serialize()
   let db2 = VectorDB::deserialize(bytes)

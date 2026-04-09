@@ -50,7 +50,14 @@ pub async fn execute_load(matches : @argparse.Matches) -> Unit {
     let snap = @storage.NativeFileStorage::new(shard_dir)
     shards.push(
       @vcdb.PersistentDB::init(
-        wal, snap, "", collection_name, dim, 4096, metric=metric, strategy=strategy,
+        wal,
+        snap,
+        "",
+        collection_name,
+        dim,
+        4096,
+        metric~,
+        strategy~,
       ),
     )
   }
@@ -108,7 +115,10 @@ pub async fn execute_load(matches : @argparse.Matches) -> Unit {
     shards[i].checkpoint() catch {
       e => {
         println(
-          "Error: Checkpoint shard " + i.to_string() + " failed: " + e.to_string(),
+          "Error: Checkpoint shard " +
+          i.to_string() +
+          " failed: " +
+          e.to_string(),
         )
         return
       }
@@ -124,8 +134,13 @@ pub async fn execute_load(matches : @argparse.Matches) -> Unit {
     )
   }
   println(
-    "loaded=" + loaded.to_string() + " errors=" + errors.to_string() + " [" + shard_info
-    .to_string() + "]",
+    "loaded=" +
+    loaded.to_string() +
+    " errors=" +
+    errors.to_string() +
+    " [" +
+    shard_info.to_string() +
+    "]",
   )
 }
 

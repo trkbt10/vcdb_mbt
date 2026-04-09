@@ -94,9 +94,24 @@ test "edge/dim/single_dimension" {
       strategy=@types.Bruteforce,
     )
 
-    let _ = db.add(@types.VectorId::from_int(1), [5.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(2), [3.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(3), [7.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [5.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [3.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(3),
+      [7.0],
+      @types.empty_attrs(),
+      0L,
+    )
 
     let results = db.search([1.0], 3, None)
 
@@ -151,9 +166,24 @@ test "edge/score/identical_scores" {
     )
 
     // All have dot product = 1.0 with [1, 0]
-    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(3), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(3),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
 
     let results = db.search([1.0, 0.0], 3, None)
 
@@ -181,9 +211,24 @@ test "edge/score/close_scores" {
       strategy=@types.Bruteforce,
     )
 
-    let _ = db.add(@types.VectorId::from_int(1), [1.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(2), [1.0000001], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(3), [1.0000002], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [1.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [1.0000001],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(3),
+      [1.0000002],
+      @types.empty_attrs(),
+      0L,
+    )
 
     let results = db.search([1.0], 3, None)
 
@@ -241,8 +286,18 @@ test "edge/vector/zero_vector_cosine" {
     )
 
     // Note: Zero vector can't be normalized, implementation should handle gracefully
-    let _ = db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [0.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
 
     // Should not crash
     let results = db.search([1.0, 0.0], 2, None)
@@ -444,7 +499,12 @@ test "edge/filter/none_match" {
     for i in 1..<=10 {
       let attrs = @types.empty_attrs()
       attrs.set("type", @types.String("normal"))
-      let _ = db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        attrs,
+        0L,
+      )
     }
 
     let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
@@ -468,7 +528,12 @@ test "edge/filter/all_match" {
     for i in 1..<=10 {
       let attrs = @types.empty_attrs()
       attrs.set("exists", @types.Bool(true))
-      let _ = db.add(@types.VectorId::from_int(i), [i.to_double(), 0.0], attrs, 0L)
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [i.to_double(), 0.0],
+        attrs,
+        0L,
+      )
     }
 
     let filter = fn(_id : @types.VectorId, attrs : @types.Attrs) -> Bool {
@@ -780,8 +845,18 @@ test "edge/capacity/minimal" {
       strategy=@types.Bruteforce,
     )
 
-    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(2), [2.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [2.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
 
     inspect(db.size(), content="2")
   })
@@ -796,7 +871,12 @@ test "edge/capacity/minimal" {
 test "edge/k/zero" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
-    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
 
     let results = db.search([1.0, 0.0], 0, None)
     inspect(results.length(), content="0")

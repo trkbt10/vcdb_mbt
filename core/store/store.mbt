@@ -417,12 +417,24 @@ pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
         let b13 = r.read_byte()
         let b14 = r.read_byte()
         let b15 = r.read_byte()
-        @types.Bytes16Id(
-          @types.Bytes16::{
-            b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14,
-            b15,
-          },
-        )
+        @types.Bytes16Id(@types.Bytes16::{
+          b0,
+          b1,
+          b2,
+          b3,
+          b4,
+          b5,
+          b6,
+          b7,
+          b8,
+          b9,
+          b10,
+          b11,
+          b12,
+          b13,
+          b14,
+          b15,
+        })
       }
       // tag 0x00 (Int64Id) or unknown (treat as Int64Id for forward compat)
       _ => @types.Int64Id(r.read_u64().reinterpret_as_int64())

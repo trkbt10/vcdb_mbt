@@ -223,9 +223,24 @@ async fn demo_metrics() -> Unit {
 
   for vec in vectors {
     let (id, v) = vec
-    let _ = db_cosine.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
-    let _ = db_dot.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
-    let _ = db_l2.add(@types.VectorId::from_int(id), v, @types.empty_attrs(), 0L)
+    let _ = db_cosine.add(
+      @types.VectorId::from_int(id),
+      v,
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db_dot.add(
+      @types.VectorId::from_int(id),
+      v,
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db_l2.add(
+      @types.VectorId::from_int(id),
+      v,
+      @types.empty_attrs(),
+      0L,
+    )
   }
 
   println("Vectors: id=1 [1,0,0], id=2 [2,0,0], id=3 [0,1,0]")

@@ -97,35 +97,65 @@ pub impl Eq for Bytes16 with equal(self, other) {
 ///|
 pub fn Bytes16::compare(self : Bytes16, other : Bytes16) -> Int {
   let mut r = self.b0.to_int() - other.b0.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b1.to_int() - other.b1.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b2.to_int() - other.b2.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b3.to_int() - other.b3.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b4.to_int() - other.b4.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b5.to_int() - other.b5.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b6.to_int() - other.b6.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b7.to_int() - other.b7.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b8.to_int() - other.b8.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b9.to_int() - other.b9.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b10.to_int() - other.b10.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b11.to_int() - other.b11.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b12.to_int() - other.b12.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b13.to_int() - other.b13.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   r = self.b14.to_int() - other.b14.to_int()
-  if r != 0 { return r }
+  if r != 0 {
+    return r
+  }
   self.b15.to_int() - other.b15.to_int()
 }
 
@@ -154,15 +184,29 @@ pub impl Show for Bytes16 with output(self, logger) {
   let hex = "0123456789abcdef"
   let chars : Array[Char] = []
   let bytes = [
-    self.b0, self.b1, self.b2, self.b3, self.b4, self.b5, self.b6, self.b7,
-    self.b8, self.b9, self.b10, self.b11, self.b12, self.b13, self.b14, self.b15,
+    self.b0,
+    self.b1,
+    self.b2,
+    self.b3,
+    self.b4,
+    self.b5,
+    self.b6,
+    self.b7,
+    self.b8,
+    self.b9,
+    self.b10,
+    self.b11,
+    self.b12,
+    self.b13,
+    self.b14,
+    self.b15,
   ]
   for i, b in bytes {
     if i == 4 || i == 6 || i == 8 || i == 10 {
       chars.push('-')
     }
     chars.push(hex.code_unit_at(b.to_int() >> 4).to_int().unsafe_to_char())
-    chars.push(Char::from_int(hex.code_unit_at(b.to_int() & 0xF).to_int()))
+    chars.push(hex.code_unit_at(b.to_int() & 0xF).to_int().unsafe_to_char())
   }
   logger.write_string("Bytes16(\"")
   logger.write_string(String::from_array(chars[:]))
@@ -201,26 +245,24 @@ pub fn Bytes16::from_uuid_string(s : String) -> Bytes16? {
   let byte_at = fn(i : Int) -> Byte {
     ((digits[i * 2] << 4) | digits[i * 2 + 1]).to_byte()
   }
-  Some(
-    Bytes16::{
-      b0: byte_at(0),
-      b1: byte_at(1),
-      b2: byte_at(2),
-      b3: byte_at(3),
-      b4: byte_at(4),
-      b5: byte_at(5),
-      b6: byte_at(6),
-      b7: byte_at(7),
-      b8: byte_at(8),
-      b9: byte_at(9),
-      b10: byte_at(10),
-      b11: byte_at(11),
-      b12: byte_at(12),
-      b13: byte_at(13),
-      b14: byte_at(14),
-      b15: byte_at(15),
-    },
-  )
+  Some(Bytes16::{
+    b0: byte_at(0),
+    b1: byte_at(1),
+    b2: byte_at(2),
+    b3: byte_at(3),
+    b4: byte_at(4),
+    b5: byte_at(5),
+    b6: byte_at(6),
+    b7: byte_at(7),
+    b8: byte_at(8),
+    b9: byte_at(9),
+    b10: byte_at(10),
+    b11: byte_at(11),
+    b12: byte_at(12),
+    b13: byte_at(13),
+    b14: byte_at(14),
+    b15: byte_at(15),
+  })
 }
 
 ///|
@@ -229,15 +271,29 @@ pub fn Bytes16::to_uuid_string(self : Bytes16) -> String {
   let hex = "0123456789abcdef"
   let chars : Array[Char] = []
   let bytes = [
-    self.b0, self.b1, self.b2, self.b3, self.b4, self.b5, self.b6, self.b7,
-    self.b8, self.b9, self.b10, self.b11, self.b12, self.b13, self.b14, self.b15,
+    self.b0,
+    self.b1,
+    self.b2,
+    self.b3,
+    self.b4,
+    self.b5,
+    self.b6,
+    self.b7,
+    self.b8,
+    self.b9,
+    self.b10,
+    self.b11,
+    self.b12,
+    self.b13,
+    self.b14,
+    self.b15,
   ]
   for i, b in bytes {
     if i == 4 || i == 6 || i == 8 || i == 10 {
       chars.push('-')
     }
     chars.push(hex.code_unit_at(b.to_int() >> 4).to_int().unsafe_to_char())
-    chars.push(Char::from_int(hex.code_unit_at(b.to_int() & 0xF).to_int()))
+    chars.push(hex.code_unit_at(b.to_int() & 0xF).to_int().unsafe_to_char())
   }
   String::from_array(chars[:])
 }
@@ -336,7 +392,6 @@ pub impl Hash for VectorId with hash_combine(self, hasher) {
     }
   }
 }
-
 
 ///|
 /// Attribute value - supports common primitive types

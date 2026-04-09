@@ -44,7 +44,11 @@ test "bytes16/from_uuid_string_round_trip" {
 test "bytes16/from_uuid_string_no_hyphens" {
   let s = "550e8400e29b41d4a716446655440000"
   match @types.Bytes16::from_uuid_string(s) {
-    Some(b) => inspect(b.to_uuid_string(), content="550e8400-e29b-41d4-a716-446655440000")
+    Some(b) =>
+      inspect(
+        b.to_uuid_string(),
+        content="550e8400-e29b-41d4-a716-446655440000",
+      )
     None => fail("parse failed")
   }
 }
@@ -53,7 +57,10 @@ test "bytes16/from_uuid_string_no_hyphens" {
 test "bytes16/from_uuid_string_invalid" {
   inspect(@types.Bytes16::from_uuid_string("not-a-uuid"), content="None")
   inspect(@types.Bytes16::from_uuid_string(""), content="None")
-  inspect(@types.Bytes16::from_uuid_string("550e8400-e29b-41d4-a716-44665544000g"), content="None")
+  inspect(
+    @types.Bytes16::from_uuid_string("550e8400-e29b-41d4-a716-44665544000g"),
+    content="None",
+  )
 }
 
 ///|
@@ -155,10 +162,22 @@ test "vector_id/bytes16id_as_map_key" {
   let m : Map[@types.VectorId, Int] = {}
   let uuid = @types.Bytes16Id(sample_uuid_for_types())
   let zero = @types.Bytes16Id(@types.Bytes16::{
-    b0: b'\x00', b1: b'\x00', b2: b'\x00', b3: b'\x00',
-    b4: b'\x00', b5: b'\x00', b6: b'\x00', b7: b'\x00',
-    b8: b'\x00', b9: b'\x00', b10: b'\x00', b11: b'\x00',
-    b12: b'\x00', b13: b'\x00', b14: b'\x00', b15: b'\x00',
+    b0: b'\x00',
+    b1: b'\x00',
+    b2: b'\x00',
+    b3: b'\x00',
+    b4: b'\x00',
+    b5: b'\x00',
+    b6: b'\x00',
+    b7: b'\x00',
+    b8: b'\x00',
+    b9: b'\x00',
+    b10: b'\x00',
+    b11: b'\x00',
+    b12: b'\x00',
+    b13: b'\x00',
+    b14: b'\x00',
+    b15: b'\x00',
   })
   m.set(uuid, 100)
   m.set(zero, 200)

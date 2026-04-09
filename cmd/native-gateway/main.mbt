@@ -24,8 +24,7 @@ pub async fn NativeGateway::execute(
 ) -> @gateway.ApiResponse {
   match matches.subcommand {
     Some(("healthz", _)) => self.request("GET", "/healthz", "")
-    Some(("collections", sub_matches)) =>
-      self.execute_collections(sub_matches)
+    Some(("collections", sub_matches)) => self.execute_collections(sub_matches)
     Some(("points", sub_matches)) => self.execute_points(sub_matches)
     Some(("request", sub_matches)) => self.execute_raw_request(sub_matches)
     _ => @gateway.ApiResponse::err("Unknown command")
@@ -40,8 +39,14 @@ pub async fn NativeGateway::try_execute_direct(
   matches : @argparse.Matches,
 ) -> Bool {
   match matches.subcommand {
-    Some(("dump", sub)) => { execute_dump(sub); true }
-    Some(("load", sub)) => { execute_load(sub); true }
+    Some(("dump", sub)) => {
+      execute_dump(sub)
+      true
+    }
+    Some(("load", sub)) => {
+      execute_load(sub)
+      true
+    }
     _ => false
   }
 }
@@ -92,9 +97,7 @@ pub async fn NativeGateway::run(
   args : Array[String],
 ) -> String {
   let cmd = @cli.vcdb_command()
-  let matches = cmd.parse(argv=args, env={}) catch {
-    e => return e.to_string()
-  }
+  let matches = cmd.parse(argv=args, env={}) catch { e => return e.to_string() }
   // Direct commands (dump/load) handle their own output
   if self.try_execute_direct(matches) {
     return ""
@@ -124,7 +127,6 @@ fn command_args() -> Array[String] {
     args
   }
 }
-
 
 ///|
 fn build_upsert_body(

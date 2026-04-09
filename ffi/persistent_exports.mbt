@@ -54,7 +54,7 @@ fn snapshot_callback_name(instance_id : Int) -> String {
 }
 
 ///|
-fn parse_metric_name(metric : String) -> @types.Metric!Error {
+fn parse_metric_name(metric : String) -> @types.Metric raise Error {
   match @types.Metric::from_name(metric) {
     Some(m) => m
     None =>
@@ -65,7 +65,7 @@ fn parse_metric_name(metric : String) -> @types.Metric!Error {
 }
 
 ///|
-fn parse_strategy_name(strategy : String) -> @types.Strategy!Error {
+fn parse_strategy_name(strategy : String) -> @types.Strategy raise Error {
   match @types.Strategy::from_name(strategy) {
     Some(s) => s
     None =>
@@ -166,8 +166,8 @@ pub fn persistent_init(
     let snapshot_storage = @storage.JsAsyncCallbackStorage::new(
       snapshot_callback_name(instance_id),
     )
-    let parsed_metric = parse_metric_name!(metric)
-    let parsed_strategy = parse_strategy_name!(strategy)
+    let parsed_metric = parse_metric_name(metric)
+    let parsed_strategy = parse_strategy_name(strategy)
     let pdb = @vcdb.PersistentDB::init(
       wal_storage,
       snapshot_storage,
@@ -188,14 +188,12 @@ fn get_persistent_db(
 ) -> @vcdb.PersistentDB[
   @storage.JsAsyncCallbackStorage,
   @storage.JsAsyncCallbackStorage,
-]!Error {
+] raise Error {
   match persistent_instances.get(instance_id) {
     Some(pdb) => pdb
     None =>
       raise @storage.AsyncIOFailed(
-        "Persistent DB instance " +
-        instance_id.to_string() +
-        " not initialized",
+        "Persistent DB instance " + instance_id.to_string() + " not initialized",
       )
   }
 }
@@ -220,7 +218,7 @@ pub fn persistent_upsert(
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db!(instance_id)
+    let db = get_persistent_db(instance_id)
     let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = points.map(fn(
         p,
       ) {
@@ -244,7 +242,7 @@ pub fn persistent_remove(
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Bool] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db!(instance_id)
+    let db = get_persistent_db(instance_id)
     db.remove(vid_from_pair(id_hi, id_lo), timestamp_ns)
   })
 }
@@ -259,7 +257,7 @@ pub fn persistent_update_attrs(
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Bool] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db!(instance_id)
+    let db = get_persistent_db(instance_id)
     let attrs = parse_json_to_attrs(attrs_json)
     db.update_attrs(vid_from_pair(id_hi, id_lo), attrs, timestamp_ns)
   })
@@ -269,7 +267,7 @@ pub fn persistent_update_attrs(
 /// Force a checkpoint (snapshot + WAL truncate).
 pub fn persistent_checkpoint(instance_id : Int) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db!(instance_id)
+    let db = get_persistent_db(instance_id)
     db.checkpoint()
   })
 }
@@ -278,7 +276,7 @@ pub fn persistent_checkpoint(instance_id : Int) -> @js_async.Promise[Unit] {
 /// Compact HNSW index. Returns removed count.
 pub fn persistent_compact(instance_id : Int) -> @js_async.Promise[Int] {
   @js_async.Promise::from_async(async fn() {
-    let db = get_persistent_db!(instance_id)
+    let db = get_persistent_db(instance_id)
     db.compact()
   })
 }

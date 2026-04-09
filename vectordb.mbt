@@ -188,11 +188,7 @@ pub async fn PersistentDB::in_memory_ivf(
   dim : Int,
   metric? : @types.Metric = @types.Cosine,
 ) -> PersistentDB[@storage.MemoryStorage, @storage.MemoryStorage] {
-  PersistentDB::in_memory(
-    dim,
-    metric~,
-    strategy=@types.Strategy::default_ivf(),
-  )
+  PersistentDB::in_memory(dim, metric~, strategy=@types.Strategy::default_ivf())
 }
 
 ///|

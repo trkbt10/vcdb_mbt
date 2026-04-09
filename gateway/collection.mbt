@@ -506,5 +506,8 @@ pub fn[S] CollectionManager::export_metadata(
     let (_, c) = kv
     collections.push(c.config.to_json())
   }
-  json_object([("version", (1.0).to_json()), ("collections", Json::array(collections))])
+  json_object([
+    ("version", 1.0.to_json()),
+    ("collections", Json::array(collections)),
+  ])
 }

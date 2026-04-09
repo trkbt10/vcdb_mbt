@@ -40,6 +40,34 @@ pub fn Attrs::keys(Self) -> Array[String]
 pub fn Attrs::set(Self, String, AttrValue) -> Unit
 pub fn Attrs::size(Self) -> Int
 
+pub(all) struct Bytes16 {
+  b0 : Byte
+  b1 : Byte
+  b2 : Byte
+  b3 : Byte
+  b4 : Byte
+  b5 : Byte
+  b6 : Byte
+  b7 : Byte
+  b8 : Byte
+  b9 : Byte
+  b10 : Byte
+  b11 : Byte
+  b12 : Byte
+  b13 : Byte
+  b14 : Byte
+  b15 : Byte
+}
+pub fn Bytes16::compare(Self, Self) -> Int
+pub fn Bytes16::from_hi_lo(Int64, Int64) -> Self
+pub fn Bytes16::from_uuid_string(String) -> Self?
+pub fn Bytes16::new(Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte, Byte) -> Self
+pub fn Bytes16::to_hi_lo(Self) -> (Int64, Int64)
+pub fn Bytes16::to_uuid_string(Self) -> String
+pub impl Eq for Bytes16
+pub impl Hash for Bytes16
+pub impl Show for Bytes16
+
 pub(all) struct DatabaseOptions {
   dim : Int
   metric : Metric
@@ -102,12 +130,21 @@ pub fn Strategy::default_ivf() -> Self
 pub fn Strategy::from_name(String) -> Self?
 pub fn Strategy::to_name(Self) -> String
 
-pub(all) struct VectorId(Int64) derive(Compare, Eq, Hash, Show)
+pub(all) enum VectorId {
+  Int64Id(Int64)
+  Bytes16Id(Bytes16)
+} derive(Show)
+pub fn VectorId::as_bytes16(Self) -> Bytes16?
+pub fn VectorId::as_int64(Self) -> Int64?
+pub fn VectorId::compare(Self, Self) -> Int
+pub fn VectorId::from_bytes16(Bytes16) -> Self
 pub fn VectorId::from_int(Int) -> Self
 pub fn VectorId::from_int64(Int64) -> Self
-#deprecated
-pub fn VectorId::inner(Self) -> Int64
+pub fn VectorId::from_uuid_string(String) -> Self?
+pub fn VectorId::to_display_string(Self) -> String
 pub fn VectorId::to_int64(Self) -> Int64
+pub impl Eq for VectorId
+pub impl Hash for VectorId
 
 pub(all) struct VectorRecord {
   vector : Array[Double]

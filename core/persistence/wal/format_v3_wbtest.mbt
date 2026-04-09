@@ -47,7 +47,12 @@ test "v3/header_version_is_v3" {
 ///|
 test "v3/bytes16id_encode_decode_roundtrip" {
   let id = @types.Bytes16Id(sample_uuid())
-  let record = WalRecord::upsert(id, [1.0, 2.0, 3.0], @types.empty_attrs(), timestamp=999L)
+  let record = WalRecord::upsert(
+    id,
+    [1.0, 2.0, 3.0],
+    @types.empty_attrs(),
+    timestamp=999L,
+  )
   let encoded = encode_wal_record(record)
   let r = @binary.BinaryReader::new(encoded)
   match decode_wal_record(r) {
@@ -56,7 +61,10 @@ test "v3/bytes16id_encode_decode_roundtrip" {
       match rec.id {
         @types.Int64Id(_) => fail("expected Bytes16Id")
         @types.Bytes16Id(b) =>
-          inspect(b.to_uuid_string(), content="550e8400-e29b-41d4-a716-446655440000")
+          inspect(
+            b.to_uuid_string(),
+            content="550e8400-e29b-41d4-a716-446655440000",
+          )
       }
       match rec.vector {
         Some(v) => inspect(v.length(), content="3")
@@ -70,14 +78,22 @@ test "v3/bytes16id_encode_decode_roundtrip" {
 ///|
 test "v3/bytes16id_segment_roundtrip" {
   let id = @types.Bytes16Id(sample_uuid())
-  let record = WalRecord::upsert(id, [9.0], @types.empty_attrs(), timestamp=12345L)
+  let record = WalRecord::upsert(
+    id,
+    [9.0],
+    @types.empty_attrs(),
+    timestamp=12345L,
+  )
   let segment = encode_wal_segment([record])
   let records = decode_wal_records(segment)
   inspect(records.length(), content="1")
   match records[0].id {
     @types.Int64Id(_) => fail("expected Bytes16Id")
     @types.Bytes16Id(b) =>
-      inspect(b.to_uuid_string(), content="550e8400-e29b-41d4-a716-446655440000")
+      inspect(
+        b.to_uuid_string(),
+        content="550e8400-e29b-41d4-a716-446655440000",
+      )
   }
 }
 

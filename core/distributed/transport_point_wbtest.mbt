@@ -10,7 +10,7 @@ test "transport_point/jsonl_roundtrip_ascii" {
   }
   let line = point.to_jsonl()
   let restored = TransportPoint::from_jsonl(line)
-  assert_false(restored.is_empty())
+  assert_false(restored is None)
   let r = restored.unwrap()
   assert_eq(r.id, point.id)
   assert_eq(r.vector, point.vector)
@@ -21,7 +21,10 @@ test "transport_point/jsonl_roundtrip_ascii" {
 ///|
 test "transport_point/jsonl_roundtrip_unicode" {
   let attrs = @types.empty_attrs()
-  attrs.set("title", @types.String("犬の空中散歩が可能なエアマットの作り方"))
+  attrs.set(
+    "title",
+    @types.String("犬の空中散歩が可能なエアマットの作り方"),
+  )
   attrs.set("category", @types.String("生活"))
   attrs.set("emoji", @types.String("🐕"))
   let point = TransportPoint::{
@@ -31,13 +34,15 @@ test "transport_point/jsonl_roundtrip_unicode" {
   }
   let line = point.to_jsonl()
   let restored = TransportPoint::from_jsonl(line)
-  assert_false(restored.is_empty())
+  assert_false(restored is None)
   let r = restored.unwrap()
   assert_eq(r.id, point.id)
   assert_eq(r.vector, point.vector)
   assert_eq(
     r.attrs.get("title"),
-    Some(@types.String("犬の空中散歩が可能なエアマットの作り方")),
+    Some(
+      @types.String("犬の空中散歩が可能なエアマットの作り方"),
+    ),
   )
   assert_eq(r.attrs.get("category"), Some(@types.String("生活")))
   assert_eq(r.attrs.get("emoji"), Some(@types.String("🐕")))
@@ -57,18 +62,15 @@ test "transport_point/jsonl_roundtrip_hi_lo_id" {
 
 ///|
 test "transport_point/from_jsonl_rejects_invalid" {
-  assert_true(TransportPoint::from_jsonl("").is_empty())
-  assert_true(TransportPoint::from_jsonl("{}").is_empty())
-  assert_true(TransportPoint::from_jsonl("{\"id\":{}}").is_empty())
+  assert_true(TransportPoint::from_jsonl("") is None)
+  assert_true(TransportPoint::from_jsonl("{}") is None)
+  assert_true(TransportPoint::from_jsonl("{\"id\":{}}") is None)
   assert_true(
-    TransportPoint::from_jsonl("{\"id\":{\"hi\":0,\"lo\":0}}").is_empty(),
+    TransportPoint::from_jsonl("{\"id\":{\"hi\":0,\"lo\":0}}") is None,
   )
   // Missing vector
   assert_true(
-    TransportPoint::from_jsonl(
-      "{\"id\":{\"hi\":0,\"lo\":1},\"payload\":{}}",
-    )
-    .is_empty(),
+    TransportPoint::from_jsonl("{\"id\":{\"hi\":0,\"lo\":1},\"payload\":{}}") is None,
   )
 }
 

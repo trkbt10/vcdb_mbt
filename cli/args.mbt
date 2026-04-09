@@ -19,15 +19,11 @@ pub fn vcdb_command() -> @argparse.Command {
           @argparse.Command(
             "create",
             about="Create a new collection",
-            positionals=[
-              @argparse.PositionArg("name", about="Collection name"),
-            ],
+            positionals=[@argparse.PositionArg("name", about="Collection name")],
             options=[
-              @argparse.OptionArg(
-                "dim",
-                about="Vector dimension",
-                default_values=["128"],
-              ),
+              @argparse.OptionArg("dim", about="Vector dimension", default_values=[
+                "128",
+              ]),
               @argparse.OptionArg(
                 "metric",
                 about="Distance metric (cosine|l2|dot)",
@@ -40,20 +36,12 @@ pub fn vcdb_command() -> @argparse.Command {
               ),
             ],
           ),
-          @argparse.Command(
-            "delete",
-            about="Delete a collection",
-            positionals=[
-              @argparse.PositionArg("name", about="Collection name"),
-            ],
-          ),
-          @argparse.Command(
-            "info",
-            about="Get collection info",
-            positionals=[
-              @argparse.PositionArg("name", about="Collection name"),
-            ],
-          ),
+          @argparse.Command("delete", about="Delete a collection", positionals=[
+            @argparse.PositionArg("name", about="Collection name"),
+          ]),
+          @argparse.Command("info", about="Get collection info", positionals=[
+            @argparse.PositionArg("name", about="Collection name"),
+          ]),
         ],
       ),
       @argparse.Command(
@@ -80,22 +68,14 @@ pub fn vcdb_command() -> @argparse.Command {
               ),
             ],
           ),
-          @argparse.Command(
-            "get",
-            about="Get a point by ID",
-            positionals=[
-              @argparse.PositionArg("collection", about="Collection name"),
-              @argparse.PositionArg("id", about="Point ID"),
-            ],
-          ),
-          @argparse.Command(
-            "delete",
-            about="Delete a point",
-            positionals=[
-              @argparse.PositionArg("collection", about="Collection name"),
-              @argparse.PositionArg("id", about="Point ID"),
-            ],
-          ),
+          @argparse.Command("get", about="Get a point by ID", positionals=[
+            @argparse.PositionArg("collection", about="Collection name"),
+            @argparse.PositionArg("id", about="Point ID"),
+          ]),
+          @argparse.Command("delete", about="Delete a point", positionals=[
+            @argparse.PositionArg("collection", about="Collection name"),
+            @argparse.PositionArg("id", about="Point ID"),
+          ]),
           @argparse.Command(
             "search",
             about="Search for similar vectors",
@@ -108,11 +88,9 @@ pub fn vcdb_command() -> @argparse.Command {
                 about="Query vector (comma-separated)",
                 required=true,
               ),
-              @argparse.OptionArg(
-                "k",
-                about="Number of results",
-                default_values=["10"],
-              ),
+              @argparse.OptionArg("k", about="Number of results", default_values=[
+                "10",
+              ]),
             ],
           ),
         ],
@@ -121,16 +99,12 @@ pub fn vcdb_command() -> @argparse.Command {
         "request",
         about="Execute one gateway request natively",
         options=[
-          @argparse.OptionArg(
-            "method",
-            about="HTTP method",
-            default_values=["GET"],
-          ),
-          @argparse.OptionArg(
-            "path",
-            about="Gateway path",
-            default_values=["/healthz"],
-          ),
+          @argparse.OptionArg("method", about="HTTP method", default_values=[
+            "GET",
+          ]),
+          @argparse.OptionArg("path", about="Gateway path", default_values=[
+            "/healthz",
+          ]),
           @argparse.OptionArg("body", about="Optional JSON request body"),
         ],
       ),
@@ -146,14 +120,15 @@ pub fn vcdb_command() -> @argparse.Command {
         about="Load JSONL into sharded persistent snapshots",
         positionals=[
           @argparse.PositionArg("input", about="Path to .jsonl input file"),
-          @argparse.PositionArg("output", about="Output directory for sharded snapshots"),
+          @argparse.PositionArg(
+            "output",
+            about="Output directory for sharded snapshots",
+          ),
         ],
         options=[
-          @argparse.OptionArg(
-            "dim",
-            about="Vector dimension",
-            default_values=["1024"],
-          ),
+          @argparse.OptionArg("dim", about="Vector dimension", default_values=[
+            "1024",
+          ]),
           @argparse.OptionArg(
             "metric",
             about="Distance metric (cosine|l2|dot)",
@@ -169,11 +144,9 @@ pub fn vcdb_command() -> @argparse.Command {
             about="Number of shards (CRUSH placement groups)",
             default_values=["1"],
           ),
-          @argparse.OptionArg(
-            "collection",
-            about="Collection name",
-            default_values=["db"],
-          ),
+          @argparse.OptionArg("collection", about="Collection name", default_values=[
+            "db",
+          ]),
         ],
       ),
       @argparse.Command("healthz", about="Health check"),

@@ -36,7 +36,6 @@ pub fn attrs_to_json_value(attrs : @types.Attrs) -> Json {
   Json::object(obj)
 }
 
-
 ///|
 /// Convert Json to AttrValue.
 pub fn json_to_attr_value(json : Json) -> @types.AttrValue? {

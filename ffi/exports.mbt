@@ -83,9 +83,7 @@ pub fn vcdb_add_uuid(
       }
       let attrs = @types.empty_attrs()
       run_async(async fn() noraise {
-        let _ = db.add(id, vector, attrs, 0L) catch {
-          _ => false
-        }
+        let _ = db.add(id, vector, attrs, 0L) catch { _ => false }
       })
       0
     }
@@ -114,10 +112,7 @@ pub fn vcdb_upsert_uuid(
 }
 
 ///|
-pub fn vcdb_get_uuid(
-  instance_id : Int,
-  uuid : String,
-) -> (Array[Double], Int) {
+pub fn vcdb_get_uuid(instance_id : Int, uuid : String) -> (Array[Double], Int) {
   match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
     (Some(db), Some(id)) =>
       match db.get(id) {
@@ -142,9 +137,7 @@ pub fn vcdb_remove_uuid(instance_id : Int, uuid : String) -> Int {
     (Some(db), Some(id)) => {
       let mut result = 0
       run_async(async fn() noraise {
-        let removed = db.remove(id, 0L) catch {
-          _ => false
-        }
+        let removed = db.remove(id, 0L) catch { _ => false }
         result = if removed { 1 } else { 0 }
       })
       result
@@ -228,9 +221,7 @@ pub fn vcdb_add(
       }
       let attrs = @types.empty_attrs()
       run_async(async fn() noraise {
-        let _ = db.add(id, vector, attrs, 0L) catch {
-          _ => false
-        }
+        let _ = db.add(id, vector, attrs, 0L) catch { _ => false }
       })
       0
     }

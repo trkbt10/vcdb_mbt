@@ -13,9 +13,7 @@ test "cli/vcdb_command_parses_collections_list" {
 test "cli/vcdb_command_parses_collections_create" {
   let cmd = vcdb_command()
   let matches = try! cmd.parse(
-    argv=[
-      "collections", "create", "test", "--dim", "128", "--metric", "cosine",
-    ],
+    argv=["collections", "create", "test", "--dim", "128", "--metric", "cosine"],
     env={},
   )
   guard matches.subcommand is Some(("collections", col_matches))
@@ -91,7 +89,7 @@ test "cli/parse_payload" {
   match payload {
     Object(obj) => {
       assert_eq(obj.get("name"), Some("test".to_json()))
-      assert_eq(obj.get("count"), Some((42.0).to_json()))
+      assert_eq(obj.get("count"), Some(42.0.to_json()))
       assert_eq(obj.get("active"), Some(true.to_json()))
     }
     _ => assert_true(false)

@@ -99,10 +99,22 @@ test "compat/v2_bytes16id_merge_with_v3_segment" {
   let v2_data = make_v2_segment(10L, 100L, [1.0])
   // Build a v3 segment with a Bytes16Id
   let uuid = @types.Bytes16::{
-    b0: b'\x55', b1: b'\x0e', b2: b'\x84', b3: b'\x00',
-    b4: b'\xe2', b5: b'\x9b', b6: b'\x41', b7: b'\xd4',
-    b8: b'\xa7', b9: b'\x16', b10: b'\x44', b11: b'\x66',
-    b12: b'\x55', b13: b'\x44', b14: b'\x00', b15: b'\x00',
+    b0: b'\x55',
+    b1: b'\x0e',
+    b2: b'\x84',
+    b3: b'\x00',
+    b4: b'\xe2',
+    b5: b'\x9b',
+    b6: b'\x41',
+    b7: b'\xd4',
+    b8: b'\xa7',
+    b9: b'\x16',
+    b10: b'\x44',
+    b11: b'\x66',
+    b12: b'\x55',
+    b13: b'\x44',
+    b14: b'\x00',
+    b15: b'\x00',
   }
   let v3_record = WalRecord::upsert(
     @types.Bytes16Id(uuid),

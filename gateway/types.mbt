@@ -99,9 +99,7 @@ fn parse_collection_metric(json : Json) -> Result[@types.Metric, String] {
 }
 
 ///|
-fn parse_collection_strategy(
-  json : Json,
-) -> Result[@types.Strategy, String] {
+fn parse_collection_strategy(json : Json) -> Result[@types.Strategy, String] {
   match get_string(json, "strategy") {
     None => Ok(@types.Strategy::default_hnsw())
     Some(s) =>
@@ -329,9 +327,7 @@ pub struct ScrollPointResponse {
 
 ///|
 pub fn ScrollPointResponse::to_json(self : ScrollPointResponse) -> Json {
-  let parts : Array[(String, Json)] = [
-    ("id", self.id.to_double().to_json()),
-  ]
+  let parts : Array[(String, Json)] = [("id", self.id.to_double().to_json())]
   match self.payload {
     Some(payload) => parts.push(("payload", attrs_to_json(payload)))
     None => ()

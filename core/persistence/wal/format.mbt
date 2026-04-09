@@ -269,11 +269,24 @@ fn decode_wal_record_versioned(
     let b13 = r.read_byte()
     let b14 = r.read_byte()
     let b15 = r.read_byte()
-    @types.Bytes16Id(
-      @types.Bytes16::{
-        b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15,
-      },
-    )
+    @types.Bytes16Id(@types.Bytes16::{
+      b0,
+      b1,
+      b2,
+      b3,
+      b4,
+      b5,
+      b6,
+      b7,
+      b8,
+      b9,
+      b10,
+      b11,
+      b12,
+      b13,
+      b14,
+      b15,
+    })
   } else if version == wal_version {
     // v3 with Int64Id: IDLen(1) + 8 bytes
     if r.remaining() < 1 {
@@ -359,9 +372,11 @@ pub fn verify_wal_header(r : @binary.BinaryReader) -> Bool {
     None => false
     Some((file_type, version)) =>
       file_type == Wal &&
-      (version == wal_version ||
-      version == wal_version_v2 ||
-      version == wal_version_v1)
+      (
+        version == wal_version ||
+        version == wal_version_v2 ||
+        version == wal_version_v1
+      )
   }
 }
 
@@ -376,9 +391,11 @@ fn read_wal_version(data : Bytes) -> Byte? {
     None => None
     Some((file_type, version)) =>
       if file_type == Wal &&
-        (version == wal_version ||
-        version == wal_version_v2 ||
-        version == wal_version_v1) {
+        (
+          version == wal_version ||
+          version == wal_version_v2 ||
+          version == wal_version_v1
+        ) {
         Some(version)
       } else {
         None

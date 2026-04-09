@@ -25,9 +25,10 @@ pub fn TransportPoint::to_jsonl(self : TransportPoint) -> String {
     @types.Int64Id(v) => {
       let hi = (v >> 32).to_int()
       let lo = v.land(0xFFFFFFFFL).to_int()
-      Json::object(
-        { "hi": hi.to_double().to_json(), "lo": lo.to_double().to_json() },
-      )
+      Json::object({
+        "hi": hi.to_double().to_json(),
+        "lo": lo.to_double().to_json(),
+      })
     }
     @types.Bytes16Id(b) =>
       Json::object({ "uuid": b.to_uuid_string().to_json() })
@@ -45,9 +46,7 @@ pub fn TransportPoint::to_jsonl(self : TransportPoint) -> String {
 
 ///|
 pub fn TransportPoint::from_jsonl(line : String) -> TransportPoint? {
-  let json : Json = @json.parse(line) catch {
-    _ => return None
-  }
+  let json : Json = @json.parse(line) catch { _ => return None }
   let id_obj = match json {
     { "id": id_json, .. } => id_json
     _ => return None
@@ -87,7 +86,8 @@ pub fn TransportPoint::from_jsonl(line : String) -> TransportPoint? {
     { "payload": payload, .. } => payload.stringify()
     _ => "{}"
   }
-  let attrs = @codec.parse_attrs_json(payload_json)
-    .unwrap_or(@types.empty_attrs())
+  let attrs = @codec.parse_attrs_json(payload_json).unwrap_or(
+    @types.empty_attrs(),
+  )
   Some(TransportPoint::{ id: vid, vector, attrs })
 }

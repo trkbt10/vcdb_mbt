@@ -90,7 +90,10 @@ test "native file storage list propagates traversal failure" {
   let storage = NativeFileStorage::new(root)
   let mut failed = false
   let _ = storage.list(Data) catch {
-    _ => { failed = true; [] }
+    _ => {
+      failed = true
+      []
+    }
   }
 
   assert_true(failed)

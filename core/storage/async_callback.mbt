@@ -83,8 +83,7 @@ fn JsAsyncCallbackStorage::get_callbacks(
 ) -> Result[JsAsyncStorageCallbacks, String] {
   match js_async_callbacks.get(self.name) {
     Some(cb) => Ok(cb)
-    None =>
-      Err("JS async storage callbacks not registered: " + self.name)
+    None => Err("JS async storage callbacks not registered: " + self.name)
   }
 }
 

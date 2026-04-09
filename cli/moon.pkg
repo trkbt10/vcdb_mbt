@@ -14,8 +14,5 @@ import {
 }
 
 options(
-  targets: {
-    "dump.mbt": [ "native" ],
-    "load.mbt": [ "native" ],
-  },
+  targets: { "dump.mbt": [ "native" ], "load.mbt": [ "native" ] },
 )

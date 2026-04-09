@@ -135,7 +135,12 @@ test "api/cosine_normalization" {
       strategy=@types.Bruteforce,
     )
     // Add non-normalized vector [3, 4] - should be normalized to [0.6, 0.8]
-    let _ = db.add(@types.VectorId::from_int(1), [3.0, 4.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [3.0, 4.0],
+      @types.empty_attrs(),
+      0L,
+    )
     let record = db.get(@types.VectorId::from_int(1))
     let v = record.unwrap().vector
     // Check normalization: [3,4] -> [0.6, 0.8]
@@ -153,9 +158,24 @@ test "api/l2_metric" {
       metric=@types.L2,
       strategy=@types.Bruteforce,
     )
-    let _ = db.add(@types.VectorId::from_int(1), [0.0, 0.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(2), [1.0, 0.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(3), [10.0, 10.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [0.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(3),
+      [10.0, 10.0],
+      @types.empty_attrs(),
+      0L,
+    )
     // Search from origin - closest should be id=1
     let results = db.search([0.0, 0.0], 3, None)
     inspect(results[0].id.to_int64(), content="1")
@@ -245,9 +265,24 @@ test "api/upsert" {
 test "api/remove" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
-    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [0.0, 1.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(3),
+      [0.5, 0.5],
+      @types.empty_attrs(),
+      0L,
+    )
     inspect(db.size(), content="3")
     // Remove middle element
     let removed = db.remove(@types.VectorId::from_int(2), 0L)
@@ -347,8 +382,18 @@ test "api/recall_validation" {
         ((i + 2) % 4).to_double(),
         ((i + 3) % 4).to_double(),
       ]
-      let _ = bf_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
-      let _ = hnsw_db.add(@types.VectorId::from_int(i), v, @types.empty_attrs(), 0L)
+      let _ = bf_db.add(
+        @types.VectorId::from_int(i),
+        v,
+        @types.empty_attrs(),
+        0L,
+      )
+      let _ = hnsw_db.add(
+        @types.VectorId::from_int(i),
+        v,
+        @types.empty_attrs(),
+        0L,
+      )
     }
     // Search both
     let query = [1.0, 2.0, 3.0, 0.0]
@@ -390,8 +435,18 @@ test "api/empty_db" {
 test "api/find" {
   run_async_test(async fn() {
     let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
-    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], @types.empty_attrs(), 0L)
-    let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs(), 0L)
+    let _ = db.add(
+      @types.VectorId::from_int(1),
+      [1.0, 0.0],
+      @types.empty_attrs(),
+      0L,
+    )
+    let _ = db.add(
+      @types.VectorId::from_int(2),
+      [0.0, 1.0],
+      @types.empty_attrs(),
+      0L,
+    )
     // Find best match
     let result = db.find([1.0, 0.0], None)
     inspect(result is None, content="false")
@@ -480,21 +535,36 @@ test "api/ivf_clustered" {
       let jitter = (i % 5).to_double() * 0.02
       let attrs = @types.empty_attrs()
       attrs.set("cluster", @types.String("A"))
-      let _ = db.add(@types.VectorId::from_int(i), [1.0, jitter, 0.0, 0.0], attrs, 0L)
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [1.0, jitter, 0.0, 0.0],
+        attrs,
+        0L,
+      )
     }
     // Cluster B: around [0, 1, 0, 0]
     for i in 30..<60 {
       let jitter = (i % 5).to_double() * 0.02
       let attrs = @types.empty_attrs()
       attrs.set("cluster", @types.String("B"))
-      let _ = db.add(@types.VectorId::from_int(i), [0.0, 1.0, jitter, 0.0], attrs, 0L)
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [0.0, 1.0, jitter, 0.0],
+        attrs,
+        0L,
+      )
     }
     // Cluster C: around [0, 0, 1, 0]
     for i in 60..<90 {
       let jitter = (i % 5).to_double() * 0.02
       let attrs = @types.empty_attrs()
       attrs.set("cluster", @types.String("C"))
-      let _ = db.add(@types.VectorId::from_int(i), [0.0, 0.0, 1.0, jitter], attrs, 0L)
+      let _ = db.add(
+        @types.VectorId::from_int(i),
+        [0.0, 0.0, 1.0, jitter],
+        attrs,
+        0L,
+      )
     }
     // Train IVF
     db.train(iterations=10)
@@ -921,7 +991,12 @@ test "api/complex_expr_search" {
       attrs.set("score", @types.Int(i.to_int64() * 5L))
       attrs.set("category", @types.String(if i <= 10 { "X" } else { "Y" }))
       let id = @types.VectorId::from_int(i)
-      let _ = db.add(id, [i.to_double() / 20.0, 1.0 - i.to_double() / 20.0], attrs, 0L)
+      let _ = db.add(
+        id,
+        [i.to_double() / 20.0, 1.0 - i.to_double() / 20.0],
+        attrs,
+        0L,
+      )
     }
     // Must: category=X AND active=true
     let expr = @filter.FilterExpr::must([

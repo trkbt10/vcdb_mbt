@@ -16,7 +16,7 @@ pub struct CoreStore {
   mut ids : Array[@types.VectorId]
   mut data : Array[Double]
   mut attrs : Array[@types.Attrs]
-  pos : Map[Int64, Int]
+  pos : Map[@types.VectorId, Int]
   mut capacity : Int
   mut count : Int
 }
