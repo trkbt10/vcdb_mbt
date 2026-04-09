@@ -266,7 +266,7 @@ pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
     let list_len = r.read_u32().reinterpret_as_int()
     for _ in 0..<list_len {
       let id_val = r.read_u64().reinterpret_as_int64()
-      let id = @types.VectorId(id_val)
+      let id = @types.Int64Id(id_val)
       state.lists[li].push(id)
       state.id_to_list.set(id_val, li)
     }

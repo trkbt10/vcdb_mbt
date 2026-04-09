@@ -277,7 +277,7 @@ pub fn LSMAttrIndex::range(
           Some(num) =>
             if range.matches(num) && !seen.contains(id_val) {
               seen.set(id_val, true)
-              result.push(@types.VectorId(id_val))
+              result.push(@types.Int64Id(id_val))
             }
         }
     }

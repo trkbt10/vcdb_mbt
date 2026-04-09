@@ -290,8 +290,8 @@ test "crush/full_64bit_hashing" {
   ]
   let map = CrushMap::new(256, 2, targets)
   // IDs that differ only in upper 32 bits
-  let id_low = @types.VectorId(1L) // Lower 32 bits: 1, Upper 32 bits: 0
-  let id_high = @types.VectorId(0x1_0000_0001L) // Lower 32 bits: 1, Upper 32 bits: 1
+  let id_low = @types.Int64Id(1L) // Lower 32 bits: 1, Upper 32 bits: 0
+  let id_high = @types.Int64Id(0x1_0000_0001L) // Lower 32 bits: 1, Upper 32 bits: 1
   let result_low = crush_locate(id_low, map)
   let result_high = crush_locate(id_high, map)
   // These should produce different placement groups (hash includes upper bits)
@@ -310,12 +310,12 @@ test "crush/64bit_id_patterns" {
   let map = CrushMap::new(1024, 1, targets)
   // Test IDs with different upper/lower bit patterns
   let ids = [
-    @types.VectorId(0L), // All zeros
-    @types.VectorId(0xFFFF_FFFF_FFFF_FFFFL), // All ones (negative in signed)
-    @types.VectorId(0x8000_0000_0000_0000L), // Only MSB set
-    @types.VectorId(0x0000_0000_8000_0000L), // Only bit 31 set (lower half MSB)
-    @types.VectorId(0x1234_5678_0000_0000L), // Upper 32 bits only
-    @types.VectorId(0x0000_0000_1234_5678L), // Lower 32 bits only
+    @types.Int64Id(0L), // All zeros
+    @types.Int64Id(0xFFFF_FFFF_FFFF_FFFFL), // All ones (negative in signed)
+    @types.Int64Id(0x8000_0000_0000_0000L), // Only MSB set
+    @types.Int64Id(0x0000_0000_8000_0000L), // Only bit 31 set (lower half MSB)
+    @types.Int64Id(0x1234_5678_0000_0000L), // Upper 32 bits only
+    @types.Int64Id(0x0000_0000_1234_5678L), // Lower 32 bits only
   ]
   // All should get valid placements
   for id in ids {

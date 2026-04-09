@@ -131,7 +131,7 @@ pub fn SegmentReader::read_at(
   let r = @binary.BinaryReader::new(self.data)
   r.skip(offset)
   // Read ID
-  let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
+  let id = @types.Int64Id(r.read_u64().reinterpret_as_int64())
   // Read lengths
   let attrs_len = r.read_u32().reinterpret_as_int()
   let vector_len = r.read_u32().reinterpret_as_int()
@@ -164,7 +164,7 @@ pub fn SegmentReader::collect(
   r.skip(@codec.header_size) // Skip header
   while r.remaining() >= 16 {
     // Read ID
-    let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
+    let id = @types.Int64Id(r.read_u64().reinterpret_as_int64())
     // Read lengths
     let attrs_len = r.read_u32().reinterpret_as_int()
     let vector_len = r.read_u32().reinterpret_as_int()

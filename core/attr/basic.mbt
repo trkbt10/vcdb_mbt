@@ -200,7 +200,7 @@ pub fn BasicAttrIndex::range(
           } else {
             let result : Array[@types.VectorId] = []
             for i = lo_idx; i < hi_idx; i = i + 1 {
-              result.push(@types.VectorId(sorted_arr[i].id))
+              result.push(@types.Int64Id(sorted_arr[i].id))
             }
             Some(result)
           }

@@ -161,7 +161,7 @@ pub fn parse_int64(input : String) -> (Bool, Int, Int) {
   let result : Result[Int64, _] = try? @string.parse_int64(input)
   match result {
     Ok(n) => {
-      let vid = @types.VectorId(n)
+      let vid = @types.Int64Id(n)
       let (hi, lo) = vid_to_pair(vid)
       (true, hi, lo)
     }

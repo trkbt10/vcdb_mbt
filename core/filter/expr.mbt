@@ -317,7 +317,7 @@ pub fn resolve_candidates_bptree(
         let result : Array[@types.VectorId] = []
         for id_val, count in counts {
           if count >= min {
-            result.push(@types.VectorId(id_val))
+            result.push(@types.Int64Id(id_val))
           }
         }
         result

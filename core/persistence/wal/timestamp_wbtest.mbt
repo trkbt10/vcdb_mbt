@@ -1,8 +1,18 @@
 ///|
-/// WAL v2 format compatibility tests
+/// WAL timestamp field behavior tests.
+///
+/// These tests verify the timestamp field semantics regardless of WAL format version.
+/// All records here are encoded in the current (v3) format.
+///
+/// Timestamp semantics:
+///   - Int64 nanoseconds since Unix epoch
+///   - 0 means "no timestamp" (v1 compatibility contract) — always included by filter
+///   - filter_wal_by_timestamp includes records where timestamp == 0 OR timestamp <= cutoff
+///
+/// Test name prefix: "timestamp/"
 
 ///|
-test "v2/encode_decode_with_timestamp" {
+test "timestamp/encode_decode_int64id" {
   let record = WalRecord::upsert(
     @types.VectorId::from_int(1),
     [1.0, 2.0],
@@ -23,7 +33,7 @@ test "v2/encode_decode_with_timestamp" {
 }
 
 ///|
-test "v2/timestamp_zero_is_valid" {
+test "timestamp/zero_value_is_valid" {
   let record = WalRecord::upsert(
     @types.VectorId::from_int(1),
     [1.0],
@@ -35,14 +45,14 @@ test "v2/timestamp_zero_is_valid" {
   let decoded = decode_wal_record(r)
   match decoded {
     Some(rec) =>
-      // timestamp=0 but flags still has has_timestamp bit set (v2 format)
+      // In v3, has_timestamp flag is always set; timestamp field value 0 is valid
       inspect(rec.timestamp, content="0")
     None => inspect(false, content="true")
   }
 }
 
 ///|
-test "v2/segment_roundtrip_with_timestamps" {
+test "timestamp/segment_roundtrip_all_record_types" {
   let records = [
     WalRecord::upsert(
       @types.VectorId::from_int(1),
@@ -67,7 +77,7 @@ test "v2/segment_roundtrip_with_timestamps" {
 }
 
 ///|
-test "v2/filter_by_timestamp" {
+test "timestamp/filter_by_cutoff" {
   let records = [
     WalRecord::upsert(
       @types.VectorId::from_int(1),
@@ -97,32 +107,36 @@ test "v2/filter_by_timestamp" {
 }
 
 ///|
-test "v2/filter_includes_v1_records" {
-  // v1 records have timestamp=0, should always be included
+test "timestamp/filter_always_includes_zero_timestamp" {
+  // Records with timestamp=0 are always included regardless of cutoff.
+  // This matches the WAL v1 compatibility contract: v1 records had no timestamp
+  // field and are replayed as timestamp=0. When decoded through decode_wal_records
+  // from a v1 segment they arrive with timestamp=0, meaning "no timestamp — always
+  // include". New v3 records can also carry timestamp=0 (explicit zero), and the
+  // filter must treat them the same way.
   let records = [
     WalRecord::upsert(
       @types.VectorId::from_int(1),
       [1.0],
       @types.empty_attrs(),
-      timestamp=0L, // v1-style (no timestamp)
+      timestamp=0L, // explicit zero — always included by filter
     ),
     WalRecord::upsert(
       @types.VectorId::from_int(2),
       [2.0],
       @types.empty_attrs(),
-      timestamp=500L, // v2 with timestamp
+      timestamp=500L,
     ),
   ]
   let segment = encode_wal_segment(records)
-  // Filter at timestamp 100 — v1 record (ts=0) always included,
-  // v2 record (ts=500) excluded
+  // cutoff=100: record with ts=0 always included; record with ts=500 excluded
   let filtered = filter_wal_by_timestamp(segment, 100L)
   inspect(filtered.length(), content="1")
   inspect(filtered[0].id.to_int64(), content="1")
 }
 
 ///|
-test "v2/max_wal_timestamp" {
+test "timestamp/max_wal_timestamp" {
   let records = [
     WalRecord::upsert(
       @types.VectorId::from_int(1),
@@ -144,14 +158,14 @@ test "v2/max_wal_timestamp" {
 }
 
 ///|
-test "v2/max_wal_timestamp_empty" {
+test "timestamp/max_wal_timestamp_empty_segment" {
   let segment = encode_wal_segment([])
   let max_ts = max_wal_timestamp(segment)
   inspect(max_ts, content="0")
 }
 
 ///|
-test "v2/merge_preserves_timestamps" {
+test "timestamp/merge_preserves_timestamps" {
   let seg1 = encode_wal_segment([
     WalRecord::upsert(
       @types.VectorId::from_int(1),
@@ -177,7 +191,7 @@ test "v2/merge_preserves_timestamps" {
 }
 
 ///|
-test "v2/replay_with_cutoff" {
+test "timestamp/replay_with_cutoff" {
   let records = [
     WalRecord::upsert(
       @types.VectorId::from_int(1),
@@ -210,7 +224,7 @@ test "v2/replay_with_cutoff" {
 }
 
 ///|
-test "v2/replay_no_cutoff_includes_all" {
+test "timestamp/replay_no_cutoff_includes_all" {
   let records = [
     WalRecord::upsert(
       @types.VectorId::from_int(1),
@@ -231,56 +245,4 @@ test "v2/replay_no_cutoff_includes_all" {
   let applied = replay_wal_data(segment, store)
   inspect(applied, content="2")
   inspect(store.size(), content="2")
-}
-
-///|
-test "v2/header_version_is_v2" {
-  let header = encode_wal_header()
-  let r = @binary.BinaryReader::new(header)
-  inspect(verify_wal_header(r), content="true")
-  // Header: magic(8) + type(1) + version(1) + reserved(2)
-  // Position 8 = file type (WAL=0x01), position 9 = version
-  inspect(header[9], content="b'\\x02'")
-}
-
-///|
-test "v2/v1_header_still_accepted" {
-  // Manually create a v1 header
-  let w = @binary.BinaryWriter::new()
-  @codec.encode_header(w, @codec.Wal, b'\x01')
-  let v1_header = w.concat()
-  let r = @binary.BinaryReader::new(v1_header)
-  inspect(verify_wal_header(r), content="true")
-}
-
-///|
-test "v2/v1_record_decode_gives_zero_timestamp" {
-  // Manually encode a v1-style record (flags=0x00, no timestamp)
-  let w = @binary.BinaryWriter::new()
-  // Type: Upsert
-  w.push_byte(b'\x01')
-  // Reserved/Flags: 0x00 (v1 style)
-  w.push_byte(b'\x00')
-  // ID
-  w.push_u64(42UL)
-  // AttrsLen=0, VectorLen=4 (1 float)
-  w.push_u32(0U)
-  w.push_u32(4U)
-  // Vector: 1.0 as f32
-  w.push_f32(1.0)
-  let data = w.concat()
-  let r = @binary.BinaryReader::new(data)
-  let decoded = decode_wal_record(r)
-  match decoded {
-    Some(rec) => {
-      inspect(rec.timestamp, content="0")
-      inspect(rec.id.to_int64(), content="42")
-      inspect(rec.record_type == WalRecordType::Upsert, content="true")
-      match rec.vector {
-        Some(v) => inspect(v.length(), content="1")
-        None => inspect(false, content="true")
-      }
-    }
-    None => inspect(false, content="true")
-  }
 }

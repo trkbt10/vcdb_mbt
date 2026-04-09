@@ -10,20 +10,30 @@ pub(all) struct TransportPoint {
 
 ///|
 /// JSONL format (SoT — both to_jsonl and from_jsonl use this definition):
-///   {"id":{"hi":<i32>,"lo":<i32>},"vector":[<f64>,...],"payload":{...}}
 ///
-/// hi/lo encodes VectorId (Int64) as two i32 halves, matching the
-/// MoonBit JS-target FFI convention.
+/// Int64Id:   {"id":{"hi":<i32>,"lo":<i32>},"vector":[<f64>,...],"payload":{...}}
+/// Bytes16Id: {"id":{"uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"},"vector":[<f64>,...],"payload":{...}}
+///
+/// hi/lo encodes Int64 as two i32 halves (MoonBit JS-target FFI convention).
+/// uuid encodes 128-bit IDs as standard UUID string for interoperability.
+///
+/// from_jsonl accepts both formats for backward compatibility.
 
 ///|
 pub fn TransportPoint::to_jsonl(self : TransportPoint) -> String {
-  let id_val = self.id.to_int64()
-  let hi = (id_val >> 32).to_int()
-  let lo = id_val.land(0xFFFFFFFFL).to_int()
+  let id_json = match self.id {
+    @types.Int64Id(v) => {
+      let hi = (v >> 32).to_int()
+      let lo = v.land(0xFFFFFFFFL).to_int()
+      Json::object(
+        { "hi": hi.to_double().to_json(), "lo": lo.to_double().to_json() },
+      )
+    }
+    @types.Bytes16Id(b) =>
+      Json::object({ "uuid": b.to_uuid_string().to_json() })
+  }
   let m : Map[String, Json] = {}
-  m["id"] = Json::object(
-    { "hi": hi.to_double().to_json(), "lo": lo.to_double().to_json() },
-  )
+  m["id"] = id_json
   let vec_json : Array[Json] = []
   for v in self.vector {
     vec_json.push(v.to_json())
@@ -42,13 +52,23 @@ pub fn TransportPoint::from_jsonl(line : String) -> TransportPoint? {
     { "id": id_json, .. } => id_json
     _ => return None
   }
-  let (hi, lo) = match id_obj {
-    { "hi": Number(h, ..), "lo": Number(l, ..), .. } => (h.to_int(), l.to_int())
+  let vid = match id_obj {
+    // Bytes16Id: {"uuid": "..."}
+    { "uuid": String(s), .. } =>
+      match @types.VectorId::from_uuid_string(s) {
+        Some(id) => id
+        None => return None
+      }
+    // Int64Id: {"hi": <number>, "lo": <number>}
+    { "hi": Number(h, ..), "lo": Number(l, ..), .. } => {
+      let hi = h.to_int()
+      let lo = l.to_int()
+      @types.VectorId::from_int64(
+        (hi.to_int64() << 32) | lo.to_int64().land(0xFFFFFFFFL),
+      )
+    }
     _ => return None
   }
-  let vid = @types.VectorId::from_int64(
-    (hi.to_int64() << 32) | lo.to_int64().land(0xFFFFFFFFL),
-  )
   let vector : Array[Double] = []
   match json {
     { "vector": Array(arr), .. } =>

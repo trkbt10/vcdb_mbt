@@ -893,7 +893,7 @@ pub fn BPTreeAttrIndex::all_ids(
 ) -> Array[@types.VectorId] {
   let result : Array[@types.VectorId] = []
   for id_val, _ in self.data {
-    result.push(@types.VectorId(id_val))
+    result.push(@types.Int64Id(id_val))
   }
   result
 }

@@ -26,20 +26,131 @@ priv struct Counter {
 let counter : Counter = { value: 1 }
 
 ///|
-/// Construct a VectorId from hi/lo Int pair (SoT for ID construction).
+/// Construct an Int64Id from hi/lo Int pair (SoT for Int64 ID construction).
 fn vid_from_pair(hi : Int, lo : Int) -> @types.VectorId {
   let hi64 = hi.to_int64()
   let lo64 = lo.to_int64().land(0xFFFFFFFFL)
-  @types.VectorId((hi64 << 32) | lo64)
+  @types.Int64Id((hi64 << 32) | lo64)
 }
 
 ///|
-/// Extract hi/lo pair from VectorId (SoT for ID extraction).
+/// Extract hi/lo pair from a VectorId.
+/// Int64Id: direct hi/lo extraction.
+/// Bytes16Id: hi = upper 8 bytes as Int64, lo = lower 8 bytes truncated to Int32.
 fn vid_to_pair(id : @types.VectorId) -> (Int, Int) {
-  let v = id.to_int64()
-  let hi = (v.reinterpret_as_uint64() >> 32).to_int()
-  let lo = v.to_int()
-  (hi, lo)
+  match id {
+    @types.Int64Id(v) => {
+      let hi = (v.reinterpret_as_uint64() >> 32).to_int()
+      let lo = v.to_int()
+      (hi, lo)
+    }
+    @types.Bytes16Id(b) => {
+      let (hi64, lo64) = b.to_hi_lo()
+      let hi = (hi64.reinterpret_as_uint64() >> 32).to_int()
+      let lo = hi64.to_int()
+      // Note: this loses the lower 8 bytes. Use vcdb_id_to_uuid for Bytes16Id.
+      ignore(lo64)
+      (hi, lo)
+    }
+  }
+}
+
+///|
+/// Construct a Bytes16Id from a UUID string.
+/// Returns None if the string is not a valid UUID.
+pub fn vid_from_uuid(s : String) -> @types.VectorId? {
+  @types.VectorId::from_uuid_string(s)
+}
+
+///|
+/// Extract UUID string from a VectorId.
+/// Int64Id: formatted as decimal string (not a UUID).
+/// Bytes16Id: formatted as UUID string.
+pub fn vcdb_id_to_string(id : @types.VectorId) -> String {
+  id.to_display_string()
+}
+
+///|
+pub fn vcdb_add_uuid(
+  instance_id : Int,
+  uuid : String,
+  vector : Array[Double],
+) -> Int {
+  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
+    (Some(db), Some(id)) => {
+      if db.has(id) {
+        return -2
+      }
+      let attrs = @types.empty_attrs()
+      run_async(async fn() noraise {
+        let _ = db.add(id, vector, attrs, 0L) catch {
+          _ => false
+        }
+      })
+      0
+    }
+    _ => -1
+  }
+}
+
+///|
+pub fn vcdb_upsert_uuid(
+  instance_id : Int,
+  uuid : String,
+  vector : Array[Double],
+) -> Int {
+  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
+    (Some(db), Some(id)) => {
+      let attrs = @types.empty_attrs()
+      run_async(async fn() noraise {
+        db.upsert([(id, vector, attrs)], 0L) catch {
+          _ => ()
+        }
+      })
+      0
+    }
+    _ => -1
+  }
+}
+
+///|
+pub fn vcdb_get_uuid(
+  instance_id : Int,
+  uuid : String,
+) -> (Array[Double], Int) {
+  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
+    (Some(db), Some(id)) =>
+      match db.get(id) {
+        Some(record) => (record.vector, 1)
+        None => ([], 0)
+      }
+    _ => ([], -1)
+  }
+}
+
+///|
+pub fn vcdb_has_uuid(instance_id : Int, uuid : String) -> Int {
+  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
+    (Some(db), Some(id)) => if db.has(id) { 1 } else { 0 }
+    _ => -1
+  }
+}
+
+///|
+pub fn vcdb_remove_uuid(instance_id : Int, uuid : String) -> Int {
+  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
+    (Some(db), Some(id)) => {
+      let mut result = 0
+      run_async(async fn() noraise {
+        let removed = db.remove(id, 0L) catch {
+          _ => false
+        }
+        result = if removed { 1 } else { 0 }
+      })
+      result
+    }
+    _ => -1
+  }
 }
 
 ///|

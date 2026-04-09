@@ -9,7 +9,7 @@ pub struct CoreStore {
   mut ids : Array[@types.VectorId]
   mut data : Array[Double] // flattened: data[i*dim..(i+1)*dim] is vector i
   mut attrs : Array[@types.Attrs]
-  pos : Map[Int64, Int] // id -> index mapping
+  pos : Map[@types.VectorId, Int] // id -> index mapping
   mut capacity : Int
   mut count : Int
 }
@@ -26,7 +26,7 @@ pub fn CoreStore::new(
   {
     dim,
     metric,
-    ids: Array::make(cap, @types.VectorId(0L)),
+    ids: Array::make(cap, @types.Int64Id(0L)),
     data: Array::make(cap * dim, 0.0),
     attrs: Array::make(cap, @types.empty_attrs()),
     pos: {},
@@ -50,7 +50,7 @@ pub fn CoreStore::capacity(self : CoreStore) -> Int {
 ///|
 /// Check if an id exists in the store
 pub fn CoreStore::has(self : CoreStore, id : @types.VectorId) -> Bool {
-  self.pos.contains(id.to_int64())
+  self.pos.contains(id)
 }
 
 ///|
@@ -65,7 +65,7 @@ pub fn CoreStore::ensure_capacity(self : CoreStore, extra : Int) -> Bool {
     new_cap = new_cap * 2
   }
   // Resize ids
-  let new_ids = Array::make(new_cap, @types.VectorId(0L))
+  let new_ids = Array::make(new_cap, @types.Int64Id(0L))
   for i in 0..<self.count {
     new_ids[i] = self.ids[i]
   }
@@ -114,7 +114,7 @@ fn CoreStore::write_vector_at(
 ///|
 /// Get index for an id
 pub fn CoreStore::get_index(self : CoreStore, id : @types.VectorId) -> Int? {
-  self.pos.get(id.to_int64())
+  self.pos.get(id)
 }
 
 ///|
@@ -174,7 +174,7 @@ pub fn CoreStore::add_or_update(
   match self.get_index(id) {
     Some(idx) => {
       guard upsert else {
-        abort("id already exists: " + id.to_int64().to_string())
+        abort("id already exists: " + id.to_display_string())
       }
       self.write_vector_at(idx, vector)
       self.attrs[idx] = attrs.copy() // Defensive copy to prevent external mutation
@@ -185,7 +185,7 @@ pub fn CoreStore::add_or_update(
       let idx = self.count
       self.ids[idx] = id
       self.attrs[idx] = attrs.copy() // Defensive copy to prevent external mutation
-      self.pos.set(id.to_int64(), idx)
+      self.pos.set(id, idx)
       self.write_vector_at(idx, vector)
       self.count = self.count + 1
       (idx, true)
@@ -221,8 +221,8 @@ pub fn CoreStore::remove_by_id(
           self.data[dst_base + i] = self.data[src_base + i]
         }
         let moved_id = self.ids[idx]
-        self.pos.set(moved_id.to_int64(), idx)
-        self.pos.remove(id.to_int64())
+        self.pos.set(moved_id, idx)
+        self.pos.remove(id)
         self.count = self.count - 1
         Some({
           moved_id: Some(moved_id),
@@ -230,7 +230,7 @@ pub fn CoreStore::remove_by_id(
           moved_to: Some(idx),
         })
       } else {
-        self.pos.remove(id.to_int64())
+        self.pos.remove(id)
         self.count = self.count - 1
         Some({ moved_id: None, moved_from: None, moved_to: None })
       }
@@ -262,7 +262,7 @@ pub fn CoreStore::shrink_to_fit(self : CoreStore) -> Unit {
     return
   }
   // Shrink ids
-  let new_ids = Array::make(n, @types.VectorId(0L))
+  let new_ids = Array::make(n, @types.Int64Id(0L))
   for i in 0..<self.count {
     new_ids[i] = self.ids[i]
   }
@@ -308,9 +308,34 @@ pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
     },
   )
   w.push_u32(self.count.reinterpret_as_uint())
-  // Write ids
+  // Write ids: tag(1) + payload(8 or 16 bytes)
+  // tag 0x00 = Int64Id (8 bytes), tag 0x01 = Bytes16Id (16 bytes)
   for i in 0..<self.count {
-    w.push_u64(self.ids[i].to_int64().reinterpret_as_uint64())
+    match self.ids[i] {
+      @types.Int64Id(v) => {
+        w.push_byte(b'\x00')
+        w.push_u64(v.reinterpret_as_uint64())
+      }
+      @types.Bytes16Id(b) => {
+        w.push_byte(b'\x01')
+        w.push_byte(b.b0)
+        w.push_byte(b.b1)
+        w.push_byte(b.b2)
+        w.push_byte(b.b3)
+        w.push_byte(b.b4)
+        w.push_byte(b.b5)
+        w.push_byte(b.b6)
+        w.push_byte(b.b7)
+        w.push_byte(b.b8)
+        w.push_byte(b.b9)
+        w.push_byte(b.b10)
+        w.push_byte(b.b11)
+        w.push_byte(b.b12)
+        w.push_byte(b.b13)
+        w.push_byte(b.b14)
+        w.push_byte(b.b15)
+      }
+    }
   }
   // Write data
   for i in 0..<(self.count * self.dim) {
@@ -371,11 +396,39 @@ pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
   }
   let count = r.read_u32().reinterpret_as_int()
   let store = CoreStore::new(dim, metric, capacity=count)
-  // Read ids
+  // Read ids: tag(1) + payload(8 or 16 bytes)
   for i in 0..<count {
-    let id_val = r.read_u64().reinterpret_as_int64()
-    store.ids[i] = @types.VectorId(id_val)
-    store.pos.set(id_val, i)
+    let tag = r.read_byte()
+    let id = match tag {
+      b'\x01' => {
+        let b0 = r.read_byte()
+        let b1 = r.read_byte()
+        let b2 = r.read_byte()
+        let b3 = r.read_byte()
+        let b4 = r.read_byte()
+        let b5 = r.read_byte()
+        let b6 = r.read_byte()
+        let b7 = r.read_byte()
+        let b8 = r.read_byte()
+        let b9 = r.read_byte()
+        let b10 = r.read_byte()
+        let b11 = r.read_byte()
+        let b12 = r.read_byte()
+        let b13 = r.read_byte()
+        let b14 = r.read_byte()
+        let b15 = r.read_byte()
+        @types.Bytes16Id(
+          @types.Bytes16::{
+            b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14,
+            b15,
+          },
+        )
+      }
+      // tag 0x00 (Int64Id) or unknown (treat as Int64Id for forward compat)
+      _ => @types.Int64Id(r.read_u64().reinterpret_as_int64())
+    }
+    store.ids[i] = id
+    store.pos.set(id, i)
   }
   // Read data
   for i in 0..<(count * dim) {

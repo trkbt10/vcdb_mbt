@@ -156,7 +156,7 @@ pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
   let entries : Array[IndexEntry] = []
   while r.remaining() >= 20 {
     // Minimum entry: id(8) + nameLen(4) + name(0) + offset(4) + length(4)
-    let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
+    let id = @types.Int64Id(r.read_u64().reinterpret_as_int64())
     let name_len = r.read_u32().reinterpret_as_int()
 
     if r.remaining() < name_len + 8 {

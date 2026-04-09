@@ -17,7 +17,7 @@ fn for_each_attr(
 fn ids_to_vector_ids(ids : Array[Int64]) -> Array[@types.VectorId] {
   let result : Array[@types.VectorId] = []
   for id in ids {
-    result.push(@types.VectorId(id))
+    result.push(@types.Int64Id(id))
   }
   result
 }

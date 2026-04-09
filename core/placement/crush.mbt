@@ -112,11 +112,37 @@ fn choose_primaries(pg : Int, replicas : Int, total : Int) -> Array[Int] {
 }
 
 ///|
+/// Hash all 16 bytes of a Bytes16 into 32 bits.
+/// Uses the same hash32 mixing function for consistency with hash64_to_32.
+fn hash_bytes16_to_32(b : @types.Bytes16) -> UInt {
+  // Mix bytes in four 32-bit words (big-endian grouping), then combine
+  let w0 = (b.b0.to_uint() << 24) |
+    (b.b1.to_uint() << 16) |
+    (b.b2.to_uint() << 8) |
+    b.b3.to_uint()
+  let w1 = (b.b4.to_uint() << 24) |
+    (b.b5.to_uint() << 16) |
+    (b.b6.to_uint() << 8) |
+    b.b7.to_uint()
+  let w2 = (b.b8.to_uint() << 24) |
+    (b.b9.to_uint() << 16) |
+    (b.b10.to_uint() << 8) |
+    b.b11.to_uint()
+  let w3 = (b.b12.to_uint() << 24) |
+    (b.b13.to_uint() << 16) |
+    (b.b14.to_uint() << 8) |
+    b.b15.to_uint()
+  hash32(w0) ^ hash32(w1) ^ hash32(w2) ^ hash32(w3)
+}
+
+///|
 /// Locate placement for a vector ID
 /// Returns the placement group and primary target keys
 pub fn crush_locate(id : @types.VectorId, map : CrushMap) -> LocateResult {
-  // Use hash64_to_32 to preserve full 64-bit ID without truncation
-  let id_hash = hash64_to_32(id.to_int64().reinterpret_as_uint64())
+  let id_hash = match id {
+    @types.Int64Id(v) => hash64_to_32(v.reinterpret_as_uint64())
+    @types.Bytes16Id(b) => hash_bytes16_to_32(b)
+  }
   let pg = if map.pgs > 0 {
     (id_hash % map.pgs.reinterpret_as_uint()).reinterpret_as_int()
   } else {

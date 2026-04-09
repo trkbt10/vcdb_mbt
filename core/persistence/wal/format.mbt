@@ -11,11 +11,22 @@
 ///   Records: Type (1) + Flags (1) + Timestamp (8) + ID (8) + AttrsLen (4) + VectorLen (4) + Attrs + Vector
 ///   Footer: same as v1
 ///
-/// Flags byte: bit 0 = has timestamp (always 1 in v2)
-/// Timestamp: nanoseconds since Unix epoch (Int64)
+/// Format v3 (wal_version=0x03):
+///   Header: same as v1 (version byte = 0x03)
+///   Records: Type (1) + Flags (1) + Timestamp (8) + IDLen (1) + ID (IDLen bytes) + AttrsLen (4) + VectorLen (4) + Attrs + Vector
+///   Footer: same as v1
 ///
-/// v2 reader can read v1 records (flags=0 → timestamp=0)
-/// v1 reader cannot read v2 records (version check rejects)
+/// Flags byte:
+///   bit 0 (0x01) = has_timestamp  — always set in v2/v3
+///   bit 1 (0x02) = has_128bit_id  — set in v3 when ID is Bytes16Id (IDLen=16)
+///                                    absent in v3 when ID is Int64Id (IDLen=8)
+///
+/// Timestamp: nanoseconds since Unix epoch (Int64)
+/// IDLen: 8 (Int64Id) or 16 (Bytes16Id)
+///
+/// v2/v3 reader can read v1 records (flags=0 → timestamp=0, id=8 bytes)
+/// v3 reader can read v2 records (no has_128bit_id flag → IDLen=8)
+/// v1 reader cannot read v2/v3 records (version check rejects)
 
 ///|
 /// WAL Footer magic: "WCRC" in little-endian
@@ -23,7 +34,11 @@ pub let wal_footer_magic : UInt = 0x43524357U
 
 ///|
 /// Current WAL format version
-pub let wal_version : Byte = b'\x02'
+pub let wal_version : Byte = b'\x03'
+
+///|
+/// V2 WAL version (for backward compatibility reads)
+let wal_version_v2 : Byte = b'\x02'
 
 ///|
 /// V1 WAL version (for backward compatibility)
@@ -32,6 +47,10 @@ let wal_version_v1 : Byte = b'\x01'
 ///|
 /// Flags
 let flag_has_timestamp : Byte = b'\x01'
+
+///|
+/// Flag indicating the ID field is 128-bit (Bytes16Id). Absent = 8-byte Int64Id.
+let flag_has_128bit_id : Byte = b'\x02'
 
 ///|
 /// WAL record types
@@ -126,16 +145,44 @@ pub fn encode_wal_record(record : WalRecord) -> Bytes {
 }
 
 ///|
-/// Encode a WAL record to an existing writer (v2 format)
+/// Encode a WAL record to an existing writer (v3 format)
 fn encode_wal_record_to(w : @binary.BinaryWriter, record : WalRecord) -> Unit {
   // Type (1 byte)
   w.push_byte(record.record_type.to_byte())
-  // Flags (1 byte) — v2: always has timestamp
-  w.push_byte(flag_has_timestamp)
+  // Flags (1 byte) — v3: has_timestamp always set; has_128bit_id if Bytes16Id
+  let flags = match record.id {
+    @types.Bytes16Id(_) => flag_has_timestamp | flag_has_128bit_id
+    @types.Int64Id(_) => flag_has_timestamp
+  }
+  w.push_byte(flags)
   // Timestamp (8 bytes, Int64 nanoseconds)
   w.push_i64(record.timestamp)
-  // ID (8 bytes)
-  w.push_u64(record.id.to_int64().reinterpret_as_uint64())
+  // ID: IDLen(1) + payload(8 or 16 bytes)
+  match record.id {
+    @types.Int64Id(v) => {
+      w.push_byte(b'\x08')
+      w.push_u64(v.reinterpret_as_uint64())
+    }
+    @types.Bytes16Id(b) => {
+      w.push_byte(b'\x10')
+      w.push_byte(b.b0)
+      w.push_byte(b.b1)
+      w.push_byte(b.b2)
+      w.push_byte(b.b3)
+      w.push_byte(b.b4)
+      w.push_byte(b.b5)
+      w.push_byte(b.b6)
+      w.push_byte(b.b7)
+      w.push_byte(b.b8)
+      w.push_byte(b.b9)
+      w.push_byte(b.b10)
+      w.push_byte(b.b11)
+      w.push_byte(b.b12)
+      w.push_byte(b.b13)
+      w.push_byte(b.b14)
+      w.push_byte(b.b15)
+    }
+  }
   // Attrs
   let attrs_bytes = encode_attrs_json(record.attrs)
   let vector_len = match record.vector {
@@ -155,9 +202,23 @@ fn encode_wal_record_to(w : @binary.BinaryWriter, record : WalRecord) -> Unit {
 }
 
 ///|
-/// Decode a WAL record from reader (supports both v1 and v2)
+/// Decode a WAL record from reader (public entry point — assumes v3 format).
+/// For reading v1/v2 WAL files, use decode_wal_records which handles versioning.
 pub fn decode_wal_record(r : @binary.BinaryReader) -> WalRecord? {
-  if r.remaining() < 18 {
+  decode_wal_record_versioned(r, wal_version)
+}
+
+///|
+/// Version-aware WAL record decoder (v1, v2, v3).
+///
+/// v1: Type(1) + Reserved(1) + ID(8) + AttrsLen(4) + VectorLen(4) + ...
+/// v2: Type(1) + Flags(1) + Timestamp(8) + ID(8) + AttrsLen(4) + VectorLen(4) + ...
+/// v3: Type(1) + Flags(1) + Timestamp(8) + IDLen(1) + ID(IDLen) + AttrsLen(4) + VectorLen(4) + ...
+fn decode_wal_record_versioned(
+  r : @binary.BinaryReader,
+  version : Byte,
+) -> WalRecord? {
+  if r.remaining() < 2 {
     return None
   }
   // Type
@@ -168,23 +229,68 @@ pub fn decode_wal_record(r : @binary.BinaryReader) -> WalRecord? {
   }
   // Flags/Reserved
   let flags = r.read_byte()
-  // Timestamp (v2) or skip (v1)
-  let timestamp : Int64 = if flags.land(flag_has_timestamp) != b'\x00' {
-    // v2: read 8-byte timestamp
-    if r.remaining() < 24 {
-      // Need: timestamp(8) + id(8) + attrs_len(4) + vector_len(4)
+  let has_timestamp = flags.land(flag_has_timestamp) != b'\x00'
+  let has_128bit_id = flags.land(flag_has_128bit_id) != b'\x00'
+  // Timestamp (v2/v3) or absent (v1)
+  let timestamp : Int64 = if has_timestamp {
+    if r.remaining() < 8 {
       return None
     }
     r.read_i64()
   } else {
-    // v1: no timestamp, flags byte was reserved=0x00
     0L
   }
-  // ID (8 bytes)
-  if r.remaining() < 16 {
-    return None
+  // ID field layout differs by version:
+  //   v1: fixed 8 bytes (no IDLen byte, no timestamp)
+  //   v2: fixed 8 bytes (no IDLen byte, has timestamp)
+  //   v3: IDLen(1) + payload(IDLen bytes)
+  let id : @types.VectorId = if has_128bit_id {
+    // v3 only: 128-bit ID
+    if r.remaining() < 1 {
+      return None
+    }
+    let id_len = r.read_byte().to_int()
+    if id_len != 16 || r.remaining() < 16 {
+      return None
+    }
+    let b0 = r.read_byte()
+    let b1 = r.read_byte()
+    let b2 = r.read_byte()
+    let b3 = r.read_byte()
+    let b4 = r.read_byte()
+    let b5 = r.read_byte()
+    let b6 = r.read_byte()
+    let b7 = r.read_byte()
+    let b8 = r.read_byte()
+    let b9 = r.read_byte()
+    let b10 = r.read_byte()
+    let b11 = r.read_byte()
+    let b12 = r.read_byte()
+    let b13 = r.read_byte()
+    let b14 = r.read_byte()
+    let b15 = r.read_byte()
+    @types.Bytes16Id(
+      @types.Bytes16::{
+        b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15,
+      },
+    )
+  } else if version == wal_version {
+    // v3 with Int64Id: IDLen(1) + 8 bytes
+    if r.remaining() < 1 {
+      return None
+    }
+    let id_len = r.read_byte().to_int()
+    if id_len != 8 || r.remaining() < 8 {
+      return None
+    }
+    @types.Int64Id(r.read_u64().reinterpret_as_int64())
+  } else {
+    // v1 or v2: fixed 8-byte ID (no IDLen byte)
+    if r.remaining() < 8 {
+      return None
+    }
+    @types.Int64Id(r.read_u64().reinterpret_as_int64())
   }
-  let id = @types.VectorId(r.read_u64().reinterpret_as_int64())
   // Lengths
   let attrs_len = r.read_u32().reinterpret_as_int()
   let vector_len = r.read_u32().reinterpret_as_int()
@@ -247,12 +353,36 @@ pub fn encode_wal_segment(records : Array[WalRecord]) -> Bytes {
 }
 
 ///|
-/// Verify WAL header (accepts both v1 and v2)
+/// Verify WAL header (accepts v1, v2, and v3). Returns the version byte on success.
 pub fn verify_wal_header(r : @binary.BinaryReader) -> Bool {
   match @codec.read_header(r) {
     None => false
     Some((file_type, version)) =>
-      file_type == Wal && (version == wal_version || version == wal_version_v1)
+      file_type == Wal &&
+      (version == wal_version ||
+      version == wal_version_v2 ||
+      version == wal_version_v1)
+  }
+}
+
+///|
+/// Read the WAL version from a header, returning None if the header is invalid.
+fn read_wal_version(data : Bytes) -> Byte? {
+  if data.length() < @codec.header_size {
+    return None
+  }
+  let r = @binary.BinaryReader::new(data)
+  match @codec.read_header(r) {
+    None => None
+    Some((file_type, version)) =>
+      if file_type == Wal &&
+        (version == wal_version ||
+        version == wal_version_v2 ||
+        version == wal_version_v1) {
+        Some(version)
+      } else {
+        None
+      }
   }
 }
 
@@ -303,19 +433,19 @@ pub fn verify_wal_checksum(data : Bytes) -> Bool {
 }
 
 ///|
-/// Decode all records from WAL data (supports v1 and v2)
+/// Decode all records from WAL data (supports v1, v2, and v3)
 pub fn decode_wal_records(data : Bytes) -> Array[WalRecord] {
   let records : Array[WalRecord] = []
-  if data.length() < @codec.header_size {
-    return records
+  let version = match read_wal_version(data) {
+    None => return records
+    Some(v) => v
   }
   let r = @binary.BinaryReader::new(data)
-  if !verify_wal_header(r) {
-    return records
-  }
+  // Skip header (already validated by read_wal_version)
+  r.skip(@codec.header_size)
   let body_len = wal_body_length(data)
   while r.position() < body_len {
-    match decode_wal_record(r) {
+    match decode_wal_record_versioned(r, version) {
       None => break
       Some(record) => records.push(record)
     }
@@ -346,13 +476,17 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
   }
 
   let new_body_len = wal_body_length(new_segment)
-  if new_segment.length() >= @codec.header_size {
-    let r = @binary.BinaryReader::new(new_segment)
-    r.skip(@codec.header_size)
-    while r.position() < new_body_len {
-      match decode_wal_record(r) {
-        None => break
-        Some(record) => encode_wal_record_to(w, record)
+  match read_wal_version(new_segment) {
+    None => ()
+    Some(new_version) => {
+      let r = @binary.BinaryReader::new(new_segment)
+      r.skip(@codec.header_size)
+      while r.position() < new_body_len {
+        match decode_wal_record_versioned(r, new_version) {
+          None => break
+          // Re-encode in current (v3) format
+          Some(record) => encode_wal_record_to(w, record)
+        }
       }
     }
   }
@@ -369,21 +503,17 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
 /// Get safe copy length - up to the last decodable record boundary
 /// Returns header length (12) if no records are decodable
 fn get_safe_copy_length(data : Bytes) -> Int {
-  if data.length() < @codec.header_size {
-    return 0
+  let version = match read_wal_version(data) {
+    None => return 0
+    Some(v) => v
   }
   let r = @binary.BinaryReader::new(data)
-  // Verify header first
-  if !verify_wal_header(r) {
-    return 0
-  }
-  // Calculate body length (without footer)
+  r.skip(@codec.header_size)
   let body_len = wal_body_length(data)
-  // Track position after last successful decode
-  let mut last_valid_pos = @codec.header_size // After header
+  let mut last_valid_pos = @codec.header_size
   while r.position() < body_len {
-    match decode_wal_record(r) {
-      None => break // Stop at first malformed record
+    match decode_wal_record_versioned(r, version) {
+      None => break
       Some(_) => last_valid_pos = r.position()
     }
   }
