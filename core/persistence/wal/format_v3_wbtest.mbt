@@ -35,13 +35,13 @@ fn sample_uuid() -> @types.Bytes16 {
 }
 
 ///|
-test "v3/header_version_is_v3" {
+test "v4/header_version_is_v4" {
   let header = encode_wal_header()
   let r = @binary.BinaryReader::new(header)
   inspect(verify_wal_header(r), content="true")
   // Header: magic(8) + type(1) + version(1) + reserved(2)
   // Position 8 = file type (WAL=0x01), position 9 = version
-  inspect(header[9], content="b'\\x03'")
+  inspect(header[9], content="b'\\x04'")
 }
 
 ///|

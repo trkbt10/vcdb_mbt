@@ -11,22 +11,23 @@
 ///   Records: Type (1) + Flags (1) + Timestamp (8) + ID (8) + AttrsLen (4) + VectorLen (4) + Attrs + Vector
 ///   Footer: same as v1
 ///
-/// Format v3 (wal_version=0x03):
+/// Format v3 (wal_version=0x03, legacy):
 ///   Header: same as v1 (version byte = 0x03)
 ///   Records: Type (1) + Flags (1) + Timestamp (8) + IDLen (1) + ID (IDLen bytes) + AttrsLen (4) + VectorLen (4) + Attrs + Vector
 ///   Footer: same as v1
 ///
+/// Format v4 (wal_version=0x04, current):
+///   Header: same as v1 (version byte = 0x04)
+///   Records: Type (1) + Flags (1) + Timestamp (8) + IDWireLen (4) + ID (wire bytes) + AttrsLen (4) + VectorLen (4) + Attrs + Vector
+///   Footer: same as v1
+///   ID uses VectorId::to_wire_bytes() / from_wire_bytes() — SoT for all ID serialization.
+///
 /// Flags byte:
-///   bit 0 (0x01) = has_timestamp  — always set in v2/v3
-///   bit 1 (0x02) = has_128bit_id  — set in v3 when ID is Bytes16Id (IDLen=16)
-///                                    absent in v3 when ID is Int64Id (IDLen=8)
+///   bit 0 (0x01) = has_timestamp  — always set in v2/v3/v4
+///   bit 1 (0x02) = has_128bit_id  — v3 only (deprecated in v4)
 ///
-/// Timestamp: nanoseconds since Unix epoch (Int64)
-/// IDLen: 8 (Int64Id) or 16 (Bytes16Id)
-///
-/// v2/v3 reader can read v1 records (flags=0 → timestamp=0, id=8 bytes)
-/// v3 reader can read v2 records (no has_128bit_id flag → IDLen=8)
-/// v1 reader cannot read v2/v3 records (version check rejects)
+/// v4 reader can read v1/v2/v3 records (version-aware decode).
+/// v3 reader cannot read v4 records (IDWireLen is u32, not u8).
 
 ///|
 /// WAL Footer magic: "WCRC" in little-endian
@@ -34,7 +35,11 @@ pub let wal_footer_magic : UInt = 0x43524357U
 
 ///|
 /// Current WAL format version
-pub let wal_version : Byte = b'\x03'
+pub let wal_version : Byte = b'\x04'
+
+///|
+/// V3 WAL version (for backward compatibility reads)
+let wal_version_v3 : Byte = b'\x03'
 
 ///|
 /// V2 WAL version (for backward compatibility reads)
@@ -173,40 +178,14 @@ pub fn encode_wal_record(record : WalRecord) -> Bytes {
 fn encode_wal_record_to(w : @binary.BinaryWriter, record : WalRecord) -> Unit {
   // Type (1 byte)
   w.push_byte(record.record_type.to_byte())
-  // Flags (1 byte) — v3: has_timestamp always set; has_128bit_id if Bytes16Id
-  let flags = match record.id {
-    @types.Bytes16Id(_) => flag_has_timestamp | flag_has_128bit_id
-    @types.Int64Id(_) => flag_has_timestamp
-  }
-  w.push_byte(flags)
+  // Flags (1 byte) — v4: has_timestamp only (ID type encoded in wire bytes)
+  w.push_byte(flag_has_timestamp)
   // Timestamp (8 bytes, Int64 nanoseconds)
   w.push_i64(record.timestamp)
-  // ID: IDLen(1) + payload(8 or 16 bytes)
-  match record.id {
-    @types.Int64Id(v) => {
-      w.push_byte(b'\x08')
-      w.push_u64(v.reinterpret_as_uint64())
-    }
-    @types.Bytes16Id(b) => {
-      w.push_byte(b'\x10')
-      w.push_byte(b.b0)
-      w.push_byte(b.b1)
-      w.push_byte(b.b2)
-      w.push_byte(b.b3)
-      w.push_byte(b.b4)
-      w.push_byte(b.b5)
-      w.push_byte(b.b6)
-      w.push_byte(b.b7)
-      w.push_byte(b.b8)
-      w.push_byte(b.b9)
-      w.push_byte(b.b10)
-      w.push_byte(b.b11)
-      w.push_byte(b.b12)
-      w.push_byte(b.b13)
-      w.push_byte(b.b14)
-      w.push_byte(b.b15)
-    }
-  }
+  // ID: length-prefixed wire bytes (SoT: VectorId::to_wire_bytes)
+  let id_wire = record.id.to_wire_bytes()
+  w.push_u32(id_wire.length().reinterpret_as_uint())
+  w.push_bytes(id_wire)
   // Attrs
   let attrs_bytes = encode_attrs_json(record.attrs)
   let vector_len = match record.vector {
@@ -267,8 +246,22 @@ fn decode_wal_record_versioned(
   // ID field layout differs by version:
   //   v1: fixed 8 bytes (no IDLen byte, no timestamp)
   //   v2: fixed 8 bytes (no IDLen byte, has timestamp)
-  //   v3: IDLen(1) + payload(IDLen bytes)
-  let id : @types.VectorId = if has_128bit_id {
+  //   v3: IDLen(1) + payload(IDLen bytes), flag_has_128bit_id for Bytes16Id
+  //   v4: WireLen(u32=4) + wire bytes (SoT: VectorId::from_wire_bytes)
+  let id : @types.VectorId = if version == wal_version {
+    // v4: length-prefixed wire bytes
+    if r.remaining() < 4 {
+      return None
+    }
+    let wire_len = r.read_u32().reinterpret_as_int()
+    if r.remaining() < wire_len {
+      return None
+    }
+    match @types.VectorId::from_wire_bytes(r.read_bytes(wire_len)) {
+      Some(v) => v
+      None => return None
+    }
+  } else if has_128bit_id {
     // v3 only: 128-bit ID
     if r.remaining() < 1 {
       return None
@@ -277,41 +270,12 @@ fn decode_wal_record_versioned(
     if id_len != 16 || r.remaining() < 16 {
       return None
     }
-    let b0 = r.read_byte()
-    let b1 = r.read_byte()
-    let b2 = r.read_byte()
-    let b3 = r.read_byte()
-    let b4 = r.read_byte()
-    let b5 = r.read_byte()
-    let b6 = r.read_byte()
-    let b7 = r.read_byte()
-    let b8 = r.read_byte()
-    let b9 = r.read_byte()
-    let b10 = r.read_byte()
-    let b11 = r.read_byte()
-    let b12 = r.read_byte()
-    let b13 = r.read_byte()
-    let b14 = r.read_byte()
-    let b15 = r.read_byte()
-    @types.Bytes16Id(@types.Bytes16::{
-      b0,
-      b1,
-      b2,
-      b3,
-      b4,
-      b5,
-      b6,
-      b7,
-      b8,
-      b9,
-      b10,
-      b11,
-      b12,
-      b13,
-      b14,
-      b15,
-    })
-  } else if version == wal_version {
+    let wire = r.read_bytes(16)
+    match @types.VectorId::from_wire_bytes(wire) {
+      Some(v) => v
+      None => return None
+    }
+  } else if version == wal_version_v3 {
     // v3 with Int64Id: IDLen(1) + 8 bytes
     if r.remaining() < 1 {
       return None
@@ -398,6 +362,7 @@ pub fn verify_wal_header(r : @binary.BinaryReader) -> Bool {
       file_type == Wal &&
       (
         version == wal_version ||
+        version == wal_version_v3 ||
         version == wal_version_v2 ||
         version == wal_version_v1
       )
@@ -500,21 +465,30 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
   let w = @binary.BinaryWriter::new()
   let mut use_existing = false
 
+  // Always write v4 header, then re-encode existing records in v4 format
+  w.push_bytes(encode_wal_header())
+
   if existing.length() >= @codec.header_size {
     if verify_wal_checksum(existing) {
-      let safe_len = get_safe_copy_length(existing)
-      if safe_len >= @codec.header_size {
-        for i in 0..<safe_len {
-          w.push_byte(existing[i])
+      let existing_body_len = wal_body_length(existing)
+      match read_wal_version(existing) {
+        None => ()
+        Some(existing_version) => {
+          let er = @binary.BinaryReader::new(existing)
+          er.skip(@codec.header_size)
+          while er.position() < existing_body_len {
+            match decode_wal_record_versioned(er, existing_version) {
+              None => break
+              Some(record) => encode_wal_record_to(w, record)
+            }
+          }
+          use_existing = true
         }
-        use_existing = true
       }
     }
   }
 
-  if !use_existing {
-    w.push_bytes(encode_wal_header())
-  }
+  let _ = use_existing
 
   let new_body_len = wal_body_length(new_segment)
   match read_wal_version(new_segment) {
@@ -525,7 +499,7 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
       while r.position() < new_body_len {
         match decode_wal_record_versioned(r, new_version) {
           None => break
-          // Re-encode in current (v3) format
+          // Re-encode in current (v4) format
           Some(record) => encode_wal_record_to(w, record)
         }
       }
