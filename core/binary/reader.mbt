@@ -109,7 +109,8 @@ pub fn BinaryReader::remaining(self : BinaryReader) -> Int {
 }
 
 ///|
-/// Skip n bytes
+/// Skip n bytes. Aborts if not enough data remaining.
 pub fn BinaryReader::skip(self : BinaryReader, n : Int) -> Unit {
+  self.ensure(n)
   self.offset = self.offset + n
 }

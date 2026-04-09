@@ -515,25 +515,6 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
 }
 
 ///|
-/// Get safe copy length - up to the last decodable record boundary
-/// Returns header length (12) if no records are decodable
-fn get_safe_copy_length(data : Bytes) -> Int {
-  let version = match read_wal_version(data) {
-    None => return 0
-    Some(v) => v
-  }
-  let r = @binary.BinaryReader::new(data)
-  r.skip(@codec.header_size)
-  let body_len = wal_body_length(data)
-  let mut last_valid_pos = @codec.header_size
-  while r.position() < body_len {
-    match decode_wal_record_versioned(r, version) {
-      None => break
-      Some(_) => last_valid_pos = r.position()
-    }
-  }
-  last_valid_pos
-}
 
 ///|
 /// Replay WAL binary data into a CoreStore (no Storage dependency).
