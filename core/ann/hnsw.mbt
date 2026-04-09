@@ -129,7 +129,49 @@ fn hnsw_score(
 }
 
 ///|
-/// Greedy descent from entry point to target through upper layers
+/// Check if a node index is tombstoned
+fn is_tombstoned(state : HNSWState, idx : Int) -> Bool {
+  idx < state.tombstone.length() && state.tombstone[idx]
+}
+
+///|
+/// Find a valid (non-tombstoned, in-bounds) entry point closest to target.
+/// `exclude` is an index that must not be considered (pass the index of the
+/// node currently being inserted so that an unlinked node is never chosen).
+/// Returns -1 if no valid node exists.
+fn find_valid_entry_point(
+  state : HNSWState,
+  store : @store.CoreStore,
+  target : Array[Double],
+  exclude? : Int = -1,
+) -> Int {
+  let mut best = -1
+  let mut best_score = -1.0e308
+  for i in 0..<state.tombstone.length() {
+    if i == exclude {
+      continue
+    }
+    if i >= store.count {
+      continue
+    }
+    if state.tombstone[i] {
+      continue
+    }
+    let sc = hnsw_score(state, store, i, target)
+    if sc > best_score {
+      best_score = sc
+      best = i
+    }
+  }
+  best
+}
+
+///|
+/// Greedy descent from entry point to target through upper layers.
+/// Tombstoned nodes are treated as transparent: their links are expanded
+/// one hop so that deleted bridging nodes do not cut the graph path.
+/// The returned index is always a valid (non-tombstoned, in-bounds) node,
+/// or `ep` if no better valid candidate is found.
 fn greedy_descent(
   state : HNSWState,
   store : @store.CoreStore,
@@ -143,20 +185,67 @@ fn greedy_descent(
     let mut improved = true
     while improved {
       improved = false
+      // Collect direct neighbors of cur, plus one-hop expansion through
+      // any tombstoned neighbors to avoid graph cuts at deleted bridge nodes.
+      // Use a visited set scoped to this inner iteration to avoid O(n^2).
+      let visited_size = @cmp.maximum(store.count, state.tombstone.length())
+      let visited_size = @cmp.maximum(visited_size, cur + 1)
+      let inner_visited = Array::make(visited_size, false)
+      if cur < inner_visited.length() {
+        inner_visited[cur] = true
+      }
       let neigh = if level < state.links.length() &&
         cur < state.links[level].length() {
         state.links[level][cur]
       } else {
         []
       }
+      // cur may itself be tombstoned (e.g. when entrypoint was deleted).
+      // In that case start with -inf so any valid neighbor wins.
       let mut best_idx = cur
-      let mut best_score = hnsw_score(state, store, cur, target)
+      let mut best_score = if is_tombstoned(state, cur) {
+        -1.0e308
+      } else {
+        hnsw_score(state, store, cur, target)
+      }
       for nb in neigh {
-        // Guard: skip out-of-bounds neighbors
         if nb >= store.count {
           continue
         }
-        if nb < state.tombstone.length() && state.tombstone[nb] {
+        if nb < inner_visited.length() && inner_visited[nb] {
+          continue
+        }
+        if nb < inner_visited.length() {
+          inner_visited[nb] = true
+        }
+        if is_tombstoned(state, nb) {
+          // Expand one hop through this tombstoned bridging node
+          let nb_neigh = if level < state.links.length() &&
+            nb < state.links[level].length() {
+            state.links[level][nb]
+          } else {
+            []
+          }
+          for nb2 in nb_neigh {
+            if nb2 >= store.count {
+              continue
+            }
+            if nb2 < inner_visited.length() && inner_visited[nb2] {
+              continue
+            }
+            if nb2 < inner_visited.length() {
+              inner_visited[nb2] = true
+            }
+            if is_tombstoned(state, nb2) {
+              continue
+            }
+            let sc2 = hnsw_score(state, store, nb2, target)
+            if sc2 > best_score {
+              best_score = sc2
+              best_idx = nb2
+              improved = true
+            }
+          }
           continue
         }
         let sc = hnsw_score(state, store, nb, target)
@@ -165,6 +254,12 @@ fn greedy_descent(
           best_idx = nb
           improved = true
         }
+      }
+      // Never move to a tombstoned node; if best_idx is still tombstoned
+      // (no valid neighbor found), keep cur unchanged to avoid propagating
+      // a dead node to the next level.
+      if is_tombstoned(state, best_idx) {
+        break
       }
       cur = best_idx
     }
@@ -362,62 +457,95 @@ pub fn hnsw_add(
       state.max_level = node_level
       state.ensure_levels(node_level)
     } else {
-      // Descend from entry point through upper levels, stopping at node_level
-      let mut cur = state.enter_point
-      if state.max_level > node_level {
-        cur = greedy_descent(
-          state,
-          store,
-          cur,
-          vec,
-          state.max_level,
-          to_level=node_level,
-        )
-      }
-      // Connect at each level from min(node_level, max_level) down to 0
-      let start_level = if node_level < state.max_level {
-        node_level
+      // Resolve a valid entry point: the stored enter_point may be tombstoned
+      // if it was removed before this add. Fall back to find_valid_entry_point
+      // so that greedy_descent and hnsw_search_layer never receive a dead node.
+      // Exclude `at` from the scan: tombstone[at] has already been reset to
+      // false above, so without the exclusion find_valid_entry_point could
+      // return the still-unlinked inserting node itself, causing
+      // hnsw_search_layer to return only {at} and connect_mutually to add no
+      // edges.  If at then samples a level above max_level it becomes a
+      // disconnected enter_point and all pre-existing nodes become unreachable.
+      let ep = if is_tombstoned(state, state.enter_point) {
+        find_valid_entry_point(state, store, vec, exclude=at)
       } else {
-        state.max_level
+        state.enter_point
       }
-      for level = start_level; level >= 0; {
-        let candidates = hnsw_search_layer(
-          state,
-          store,
-          cur,
-          vec,
-          level,
-          state.ef_construction,
-        )
-        // Select M nearest neighbors
-        let neighbors : Array[Int] = []
-        for c in candidates {
-          if neighbors.length() >= state.m {
-            break
-          }
-          if c.idx != at {
-            neighbors.push(c.idx)
-          }
-        }
-        state.ensure_levels(level)
-        connect_mutually(state, store, at, neighbors, level)
-        // Update current for next level
-        if candidates.length() > 0 {
-          cur = candidates[0].idx
-        }
-        continue level - 1
-      }
-      // Update entry point if this node has higher level
-      if node_level > state.max_level {
-        state.max_level = node_level
+      // If every existing node is tombstoned, treat this as the first live node
+      if ep < 0 {
         state.enter_point = at
+        state.max_level = node_level
+        state.ensure_levels(node_level)
+      } else {
+        // Descend from entry point through upper levels, stopping at node_level
+        let mut cur = ep
+        if state.max_level > node_level {
+          cur = greedy_descent(
+            state,
+            store,
+            cur,
+            vec,
+            state.max_level,
+            to_level=node_level,
+          )
+        }
+        // Connect at each level from min(node_level, max_level) down to 0
+        let start_level = if node_level < state.max_level {
+          node_level
+        } else {
+          state.max_level
+        }
+        for level = start_level; level >= 0; {
+          let candidates = hnsw_search_layer(
+            state,
+            store,
+            cur,
+            vec,
+            level,
+            state.ef_construction,
+          )
+          // Select M nearest neighbors
+          let neighbors : Array[Int] = []
+          for c in candidates {
+            if neighbors.length() >= state.m {
+              break
+            }
+            if c.idx != at {
+              neighbors.push(c.idx)
+            }
+          }
+          state.ensure_levels(level)
+          connect_mutually(state, store, at, neighbors, level)
+          // Update current for next level
+          if candidates.length() > 0 {
+            cur = candidates[0].idx
+          }
+          continue level - 1
+        }
+        // Update entry point if this node has higher level
+        if node_level > state.max_level {
+          state.max_level = node_level
+          state.enter_point = at
+        }
       }
     }
   })
 }
 
 ///|
-/// Remove a vector from HNSW (mark as tombstone)
+/// Remove a vector from HNSW (mark as tombstone).
+///
+/// This is a soft-delete: the node's graph edges are preserved so that
+/// traversal can continue through it during search.  The node is excluded
+/// from search results but still used as a relay in greedy descent.
+///
+/// **Incremental update (replace old ID with new ID):**
+/// Calling `hnsw_remove(old)` followed by `hnsw_add(new)` is supported.
+/// The new node is connected during `hnsw_add` even when tombstoned nodes
+/// act as bridging nodes in the existing graph.  For high-throughput workloads
+/// that delete many entries before adding new ones, call
+/// `hnsw_compact_and_rebuild` periodically to fully evict tombstones and
+/// restore graph quality.
 pub fn hnsw_remove(
   state : HNSWState,
   id : @types.VectorId,
@@ -449,24 +577,19 @@ pub fn hnsw_search(
   if state.enter_point < 0 {
     return []
   }
-  // Find a valid entry point (not tombstoned and within store bounds)
-  let mut entry = state.enter_point
-  if entry >= store.count ||
-    (entry < state.tombstone.length() && state.tombstone[entry]) {
-    // Entry point is invalid, find any valid node
-    entry = -1
-    for i in 0..<state.tombstone.length() {
-      if i < store.count && !state.tombstone[i] {
-        entry = i
-        break
-      }
-    }
-    if entry < 0 {
-      return [] // All nodes are tombstoned or invalid
-    }
-  }
-  // Normalize query for cosine
+  // Normalize query for cosine (needed both for EP resolution and search)
   let query = store.normalize_query(q)
+  // Find a valid entry point (not tombstoned and within store bounds).
+  // state.enter_point may be tombstoned if the highest-level node was deleted.
+  let entry = if state.enter_point < store.count &&
+    !is_tombstoned(state, state.enter_point) {
+    state.enter_point
+  } else {
+    find_valid_entry_point(state, store, query)
+  }
+  if entry < 0 {
+    return [] // All nodes are tombstoned or invalid
+  }
   // Descend from entry point
   let mut cur = entry
   if state.max_level > 0 {

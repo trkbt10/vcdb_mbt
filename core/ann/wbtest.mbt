@@ -690,3 +690,221 @@ test "hnsw/compact_preserves_tombstones" {
     inspect(r.id.to_int64() != 2L, content="true")
   }
 }
+
+///|
+/// Helper: add a vector to both store and HNSW index
+fn add_to_hnsw(
+  store : @store.CoreStore,
+  state : HNSWState,
+  id : Int,
+  vec : Array[Double],
+) -> Unit {
+  let _ = store.add_or_update(
+    @types.VectorId::from_int(id),
+    vec,
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  hnsw_add(state, store, @types.VectorId::from_int(id))
+}
+
+///|
+/// Helper: assert that a search result set contains a given ID
+fn assert_found(results : Array[@types.SearchHit], id : Int) -> Unit raise {
+  let mut found = false
+  for r in results {
+    if r.id.to_int64() == id.to_int64() {
+      found = true
+    }
+  }
+  inspect(found, content="true")
+}
+
+///|
+/// Helper: assert that a search result set does NOT contain a given ID
+fn assert_not_found(results : Array[@types.SearchHit], id : Int) -> Unit raise {
+  let mut found = false
+  for r in results {
+    if r.id.to_int64() == id.to_int64() {
+      found = true
+    }
+  }
+  inspect(found, content="false")
+}
+
+///|
+/// Regression: tombstoned entry point must not be returned and search must
+/// still succeed.  Two nodes, entry point forced to the tombstoned one.
+test "hnsw/tombstoned_entrypoint_search_still_works" {
+  let store = @store.CoreStore::new(2, @types.Dot, capacity=10)
+  // m=2, small ef so the graph is minimal
+  let params : @types.HNSWParams = {
+    ..@types.HNSWParams::default(),
+    m: 2,
+    ef_construction: 4,
+    ef_search: 4,
+    seed: 7UL,
+  }
+  let state = HNSWState::new(params, @types.Dot, 10)
+  add_to_hnsw(store, state, 1, [1.0, 0.0])
+  add_to_hnsw(store, state, 2, [0.0, 1.0])
+  // Force entry point to index 0 (ID 1) then tombstone it
+  state.enter_point = 0
+  hnsw_remove(state, @types.VectorId::from_int(1), store)
+  // Search should still find ID 2 and must not return ID 1
+  let results = hnsw_search(state, store, [0.0, 1.0], 2, None)
+  inspect(results.length() > 0, content="true")
+  assert_not_found(results, 1)
+  assert_found(results, 2)
+}
+
+///|
+/// Regression: tombstoned entry point must not block hnsw_add from connecting
+/// the new node.  After all prior nodes are tombstoned the new node becomes
+/// reachable as the sole valid node.
+test "hnsw/add_after_all_tombstoned" {
+  let store = @store.CoreStore::new(2, @types.Dot, capacity=10)
+  let params : @types.HNSWParams = {
+    ..@types.HNSWParams::default(),
+    m: 2,
+    ef_construction: 4,
+    ef_search: 4,
+    seed: 7UL,
+  }
+  let state = HNSWState::new(params, @types.Dot, 10)
+  add_to_hnsw(store, state, 1, [1.0, 0.0])
+  add_to_hnsw(store, state, 2, [0.0, 1.0])
+  // Tombstone both existing nodes
+  hnsw_remove(state, @types.VectorId::from_int(1), store)
+  hnsw_remove(state, @types.VectorId::from_int(2), store)
+  // Add a new node; it must become the sole live node and be findable
+  add_to_hnsw(store, state, 3, [0.5, 0.5])
+  let results = hnsw_search(state, store, [0.5, 0.5], 3, None)
+  inspect(results.length(), content="1")
+  assert_found(results, 3)
+  assert_not_found(results, 1)
+  assert_not_found(results, 2)
+}
+
+///|
+/// Regression: remove(A) + add(B) where A sits between two clusters.
+/// B, added near A's position, must be reachable.
+///
+/// We use m=4 and large ef so every node is well-connected, making this a
+/// deterministic graph regardless of level sampling.  The test is NOT about
+/// whether every original node survives the tombstone (HNSW gives no such
+/// guarantee at low m), but strictly that B is reachable after remove(A)+add(B).
+test "hnsw/remove_bridge_then_add_nearby_reachable" {
+  let store = @store.CoreStore::new(2, @types.Dot, capacity=20)
+  let params : @types.HNSWParams = {
+    ..@types.HNSWParams::default(),
+    m: 4,
+    ef_construction: 20,
+    ef_search: 20,
+    seed: 42UL,
+  }
+  let state = HNSWState::new(params, @types.Dot, 20)
+  add_to_hnsw(store, state, 1, [1.0, 0.0])
+  add_to_hnsw(store, state, 2, [0.9, 0.1])
+  add_to_hnsw(store, state, 3, [0.5, 0.5]) // bridge to be tombstoned
+  add_to_hnsw(store, state, 4, [0.1, 0.9])
+  add_to_hnsw(store, state, 5, [0.0, 1.0])
+  // Tombstone the bridge node
+  hnsw_remove(state, @types.VectorId::from_int(3), store)
+  // Add ID10 near the former bridge position
+  add_to_hnsw(store, state, 10, [0.55, 0.45])
+  // ID10 must be reachable; ID3 must not appear
+  let results = hnsw_search(state, store, [0.55, 0.45], 5, None)
+  assert_found(results, 10)
+  assert_not_found(results, 3)
+}
+
+///|
+/// Regression: remove(A) + add(B) where A was the stored entry point at a
+/// high level.  B is a new ID and must connect into the graph properly.
+test "hnsw/remove_entrypoint_then_add_new_id" {
+  let store = @store.CoreStore::new(2, @types.Dot, capacity=20)
+  // seed=1 tends to assign level > 0 to early nodes, making them entrypoint
+  let params : @types.HNSWParams = {
+    ..@types.HNSWParams::default(),
+    m: 4,
+    ef_construction: 16,
+    ef_search: 16,
+    seed: 1UL,
+  }
+  let state = HNSWState::new(params, @types.Dot, 20)
+  add_to_hnsw(store, state, 1, [1.0, 0.0])
+  add_to_hnsw(store, state, 2, [0.8, 0.2])
+  add_to_hnsw(store, state, 3, [0.6, 0.4])
+  add_to_hnsw(store, state, 4, [0.4, 0.6])
+  add_to_hnsw(store, state, 5, [0.2, 0.8])
+  add_to_hnsw(store, state, 6, [0.0, 1.0])
+  // Force entry point and tombstone it to simulate the reported scenario
+  state.enter_point = 0
+  hnsw_remove(state, @types.VectorId::from_int(1), store)
+  // Add new ID 10 near the tombstoned entrypoint's vector
+  add_to_hnsw(store, state, 10, [0.95, 0.05])
+  // Both remaining live IDs and the new ID must be findable
+  let results = hnsw_search(state, store, [0.95, 0.05], 6, None)
+  assert_found(results, 10)
+  assert_not_found(results, 1)
+  // Every live ID (2-6) must also be reachable from some query
+  let results2 = hnsw_search(state, store, [0.0, 1.0], 6, None)
+  assert_found(results2, 6)
+  assert_not_found(results2, 1)
+}
+
+///|
+/// Regression [P1]: when the entry point is tombstoned, find_valid_entry_point
+/// must not pick the node currently being inserted (at), because at has had
+/// its tombstone cleared but has no edges yet.  If at is chosen as ep,
+/// hnsw_search_layer returns only {at} and connect_mutually adds no edges.
+/// When at also samples a level above max_level, the disconnected node becomes
+/// the new enter_point and all pre-existing nodes become unreachable.
+///
+/// We construct the failure condition explicitly by manipulating level_arr
+/// after the insert so the test does not depend on seed-specific level sampling.
+test "hnsw/fallback_ep_must_not_pick_inserting_node" {
+  let store = @store.CoreStore::new(2, @types.Dot, capacity=20)
+  let params : @types.HNSWParams = {
+    ..@types.HNSWParams::default(),
+    m: 4,
+    ef_construction: 16,
+    ef_search: 16,
+    seed: 1UL,
+  }
+  let state = HNSWState::new(params, @types.Dot, 20)
+  // Build a two-node graph; force enter_point to index 0 (ID 1) at level 1
+  add_to_hnsw(store, state, 1, [1.0, 0.0])
+  add_to_hnsw(store, state, 2, [0.0, 1.0])
+  state.enter_point = 0
+  state.max_level = 1
+  state.level_arr[0] = 1
+  // Tombstone the entry point (index 0 = ID 1)
+  hnsw_remove(state, @types.VectorId::from_int(1), store)
+  // Add ID 10; the inserting node lands at index 2.
+  // Without the fix: tombstone[2]=false before find_valid_entry_point runs,
+  // so find_valid_entry_point sees index 2 as a valid node and returns it.
+  // hnsw_search_layer(entry=2) returns only {2} (no edges yet), neighbors=[],
+  // connect_mutually does nothing.  If level_arr[2] > max_level=1 then
+  // enter_point is promoted to 2 (disconnected), and ID 2 becomes unreachable.
+  // Force level_arr[2] = 2 > max_level=1 to trigger the promotion path.
+  // We do this by pre-setting level_arr before the add call executes its sample.
+  // Because hnsw_add overwrites level_arr[at] with sample_level(), we instead
+  // verify the invariant by checking post-add connectivity for all live nodes.
+  add_to_hnsw(store, state, 10, [0.5, 0.5])
+  // Manually elevate the new node to level 2 and update enter_point to simulate
+  // the worst-case promotion — the fix must hold regardless of sampled level.
+  let at10 = store.get_index(@types.VectorId::from_int(10)).unwrap()
+  state.level_arr[at10] = 2
+  state.max_level = 2
+  state.enter_point = at10
+  // Now verify: ID 2 (the only pre-existing live node) must still be reachable
+  // even though enter_point was just reset to the newly inserted node.
+  let r1 = hnsw_search(state, store, [0.0, 1.0], 5, None)
+  assert_found(r1, 2)
+  assert_not_found(r1, 1)
+  // ID 10 must also be reachable
+  let r2 = hnsw_search(state, store, [0.5, 0.5], 5, None)
+  assert_found(r2, 10)
+}
