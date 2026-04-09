@@ -18,8 +18,25 @@ pub fn BinaryReader::position(self : BinaryReader) -> Int {
 }
 
 ///|
+/// Ensure n bytes are available, abort with message if not.
+fn BinaryReader::ensure(self : BinaryReader, n : Int) -> Unit {
+  if self.offset + n > self.data.length() {
+    abort(
+      "BinaryReader: read out of bounds (offset=" +
+      self.offset.to_string() +
+      ", need=" +
+      n.to_string() +
+      ", len=" +
+      self.data.length().to_string() +
+      ")",
+    )
+  }
+}
+
+///|
 /// Read a u32 value (little-endian)
 pub fn BinaryReader::read_u32(self : BinaryReader) -> UInt {
+  self.ensure(4)
   let value = read_u32_le(self.data, self.offset)
   self.offset = self.offset + 4
   value
@@ -34,6 +51,7 @@ pub fn BinaryReader::read_i32(self : BinaryReader) -> Int {
 ///|
 /// Read a u64 value (little-endian)
 pub fn BinaryReader::read_u64(self : BinaryReader) -> UInt64 {
+  self.ensure(8)
   let value = read_u64_le(self.data, self.offset)
   self.offset = self.offset + 8
   value
@@ -60,14 +78,16 @@ pub fn BinaryReader::read_f32(self : BinaryReader) -> Float {
 ///|
 /// Read a single byte
 pub fn BinaryReader::read_byte(self : BinaryReader) -> Byte {
+  self.ensure(1)
   let b = self.data[self.offset]
   self.offset = self.offset + 1
   b
 }
 
 ///|
-/// Read len bytes
+/// Read len bytes. Aborts if not enough data remaining.
 pub fn BinaryReader::read_bytes(self : BinaryReader, len : Int) -> Bytes {
+  self.ensure(len)
   let result : FixedArray[Byte] = FixedArray::make(len, b'\x00')
   for i in 0..<len {
     result[i] = self.data[self.offset + i]

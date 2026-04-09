@@ -223,8 +223,8 @@ pub fn ivf_find(
 /// Serialize IVF state to bytes
 pub fn ivf_serialize(state : IVFState, dim : Int) -> Bytes {
   let w = @binary.BinaryWriter::new()
-  // Version marker: v2 uses VectorId wire bytes
-  w.push_u32(2U)
+  // Version marker: 0x49564632 = "IVF2" in ASCII — cannot collide with centroid_count
+  w.push_u32(0x49564632U)
   // Write centroid_count
   w.push_i32(state.centroid_count)
   // Write centroids (flattened array)
@@ -249,9 +249,9 @@ pub fn ivf_serialize(state : IVFState, dim : Int) -> Bytes {
 /// Deserialize IVF state from bytes
 pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
   let r = @binary.BinaryReader::new(data)
-  // Detect format version: v2 starts with 0x00000002, old format starts with centroid_count
+  // Detect format version: v2 starts with magic 0x49564632 ("IVF2")
   let first_u32 = r.read_u32()
-  let version = if first_u32 == 2U { 2 } else { 1 }
+  let version = if first_u32 == 0x49564632U { 2 } else { 1 }
   // Read centroid_count
   state.centroid_count = if version >= 2 {
     r.read_i32()

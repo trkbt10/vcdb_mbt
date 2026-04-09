@@ -26,7 +26,7 @@ import type {
   ScrollEntry,
 } from "./types.js";
 import type { StorageAdapter, StorageKindType } from "./storage/types.js";
-import { getVectorDbFfi, getPersistentFfi } from "./ffi/loader.js";
+import { getVectorDbFfi, getPersistentFfi, isModuleLoaded } from "./ffi/loader.js";
 import {
   int64ToWireBytes,
   wireBytesBigInt,
@@ -185,6 +185,9 @@ export class PersistentDB {
   ) {}
 
   static async create(options: PersistentDBOptions): Promise<PersistentDB> {
+    if (!isModuleLoaded()) {
+      throw new Error("PersistentDB.create() requires loadModule() to have been called first.");
+    }
     const ffi = getPersistentFfi();
     const instanceId = options.instanceId ?? ffi.persistent_allocate_id();
     const {

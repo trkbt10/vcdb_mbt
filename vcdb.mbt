@@ -318,23 +318,14 @@ pub fn VectorDB::get(
 /// Scroll points in ascending ID order, similar to Qdrant scroll.
 ///
 /// Thin wrapper over scroll_filtered with no filter expression.
-/// Offset semantics: returns entries with ID >= offset (for backward
-/// compatibility with gateway which passes `last_id + 1`).
+/// Offset semantics: returns entries with ID strictly greater than offset.
+/// Pass the last ID from previous page as offset to get the next page.
 pub fn VectorDB::scroll(
   self : VectorDB,
   offset? : @types.VectorId? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
-  // Convert >= semantics to > semantics by subtracting 1 from offset
-  let adjusted = match offset {
-    Some(vid) =>
-      match vid {
-        Int64Id(o) => Some(@types.Int64Id(o - 1L))
-        Bytes16Id(_) => Some(vid) // For Bytes16Id, pass through as-is
-      }
-    None => None
-  }
-  self.scroll_filtered(expr=None, offset=adjusted, limit~)
+  self.scroll_filtered(expr=None, offset~, limit~)
 }
 
 ///|

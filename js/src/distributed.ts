@@ -7,8 +7,14 @@
  * All functions require loadModule() to have been called first.
  */
 import type { VectorId, SearchHit, ScrollEntry } from "./types.js";
-import { getDistributedFfi } from "./ffi/loader.js";
+import { getDistributedFfi, isModuleLoaded } from "./ffi/loader.js";
 import { int64ToWireBytes, wireBytesBigInt } from "./ffi/vector-id.js";
+
+function ensureLoaded(caller: string): void {
+  if (!isModuleLoaded()) {
+    throw new Error(`${caller}() requires loadModule() to have been called first.`);
+  }
+}
 
 const parsePayload = (json: string): Record<string, unknown> | null => {
   if (!json) return null;
@@ -54,6 +60,7 @@ export function placementGroup(
   id: VectorId,
   pgCount: number,
 ): number {
+  ensureLoaded("placementGroup");
   return getDistributedFfi().crush_placement_group(int64ToWireBytes(id), pgCount);
 }
 
@@ -67,6 +74,7 @@ export function groupUpsert(
   }>,
   pgCount: number,
 ): UpsertGroup[] {
+  ensureLoaded("groupUpsert");
   const ffi = getDistributedFfi();
   const ffiPoints = points.map((p) => ({
     _0: int64ToWireBytes(p.id),
@@ -92,6 +100,7 @@ export function mergeSearch(
   shardResults: readonly ShardSearchResult[],
   topK: number,
 ): MergedResult<readonly SearchHit[]> {
+  ensureLoaded("mergeSearch");
   const ffi = getDistributedFfi();
   const ffiInput = shardResults.map((r) => {
     if ("error" in r) {
@@ -122,6 +131,7 @@ export function mergeScroll(
   shardResults: readonly ShardScrollResult[],
   limit: number,
 ): MergedResult<readonly ScrollEntry[]> {
+  ensureLoaded("mergeScroll");
   const ffi = getDistributedFfi();
   const ffiInput = shardResults.map((r) => {
     if ("error" in r) {
@@ -149,6 +159,7 @@ export function mergeScroll(
 export function mergeCount(
   shardResults: readonly ShardCountResult[],
 ): MergedResult<number> {
+  ensureLoaded("mergeCount");
   const ffi = getDistributedFfi();
   const ffiInput = shardResults.map((r) => {
     if ("error" in r) {
