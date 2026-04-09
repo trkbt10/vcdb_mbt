@@ -21,7 +21,28 @@ pub(all) enum RebalancePhase {
   Complete
   /// Rebalance failed with error.
   Failed(String)
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for RebalancePhase with output(self, logger) {
+  match self {
+    Planning => logger.write_string("Planning")
+    Copying(completed, total) => {
+      logger.write_string("Copying(")
+      Show::output(completed, logger)
+      logger.write_string(", ")
+      Show::output(total, logger)
+      logger.write_string(")")
+    }
+    Updating => logger.write_string("Updating")
+    Complete => logger.write_string("Complete")
+    Failed(msg) => {
+      logger.write_string("Failed(")
+      Show::output(msg, logger)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 /// Progress snapshot for a rebalance operation.
@@ -30,7 +51,20 @@ pub(all) struct RebalanceProgress {
   moves_total : Int
   moves_completed : Int
   bytes_moved : Int64
-} derive(Show)
+}
+
+///|
+pub impl Show for RebalanceProgress with output(self, logger) {
+  logger.write_string("{ phase: ")
+  Show::output(self.phase, logger)
+  logger.write_string(", moves_total: ")
+  Show::output(self.moves_total, logger)
+  logger.write_string(", moves_completed: ")
+  Show::output(self.moves_completed, logger)
+  logger.write_string(", bytes_moved: ")
+  Show::output(self.bytes_moved, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Mutable state for an async rebalance operation.

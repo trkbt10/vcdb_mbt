@@ -60,8 +60,6 @@ options(
         "distributed_merge_scroll",
         "distributed_merge_count",
         "distributed_group_upsert",
-        "parse_int64",
-        "format_int64",
       ],
     },
   },

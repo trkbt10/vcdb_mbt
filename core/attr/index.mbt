@@ -26,7 +26,16 @@ pub fn attr_value_to_number(value : @types.AttrValue) -> Double? {
 pub struct NumEntry {
   value : Double
   id : Int64
-} derive(Show)
+}
+
+///|
+pub impl Show for NumEntry with output(self, logger) {
+  logger.write_string("{ value: ")
+  Show::output(self.value, logger)
+  logger.write_string(", id: ")
+  Show::output(self.id, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Compare NumEntry by value for sorting

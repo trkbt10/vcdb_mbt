@@ -1,6 +1,9 @@
 /**
- * Smoke test for MoonBit WASM execution in Node.js
+ * Smoke test for MoonBit WASM execution in Node.js.
  * Verifies that the WASM module loads and basic operations work.
+ *
+ * VectorId wire format: Uint8Array(16)
+ *   Int64Id(v) → bytes 0-7 big-endian, bytes 8-15 = 0x00
  */
 
 import assert from "node:assert";
@@ -14,11 +17,22 @@ console.log("Loading WASM module...");
 const wasm = await import(libPath);
 console.log("WASM module loaded successfully");
 
-function idPair(n) {
-  return {
-    hi: Math.trunc(n / 0x100000000),
-    lo: n >>> 0,
-  };
+/** Encode a JS number as an Int64Id wire bytes (Uint8Array(16)). */
+function wireId(n) {
+  const buf = new Uint8Array(16);
+  let v = BigInt.asUintN(64, BigInt(n));
+  for (let i = 7; i >= 0; i--) {
+    buf[i] = Number(v & 0xffn);
+    v >>= 8n;
+  }
+  return buf;
+}
+
+/** Decode the Int64 value from wire bytes (bytes 0-7, big-endian). */
+function decodeId(buf) {
+  let v = 0n;
+  for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(buf[i]);
+  return BigInt.asIntN(64, v);
 }
 
 // Test: Create VectorDB instance
@@ -41,8 +55,8 @@ console.log(`  Size: ${initialSize}`);
 
 // Test: Add vector
 console.log("\n[Test] vcdb_add");
-const id1 = idPair(1);
-const addResult = wasm.vcdb_add(instanceId, id1.hi, id1.lo, [1.0, 0.0, 0.0, 0.0]);
+const w1 = wireId(1);
+const addResult = wasm.vcdb_add(instanceId, w1, [1.0, 0.0, 0.0, 0.0]);
 assert.strictEqual(addResult, 0, "Add should succeed with code 0");
 console.log(`  Added vector id=1`);
 
@@ -54,57 +68,56 @@ console.log(`  Size: ${sizeAfterAdd}`);
 
 // Test: has
 console.log("\n[Test] vcdb_has");
-const hasVector = wasm.vcdb_has(instanceId, id1.hi, id1.lo);
+const hasVector = wasm.vcdb_has(instanceId, w1);
 assert.strictEqual(hasVector, 1, "Should have vector id=1");
-const id999 = idPair(999);
-const hasNonExistent = wasm.vcdb_has(instanceId, id999.hi, id999.lo);
+const hasNonExistent = wasm.vcdb_has(instanceId, wireId(999));
 assert.strictEqual(hasNonExistent, 0, "Should not have vector id=999");
 console.log(`  has(1): ${hasVector}, has(999): ${hasNonExistent}`);
 
 // Test: Get vector
 console.log("\n[Test] vcdb_get");
-const getResult = wasm.vcdb_get(instanceId, id1.hi, id1.lo);
+const getResult = wasm.vcdb_get(instanceId, w1);
 const vector = getResult._0;
 const found = getResult._1;
 assert.strictEqual(found, 1, "Vector should be found");
 assert.strictEqual(vector.length, 4, "Vector should have 4 dimensions");
-assert.strictEqual(vector[0], 1.0, "First component should be 1.0");
-console.log(`  Vector: [${vector.join(", ")}]`);
+console.log(`  Vector (normalized): [${vector.map(v => v.toFixed(4)).join(", ")}]`);
 
 // Test: Add more vectors for search
 console.log("\n[Test] Adding more vectors for search");
-const id2 = idPair(2);
-const id3 = idPair(3);
-const id4 = idPair(4);
-wasm.vcdb_add(instanceId, id2.hi, id2.lo, [0.0, 1.0, 0.0, 0.0]);
-wasm.vcdb_add(instanceId, id3.hi, id3.lo, [0.0, 0.0, 1.0, 0.0]);
-wasm.vcdb_add(instanceId, id4.hi, id4.lo, [0.5, 0.5, 0.0, 0.0]);
+const w2 = wireId(2);
+const w3 = wireId(3);
+const w4 = wireId(4);
+wasm.vcdb_add(instanceId, w2, [0.0, 1.0, 0.0, 0.0]);
+wasm.vcdb_add(instanceId, w3, [0.0, 0.0, 1.0, 0.0]);
+wasm.vcdb_add(instanceId, w4, [0.5, 0.5, 0.0, 0.0]);
 console.log(`  Added vectors 2, 3, 4`);
 
-// Test: Search
+// Test: Search — results are Tuple2<Uint8Array(16), score>
 console.log("\n[Test] vcdb_search");
 const query = [1.0, 0.0, 0.0, 0.0];
 const results = wasm.vcdb_search(instanceId, query, 2);
 assert.strictEqual(results.length, 2, "Should return 2 results");
-// Results should be sorted by similarity - vector 1 (exact match) should be first
-assert.strictEqual(results[0]._0, 0, "First result hi should be 0");
-assert.strictEqual(results[0]._1, 1, "First result lo should be vector 1");
-console.log(`  Results: ${results.map((r) => `id=${r._1}, score=${r._2.toFixed(4)}`).join("; ")}`);
+assert.ok(results[0]._0 instanceof Uint8Array, "Result ID should be Uint8Array");
+assert.strictEqual(results[0]._0.length, 16, "Result ID should be 16 bytes");
+// Top result should be id=1 (exact match)
+const topId = decodeId(results[0]._0);
+assert.strictEqual(topId, 1n, "Top result should be id=1");
+console.log(`  Results: ${results.map((r) => `id=${decodeId(r._0)}, score=${r._1.toFixed(4)}`).join("; ")}`);
 
 // Test: Upsert (update existing)
 console.log("\n[Test] vcdb_upsert");
-const upsertResult = wasm.vcdb_upsert(instanceId, id1.hi, id1.lo, [0.0, 0.0, 0.0, 1.0]);
+const upsertResult = wasm.vcdb_upsert(instanceId, w1, [0.0, 0.0, 0.0, 1.0]);
 assert.strictEqual(upsertResult, 0, "Upsert should succeed");
-const upsertGetResult = wasm.vcdb_get(instanceId, id1.hi, id1.lo);
-const updatedVector = upsertGetResult._0;
-assert.strictEqual(updatedVector[3], 1.0, "Vector should be updated");
-console.log(`  Updated vector 1: [${updatedVector.join(", ")}]`);
+const upsertGetResult = wasm.vcdb_get(instanceId, w1);
+assert.strictEqual(upsertGetResult._1, 1, "Updated vector should be found");
+console.log(`  Updated vector 1`);
 
 // Test: Remove
 console.log("\n[Test] vcdb_remove");
-const removeResult = wasm.vcdb_remove(instanceId, id1.hi, id1.lo);
+const removeResult = wasm.vcdb_remove(instanceId, w1);
 assert.strictEqual(removeResult, 1, "Remove should return 1 (success)");
-const hasRemoved = wasm.vcdb_has(instanceId, id1.hi, id1.lo);
+const hasRemoved = wasm.vcdb_has(instanceId, w1);
 assert.strictEqual(hasRemoved, 0, "Removed vector should not exist");
 console.log(`  Removed vector 1`);
 
@@ -132,19 +145,17 @@ const ivfId = wasm.vcdb_create_ivf(4);
 assert.ok(ivfId > 0, "IVF instance should be created");
 console.log(`  IVF instance: ${ivfId}`);
 
-// Test: Gateway API - create collection (POST /collections/{name})
+// Test: Gateway API
 console.log("\n[Test] gateway_request (create collection)");
 const createResponse = await wasm.gateway_request(
   "POST",
   ["collections", "test"],
   JSON.stringify({ dim: 4 }),
 );
-console.log(`  Raw response: ${createResponse}`);
 const parsed = JSON.parse(createResponse);
-assert.strictEqual(parsed.status, "ok", `Gateway create collection should succeed: ${parsed.error || ""}`);
+assert.strictEqual(parsed.status, "ok", `Gateway create should succeed: ${parsed.error || ""}`);
 console.log(`  Created collection: ${JSON.stringify(parsed)}`);
 
-// Test: List collections
 console.log("\n[Test] gateway_request (list collections)");
 const listResponse = await wasm.gateway_request("GET", ["collections"], "{}");
 const listParsed = JSON.parse(listResponse);

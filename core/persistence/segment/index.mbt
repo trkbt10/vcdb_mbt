@@ -19,7 +19,22 @@ pub(all) struct IndexHeader {
   count : Int // Number of entries
   strategy_code : Int // Strategy encoding (0=Bruteforce, 1=HNSW, 2=IVF)
   has_ann : Bool // Whether ANN bytes are included
-} derive(Show)
+}
+
+///|
+pub impl Show for IndexHeader with output(self, logger) {
+  logger.write_string("{ metric_code: ")
+  Show::output(self.metric_code, logger)
+  logger.write_string(", dim: ")
+  Show::output(self.dim, logger)
+  logger.write_string(", count: ")
+  Show::output(self.count, logger)
+  logger.write_string(", strategy_code: ")
+  Show::output(self.strategy_code, logger)
+  logger.write_string(", has_ann: ")
+  Show::output(self.has_ann, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Encode metric to code
@@ -111,7 +126,18 @@ pub struct DecodedIndexFile {
   header : IndexHeader
   entries : Array[IndexEntry]
   ann : Bytes?
-} derive(Show)
+}
+
+///|
+pub impl Show for DecodedIndexFile with output(self, logger) {
+  logger.write_string("{ header: ")
+  Show::output(self.header, logger)
+  logger.write_string(", entries: ")
+  Show::output(self.entries, logger)
+  logger.write_string(", ann: ")
+  Show::output(self.ann, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Decode index file from bytes

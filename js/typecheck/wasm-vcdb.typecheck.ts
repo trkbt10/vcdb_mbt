@@ -1,5 +1,5 @@
-import type { VectorDB } from "../src/vectordb.js";
-import type { VectorId, SearchResult } from "../src/types.js";
+import type { VectorDB } from "../src/db.js";
+import type { VectorId, SearchResult } from "../src/index.js";
 
 declare const db: VectorDB;
 declare const vector: number[];
@@ -8,7 +8,7 @@ const bigintId: VectorId = 1n;
 
 db.add(bigintId, vector);
 db.upsert(bigintId, vector);
-db.get(bigintId);
+db.get_(bigintId);
 db.has(bigintId);
 db.remove(bigintId);
 

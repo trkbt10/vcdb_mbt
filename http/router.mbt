@@ -9,7 +9,20 @@ pub struct HttpRequest {
   path : String
   headers : Map[String, String]
   body : String
-} derive(Show)
+}
+
+///|
+pub impl Show for HttpRequest with output(self, logger) {
+  logger.write_string("{ http_method: ")
+  Show::output(self.http_method, logger)
+  logger.write_string(", path: ")
+  Show::output(self.path, logger)
+  logger.write_string(", headers: ")
+  Show::output(self.headers, logger)
+  logger.write_string(", body: ")
+  Show::output(self.body, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// HTTP response representation
@@ -17,7 +30,18 @@ pub struct HttpResponse {
   status : Int
   headers : Map[String, String]
   body : String
-} derive(Show)
+}
+
+///|
+pub impl Show for HttpResponse with output(self, logger) {
+  logger.write_string("{ status: ")
+  Show::output(self.status, logger)
+  logger.write_string(", headers: ")
+  Show::output(self.headers, logger)
+  logger.write_string(", body: ")
+  Show::output(self.body, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Create an HTTP request

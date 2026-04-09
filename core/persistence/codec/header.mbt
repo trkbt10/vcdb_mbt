@@ -22,7 +22,16 @@ pub(all) enum FileType {
   Wal // 0x01
   Segment // 0x02
   Index // 0x03
-} derive(Eq, Show)
+} derive(Eq)
+
+///|
+pub impl Show for FileType with output(self, logger) {
+  match self {
+    Wal => logger.write_string("Wal")
+    Segment => logger.write_string("Segment")
+    Index => logger.write_string("Index")
+  }
+}
 
 ///|
 /// Convert file type to byte

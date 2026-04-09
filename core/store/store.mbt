@@ -199,7 +199,18 @@ pub struct MoveInfo {
   moved_id : @types.VectorId?
   moved_from : Int?
   moved_to : Int?
-} derive(Show)
+}
+
+///|
+pub impl Show for MoveInfo with output(self, logger) {
+  logger.write_string("{ moved_id: ")
+  Show::output(self.moved_id, logger)
+  logger.write_string(", moved_from: ")
+  Show::output(self.moved_from, logger)
+  logger.write_string(", moved_to: ")
+  Show::output(self.moved_to, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Remove a vector by id. Returns move info if compaction occurred.

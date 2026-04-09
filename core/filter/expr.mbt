@@ -9,7 +9,37 @@ pub(all) enum LeafExpr {
   Range(String, @types.NumericRange) // key in range
   Exists(String) // key exists (not null)
   IsNull(String) // key is null or doesn't exist
-} derive(Show)
+}
+
+///|
+pub impl Show for LeafExpr with output(self, logger) {
+  match self {
+    Match(key, value) => {
+      logger.write_string("Match(")
+      Show::output(key, logger)
+      logger.write_string(", ")
+      Show::output(value, logger)
+      logger.write_string(")")
+    }
+    Range(key, range) => {
+      logger.write_string("Range(")
+      Show::output(key, logger)
+      logger.write_string(", ")
+      Show::output(range, logger)
+      logger.write_string(")")
+    }
+    Exists(key) => {
+      logger.write_string("Exists(")
+      Show::output(key, logger)
+      logger.write_string(")")
+    }
+    IsNull(key) => {
+      logger.write_string("IsNull(")
+      Show::output(key, logger)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 /// Filter expression (can be nested)
@@ -18,7 +48,35 @@ pub(all) enum FilterExpr {
   Must(Array[FilterExpr]) // All must match (AND)
   MustNot(Array[FilterExpr]) // None must match (AND NOT)
   Should(Array[FilterExpr], Int) // At least N must match (OR with min)
-} derive(Show)
+}
+
+///|
+pub impl Show for FilterExpr with output(self, logger) {
+  match self {
+    Leaf(leaf) => {
+      logger.write_string("Leaf(")
+      Show::output(leaf, logger)
+      logger.write_string(")")
+    }
+    Must(exprs) => {
+      logger.write_string("Must(")
+      Show::output(exprs, logger)
+      logger.write_string(")")
+    }
+    MustNot(exprs) => {
+      logger.write_string("MustNot(")
+      Show::output(exprs, logger)
+      logger.write_string(")")
+    }
+    Should(exprs, min) => {
+      logger.write_string("Should(")
+      Show::output(exprs, logger)
+      logger.write_string(", ")
+      Show::output(min, logger)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 /// Filter strategy for search
@@ -26,7 +84,16 @@ pub(all) enum FilterStrategy {
   PreFilter // Filter before vector search (faster for selective filters)
   PostFilter // Filter after vector search (simpler, always correct)
   Auto // Automatically choose based on selectivity
-} derive(Show)
+}
+
+///|
+pub impl Show for FilterStrategy with output(self, logger) {
+  match self {
+    PreFilter => logger.write_string("PreFilter")
+    PostFilter => logger.write_string("PostFilter")
+    Auto => logger.write_string("Auto")
+  }
+}
 
 ///|
 /// Create a Match filter

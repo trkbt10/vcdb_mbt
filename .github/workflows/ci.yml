@@ -66,7 +66,7 @@ jobs:
           moon update
 
       - name: Build WASM/JS target
-        run: moon build --target js lib
+        run: moon build --target js ffi
 
       - name: Setup JS package
         working-directory: js
@@ -77,3 +77,6 @@ jobs:
 
       - name: Run WASM smoke test
         run: node js/test/smoke.test.mjs
+
+      - name: Run FFI contract test
+        run: node js/test/contract.test.mjs

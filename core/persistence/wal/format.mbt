@@ -58,7 +58,16 @@ pub enum WalRecordType {
   Upsert // 1 - Insert or update vector with attrs
   Remove // 2 - Delete vector
   SetAttrs // 3 - Update attrs only
-} derive(Eq, Show)
+} derive(Eq)
+
+///|
+pub impl Show for WalRecordType with output(self, logger) {
+  match self {
+    Upsert => logger.write_string("Upsert")
+    Remove => logger.write_string("Remove")
+    SetAttrs => logger.write_string("SetAttrs")
+  }
+}
 
 ///|
 pub fn WalRecordType::to_byte(self : WalRecordType) -> Byte {
@@ -88,7 +97,22 @@ pub struct WalRecord {
   vector : Array[Double]?
   /// Nanoseconds since Unix epoch. 0 = no timestamp (v1 compatibility).
   timestamp : Int64
-} derive(Show)
+}
+
+///|
+pub impl Show for WalRecord with output(self, logger) {
+  logger.write_string("{ record_type: ")
+  Show::output(self.record_type, logger)
+  logger.write_string(", id: ")
+  Show::output(self.id, logger)
+  logger.write_string(", attrs: ")
+  Show::output(self.attrs, logger)
+  logger.write_string(", vector: ")
+  Show::output(self.vector, logger)
+  logger.write_string(", timestamp: ")
+  Show::output(self.timestamp, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Create an upsert record with timestamp

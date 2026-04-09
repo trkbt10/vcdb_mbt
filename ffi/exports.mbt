@@ -1,9 +1,12 @@
 ///|
 /// FFI exports for JavaScript interop.
 ///
-/// All vector IDs are passed as (hi: Int, lo: Int) pairs — never as Double.
-/// This is the only way to construct/extract VectorIds in the FFI.
-/// Double-based paths are structurally impossible.
+/// Wire format for VectorId: Bytes of exactly 16 bytes.
+///   Int64Id(v)    → bytes 0-7 = v big-endian, bytes 8-15 = 0x00
+///   Bytes16Id(b)  → bytes 0-15 = b as-is
+///
+/// Use vcdb_id_encode / vcdb_id_decode for all ID conversions.
+/// The old hi/lo pair and UUID-string paths have been removed.
 
 ///|
 /// Bridge: run an async function synchronously.
@@ -26,125 +29,20 @@ priv struct Counter {
 let counter : Counter = { value: 1 }
 
 ///|
-/// Construct an Int64Id from hi/lo Int pair (SoT for Int64 ID construction).
-fn vid_from_pair(hi : Int, lo : Int) -> @types.VectorId {
-  let hi64 = hi.to_int64()
-  let lo64 = lo.to_int64().land(0xFFFFFFFFL)
-  @types.Int64Id((hi64 << 32) | lo64)
+/// Encode a VectorId to the 16-byte wire format.
+/// JS receives a Uint8Array(16).
+fn vid_encode(id : @types.VectorId) -> Bytes {
+  id.to_wire_bytes()
 }
 
 ///|
-/// Extract hi/lo pair from a VectorId.
-/// Int64Id: direct hi/lo extraction.
-/// Bytes16Id: hi = upper 8 bytes as Int64, lo = lower 8 bytes truncated to Int32.
-fn vid_to_pair(id : @types.VectorId) -> (Int, Int) {
-  match id {
-    @types.Int64Id(v) => {
-      let hi = (v.reinterpret_as_uint64() >> 32).to_int()
-      let lo = v.to_int()
-      (hi, lo)
-    }
-    @types.Bytes16Id(b) => {
-      let (hi64, lo64) = b.to_hi_lo()
-      let hi = (hi64.reinterpret_as_uint64() >> 32).to_int()
-      let lo = hi64.to_int()
-      // Note: this loses the lower 8 bytes. Use vcdb_id_to_uuid for Bytes16Id.
-      ignore(lo64)
-      (hi, lo)
-    }
-  }
+/// Decode a VectorId from the 16-byte wire format.
+/// Returns None if data is not exactly 16 bytes.
+fn vid_decode(data : Bytes) -> @types.VectorId? {
+  @types.VectorId::from_wire_bytes(data)
 }
 
-///|
-/// Construct a Bytes16Id from a UUID string.
-/// Returns None if the string is not a valid UUID.
-pub fn vid_from_uuid(s : String) -> @types.VectorId? {
-  @types.VectorId::from_uuid_string(s)
-}
-
-///|
-/// Extract UUID string from a VectorId.
-/// Int64Id: formatted as decimal string (not a UUID).
-/// Bytes16Id: formatted as UUID string.
-pub fn vcdb_id_to_string(id : @types.VectorId) -> String {
-  id.to_display_string()
-}
-
-///|
-pub fn vcdb_add_uuid(
-  instance_id : Int,
-  uuid : String,
-  vector : Array[Double],
-) -> Int {
-  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
-    (Some(db), Some(id)) => {
-      if db.has(id) {
-        return -2
-      }
-      let attrs = @types.empty_attrs()
-      run_async(async fn() noraise {
-        let _ = db.add(id, vector, attrs, 0L) catch { _ => false }
-      })
-      0
-    }
-    _ => -1
-  }
-}
-
-///|
-pub fn vcdb_upsert_uuid(
-  instance_id : Int,
-  uuid : String,
-  vector : Array[Double],
-) -> Int {
-  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
-    (Some(db), Some(id)) => {
-      let attrs = @types.empty_attrs()
-      run_async(async fn() noraise {
-        db.upsert([(id, vector, attrs)], 0L) catch {
-          _ => ()
-        }
-      })
-      0
-    }
-    _ => -1
-  }
-}
-
-///|
-pub fn vcdb_get_uuid(instance_id : Int, uuid : String) -> (Array[Double], Int) {
-  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
-    (Some(db), Some(id)) =>
-      match db.get(id) {
-        Some(record) => (record.vector, 1)
-        None => ([], 0)
-      }
-    _ => ([], -1)
-  }
-}
-
-///|
-pub fn vcdb_has_uuid(instance_id : Int, uuid : String) -> Int {
-  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
-    (Some(db), Some(id)) => if db.has(id) { 1 } else { 0 }
-    _ => -1
-  }
-}
-
-///|
-pub fn vcdb_remove_uuid(instance_id : Int, uuid : String) -> Int {
-  match (instances.get(instance_id), @types.VectorId::from_uuid_string(uuid)) {
-    (Some(db), Some(id)) => {
-      let mut result = 0
-      run_async(async fn() noraise {
-        let removed = db.remove(id, 0L) catch { _ => false }
-        result = if removed { 1 } else { 0 }
-      })
-      result
-    }
-    _ => -1
-  }
-}
+// ── Instance management ──────────────────────────────────────
 
 ///|
 pub fn vcdb_create(dim : Int) -> Int {
@@ -206,16 +104,32 @@ pub fn vcdb_dim(instance_id : Int) -> Int {
   }
 }
 
+// ── ID encode / decode (SoT for JS ↔ VectorId conversion) ────
+
 ///|
+/// Encode a VectorId to 16 bytes.
+/// JS must call this to convert a VectorId returned by search/scroll
+/// back to a wire-format Uint8Array for round-trip verification.
+pub fn vcdb_id_encode(instance_id : Int, id_bytes : Bytes) -> Bytes {
+  match (instances.get(instance_id), vid_decode(id_bytes)) {
+    (Some(_), Some(id)) => vid_encode(id)
+    _ => b""
+  }
+}
+
+// ── Mutation operations ──────────────────────────────────────
+
+///|
+/// Add a vector. id_bytes must be exactly 16 bytes (wire format).
+/// Returns 0 on success, -1 if instance not found or id invalid,
+/// -2 if id already exists.
 pub fn vcdb_add(
   instance_id : Int,
-  id_hi : Int,
-  id_lo : Int,
+  id_bytes : Bytes,
   vector : Array[Double],
 ) -> Int {
-  match instances.get(instance_id) {
-    Some(db) => {
-      let id = vid_from_pair(id_hi, id_lo)
+  match (instances.get(instance_id), vid_decode(id_bytes)) {
+    (Some(db), Some(id)) => {
       if db.has(id) {
         return -2
       }
@@ -225,91 +139,95 @@ pub fn vcdb_add(
       })
       0
     }
-    None => -1
+    _ => -1
   }
 }
 
 ///|
+/// Upsert a vector. id_bytes must be exactly 16 bytes (wire format).
+/// Returns 0 on success, -1 if instance not found or id invalid.
 pub fn vcdb_upsert(
   instance_id : Int,
-  id_hi : Int,
-  id_lo : Int,
+  id_bytes : Bytes,
   vector : Array[Double],
 ) -> Int {
-  match instances.get(instance_id) {
-    Some(db) => {
+  match (instances.get(instance_id), vid_decode(id_bytes)) {
+    (Some(db), Some(id)) => {
       let attrs = @types.empty_attrs()
       run_async(async fn() noraise {
-        db.upsert([(vid_from_pair(id_hi, id_lo), vector, attrs)], 0L) catch {
-          _ => ()
-        }
+        db.upsert([(id, vector, attrs)], 0L) catch { _ => () }
       })
       0
     }
-    None => -1
+    _ => -1
   }
 }
 
 ///|
+/// Remove a vector. id_bytes must be exactly 16 bytes (wire format).
+/// Returns 1 if removed, 0 if not found, -1 on error.
+pub fn vcdb_remove(instance_id : Int, id_bytes : Bytes) -> Int {
+  match (instances.get(instance_id), vid_decode(id_bytes)) {
+    (Some(db), Some(id)) => {
+      let mut result = 0
+      run_async(async fn() noraise {
+        let removed = db.remove(id, 0L) catch { _ => false }
+        result = if removed { 1 } else { 0 }
+      })
+      result
+    }
+    _ => -1
+  }
+}
+
+// ── Read operations ──────────────────────────────────────────
+
+///|
+/// Get a vector by id. id_bytes must be exactly 16 bytes (wire format).
+/// Returns (vector, 1) if found, ([], 0) if not found, ([], -1) on error.
 pub fn vcdb_get(
   instance_id : Int,
-  id_hi : Int,
-  id_lo : Int,
+  id_bytes : Bytes,
 ) -> (Array[Double], Int) {
-  match instances.get(instance_id) {
-    Some(db) =>
-      match db.get(vid_from_pair(id_hi, id_lo)) {
+  match (instances.get(instance_id), vid_decode(id_bytes)) {
+    (Some(db), Some(id)) =>
+      match db.get(id) {
         Some(record) => (record.vector, 1)
         None => ([], 0)
       }
-    None => ([], -1)
+    _ => ([], -1)
   }
 }
 
 ///|
+/// Check if a vector exists. id_bytes must be exactly 16 bytes (wire format).
+/// Returns 1 if exists, 0 if not, -1 on error.
+pub fn vcdb_has(instance_id : Int, id_bytes : Bytes) -> Int {
+  match (instances.get(instance_id), vid_decode(id_bytes)) {
+    (Some(db), Some(id)) => if db.has(id) { 1 } else { 0 }
+    _ => -1
+  }
+}
+
+///|
+/// Search by vector similarity.
+/// Returns Array of (id_bytes: Bytes, score: Double).
+/// Each id_bytes is exactly 16 bytes in wire format.
 pub fn vcdb_search(
   instance_id : Int,
   query : Array[Double],
   k : Int,
-) -> Array[(Int, Int, Double)] {
+) -> Array[(Bytes, Double)] {
   match instances.get(instance_id) {
     Some(db) => {
       let results = db.search(query, k, None)
-      let out : Array[(Int, Int, Double)] = []
-      for hit in results {
-        let (hi, lo) = vid_to_pair(hit.id)
-        out.push((hi, lo, hit.score))
-      }
-      out
+      results.map(fn(hit) { (vid_encode(hit.id), hit.score) })
     }
     None => []
   }
 }
 
-///|
-pub fn vcdb_has(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
-  match instances.get(instance_id) {
-    Some(db) => if db.has(vid_from_pair(id_hi, id_lo)) { 1 } else { 0 }
-    None => -1
-  }
-}
-
-///|
-pub fn vcdb_remove(instance_id : Int, id_hi : Int, id_lo : Int) -> Int {
-  match instances.get(instance_id) {
-    Some(db) => {
-      let mut result = 0
-      run_async(async fn() noraise {
-        let removed = db.remove(vid_from_pair(id_hi, id_lo), 0L) catch {
-          _ => false
-        }
-        result = if removed { 1 } else { 0 }
-      })
-      result
-    }
-    None => -1
-  }
-}
+// ── Serialization ────────────────────────────────────────────
 
 ///|
 pub fn vcdb_serialize(instance_id : Int) -> Bytes {
@@ -327,8 +245,9 @@ pub fn vcdb_deserialize(data : Bytes) -> Int {
   id
 }
 
+// ── Parse JSON attrs (used by persistent_exports) ────────────
+
 ///|
-/// Parse JSON string to Attrs (used by persistent_exports)
 fn parse_json_to_attrs(json : String) -> @types.Attrs {
   if json.length() == 0 || json == "{}" {
     return @types.empty_attrs()
@@ -336,29 +255,26 @@ fn parse_json_to_attrs(json : String) -> @types.Attrs {
   @codec.parse_attrs_json(json).unwrap_or(@types.empty_attrs())
 }
 
-// ============================================================================
-// CRUSH placement — deterministic vector-to-shard mapping
-// ============================================================================
+// ── CRUSH placement ──────────────────────────────────────────
 
 ///|
 /// Compute placement group for a vector ID.
-/// This is the SoT for shard routing — JS consumers MUST use this
-/// instead of implementing their own hash function.
-///
-/// Returns a placement group number in [0, pg_count).
-pub fn crush_placement_group(id_hi : Int, id_lo : Int, pg_count : Int) -> Int {
-  let vid = vid_from_pair(id_hi, id_lo)
-  let map = @placement.CrushMap::new(pg_count, 1, [])
-  let result = @placement.crush_locate(vid, map)
-  result.pg
+/// id_bytes must be exactly 16 bytes (wire format).
+/// Returns placement group in [0, pg_count), or -1 on error.
+pub fn crush_placement_group(id_bytes : Bytes, pg_count : Int) -> Int {
+  match vid_decode(id_bytes) {
+    Some(vid) => {
+      let map = @placement.CrushMap::new(pg_count, 1, [])
+      let result = @placement.crush_locate(vid, map)
+      result.pg
+    }
+    None => -1
+  }
 }
 
-// ============================================================================
-// Gateway API — JS exports are in gateway_exports.mbt (JS-only)
-// ============================================================================
+// ── Gateway import anchor ────────────────────────────────────
 
 ///|
-/// Keep @gateway import alive for JS-only gateway_exports.mbt.
 fn _gateway_import_anchor() -> @gateway.CollectionConfig {
   @gateway.CollectionConfig::default("", 0)
 }

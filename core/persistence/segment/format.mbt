@@ -14,14 +14,34 @@ pub(all) struct DataPointer {
   segment : String // Segment name
   offset : Int // Byte offset within segment
   length : Int // Record length in bytes
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for DataPointer with output(self, logger) {
+  logger.write_string("{ segment: ")
+  Show::output(self.segment, logger)
+  logger.write_string(", offset: ")
+  Show::output(self.offset, logger)
+  logger.write_string(", length: ")
+  Show::output(self.length, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Index entry - mapping from vector ID to data location
 pub(all) struct IndexEntry {
   id : @types.VectorId
   ptr : DataPointer
-} derive(Show)
+}
+
+///|
+pub impl Show for IndexEntry with output(self, logger) {
+  logger.write_string("{ id: ")
+  Show::output(self.id, logger)
+  logger.write_string(", ptr: ")
+  Show::output(self.ptr, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Segment writer - builds a segment in memory

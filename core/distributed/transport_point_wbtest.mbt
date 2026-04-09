@@ -70,7 +70,8 @@ test "transport_point/from_jsonl_rejects_invalid" {
   )
   // Missing vector
   assert_true(
-    TransportPoint::from_jsonl("{\"id\":{\"hi\":0,\"lo\":1},\"payload\":{}}") is None,
+    TransportPoint::from_jsonl("{\"id\":{\"hi\":0,\"lo\":1},\"payload\":{}}")
+    is None,
   )
 }
 

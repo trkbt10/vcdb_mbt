@@ -4,12 +4,12 @@
  * VectorDB: in-memory, no persistence, synchronous API.
  * PersistentDB: WAL + snapshot, async mutations, sync reads.
  *
- * Both hide MoonBit FFI details (hi/lo pairs, tuples, JSON encoding).
- * Consumers work with bigint IDs and plain JS objects.
+ * Both hide MoonBit FFI details (wire bytes, tuple encoding).
+ * Consumers work with VectorId (bigint for Int64Id) and plain JS objects.
  *
- * Storage conversion utilities (kvStoreToCallbacks, storageToCallbacks)
- * are also here — they bridge StorageAdapter/KeyValueStore to the FFI
- * callback shape required by PersistentDB.
+ * NOTE: Bytes16Id support in write operations (add/upsert) is currently
+ * blocked by a limitation in core/attr/bptree.mbt. Only Int64Id is
+ * fully supported for mutations at this time.
  */
 import type {
   VectorDbFfi,
@@ -27,7 +27,11 @@ import type {
 } from "./index.js";
 import type { StorageAdapter, StorageKindType } from "./storage/types.js";
 import { getVectorDbFfi } from "./ffi/loader.js";
-import { toHiLo, fromHiLo, nowNs } from "./ffi/vector-id.js";
+import {
+  int64ToWireBytes,
+  wireBytesBigInt,
+  nowNs,
+} from "./ffi/vector-id.js";
 
 const parsePayload = (json: string): Record<string, unknown> | null => {
   if (!json) return null;
@@ -37,6 +41,24 @@ const parsePayload = (json: string): Record<string, unknown> | null => {
     return null;
   }
 };
+
+/* ── VectorId ↔ wire bytes ───────────────────────────────────── */
+
+/**
+ * Encode a VectorId to the 16-byte wire format.
+ * VectorId is bigint (Int64Id only — Bytes16Id write path is not yet supported).
+ */
+function encodeId(id: VectorId): Uint8Array {
+  return int64ToWireBytes(id);
+}
+
+/**
+ * Decode a VectorId from the 16-byte wire format.
+ * Returns bigint (treating the result as Int64Id).
+ */
+function decodeId(buf: Uint8Array): VectorId {
+  return wireBytesBigInt(buf);
+}
 
 /* ══════════════════════════════════════════════════════════════ */
 /*  VectorDB — in-memory, no persistence                        */
@@ -80,23 +102,20 @@ export class VectorDB {
 
   add(id: VectorId, vector: number[]): void {
     this.checkDisposed();
-    const { hi, lo } = toHiLo(id);
-    const result = this.ffi.vcdb_add(this.instanceId, hi, lo, vector);
+    const result = this.ffi.vcdb_add(this.instanceId, encodeId(id), vector);
     if (result === -2) throw new Error("Vector already exists");
     if (result !== 0) throw new Error("Failed to add vector");
   }
 
   upsert(id: VectorId, vector: number[]): void {
     this.checkDisposed();
-    const { hi, lo } = toHiLo(id);
-    const result = this.ffi.vcdb_upsert(this.instanceId, hi, lo, vector);
+    const result = this.ffi.vcdb_upsert(this.instanceId, encodeId(id), vector);
     if (result !== 0) throw new Error("Failed to upsert vector");
   }
 
   get_(id: VectorId): number[] | undefined {
     this.checkDisposed();
-    const { hi, lo } = toHiLo(id);
-    const result = this.ffi.vcdb_get(this.instanceId, hi, lo);
+    const result = this.ffi.vcdb_get(this.instanceId, encodeId(id));
     return result._1 === 1 ? result._0 : undefined;
   }
 
@@ -104,21 +123,19 @@ export class VectorDB {
     this.checkDisposed();
     const results = this.ffi.vcdb_search(this.instanceId, query, k);
     return results.map((r) => ({
-      id: fromHiLo(r._0, r._1),
-      score: r._2,
+      id: decodeId(r._0),
+      score: r._1,
     }));
   }
 
   has(id: VectorId): boolean {
     this.checkDisposed();
-    const { hi, lo } = toHiLo(id);
-    return this.ffi.vcdb_has(this.instanceId, hi, lo) === 1;
+    return this.ffi.vcdb_has(this.instanceId, encodeId(id)) === 1;
   }
 
   remove(id: VectorId): boolean {
     this.checkDisposed();
-    const { hi, lo } = toHiLo(id);
-    return this.ffi.vcdb_remove(this.instanceId, hi, lo) === 1;
+    return this.ffi.vcdb_remove(this.instanceId, encodeId(id)) === 1;
   }
 
   serialize(): Uint8Array {
@@ -203,22 +220,21 @@ export class PersistentDB {
   async upsert(
     points: readonly { id: VectorId; vector: number[]; payload: Record<string, unknown> }[],
   ): Promise<void> {
-    const ffiPoints = points.map((p) => {
-      const { hi, lo } = toHiLo(p.id);
-      return { _0: hi, _1: lo, _2: p.vector, _3: JSON.stringify(p.payload) };
-    });
+    const ffiPoints = points.map((p) => ({
+      _0: encodeId(p.id),
+      _1: p.vector,
+      _2: JSON.stringify(p.payload),
+    }));
     await this.ffi.persistent_upsert(this.instanceId, ffiPoints, nowNs());
   }
 
   async remove(id: VectorId): Promise<boolean> {
-    const { hi, lo } = toHiLo(id);
-    return this.ffi.persistent_remove(this.instanceId, hi, lo, nowNs());
+    return this.ffi.persistent_remove(this.instanceId, encodeId(id), nowNs());
   }
 
   async updateAttrs(id: VectorId, attrs: Record<string, unknown>): Promise<boolean> {
-    const { hi, lo } = toHiLo(id);
     return this.ffi.persistent_update_attrs(
-      this.instanceId, hi, lo, JSON.stringify(attrs), nowNs(),
+      this.instanceId, encodeId(id), JSON.stringify(attrs), nowNs(),
     );
   }
 
@@ -234,32 +250,28 @@ export class PersistentDB {
 
   search(vector: number[], topK: number, filterJson: string = ""): readonly SearchHit[] {
     return this.ffi.persistent_search(this.instanceId, vector, topK, true, filterJson)
-      .map((r) => ({ id: fromHiLo(r._0, r._1), score: r._2, payload: parsePayload(r._3) }));
+      .map((r) => ({ id: decodeId(r._0), score: r._1, payload: parsePayload(r._2) }));
   }
 
   get(id: VectorId): PointRecord {
-    const { hi, lo } = toHiLo(id);
-    const r = this.ffi.persistent_get(this.instanceId, hi, lo, true);
+    const r = this.ffi.persistent_get(this.instanceId, encodeId(id), true);
     return { found: r._0, vector: r._1, payload: r._0 ? parsePayload(r._2) : null };
   }
 
   has(id: VectorId): boolean {
-    const { hi, lo } = toHiLo(id);
-    return this.ffi.persistent_has(this.instanceId, hi, lo);
+    return this.ffi.persistent_has(this.instanceId, encodeId(id));
   }
 
   scroll(offset: VectorId | undefined, limit: number): readonly ScrollEntry[] {
-    const hasOffset = offset !== undefined;
-    const { hi: oHi, lo: oLo } = hasOffset ? toHiLo(offset) : { hi: 0, lo: 0 };
-    return this.ffi.persistent_scroll(this.instanceId, oHi, oLo, hasOffset, limit, true)
-      .map((r) => ({ id: fromHiLo(r._0, r._1), payload: parsePayload(r._2) }));
+    const offsetBytes = offset !== undefined ? encodeId(offset) : new Uint8Array(0);
+    return this.ffi.persistent_scroll(this.instanceId, offsetBytes, limit, true)
+      .map((r) => ({ id: decodeId(r._0), payload: parsePayload(r._1) }));
   }
 
   scrollFiltered(filterJson: string, offset: VectorId | undefined, limit: number): readonly ScrollEntry[] {
-    const hasOffset = offset !== undefined;
-    const { hi: oHi, lo: oLo } = hasOffset ? toHiLo(offset) : { hi: 0, lo: 0 };
-    return this.ffi.persistent_scroll_filtered(this.instanceId, filterJson, oHi, oLo, hasOffset, limit, true)
-      .map((r) => ({ id: fromHiLo(r._0, r._1), payload: parsePayload(r._2) }));
+    const offsetBytes = offset !== undefined ? encodeId(offset) : new Uint8Array(0);
+    return this.ffi.persistent_scroll_filtered(this.instanceId, filterJson, offsetBytes, limit, true)
+      .map((r) => ({ id: decodeId(r._0), payload: parsePayload(r._1) }));
   }
 
   countFiltered(filterJson: string): number {
@@ -281,10 +293,6 @@ export class PersistentDB {
 /*  Storage → AsyncStorageCallbacks conversion                  */
 /* ══════════════════════════════════════════════════════════════ */
 
-/**
- * Kind-agnostic store interface (DOKeyValueStore, R2KeyValueStore, etc.).
- * Any object with these methods can be adapted to AsyncStorageCallbacks.
- */
 export interface KeyValueStore {
   read(path: string): Promise<Uint8Array | null>;
   write(path: string, data: Uint8Array): Promise<void>;
@@ -293,7 +301,6 @@ export interface KeyValueStore {
   list(): Promise<string[]>;
 }
 
-/** Adapt a KeyValueStore to AsyncStorageCallbacks (kind-agnostic). */
 export function kvStoreToCallbacks(store: KeyValueStore): AsyncStorageCallbacks {
   return {
     read: async (path: string, _kind: number): Promise<Uint8Array> => {
@@ -309,7 +316,6 @@ export function kvStoreToCallbacks(store: KeyValueStore): AsyncStorageCallbacks 
   };
 }
 
-/** Adapt a StorageAdapter to AsyncStorageCallbacks for a fixed kind. */
 export function storageToCallbacks(adapter: StorageAdapter, kind: StorageKindType): AsyncStorageCallbacks {
   return {
     read: async (path: string, _kind: number): Promise<Uint8Array> => {
@@ -329,11 +335,6 @@ export function storageToCallbacks(adapter: StorageAdapter, kind: StorageKindTyp
 /*  Standalone registration and init                            */
 /* ══════════════════════════════════════════════════════════════ */
 
-/**
- * Register WAL and snapshot storage with the persistent FFI.
- * Use when you need separate control over registration and initialization
- * (e.g., Cloudflare DO pattern). Otherwise prefer PersistentDB.create().
- */
 export function registerPersistentStorage(
   ffi: PersistentFfi,
   instanceId: number,
@@ -352,7 +353,6 @@ export function registerPersistentStorage(
   );
 }
 
-/** Initialize a persistent instance. Must be called after registerPersistentStorage(). */
 export async function initPersistentDB(
   ffi: PersistentFfi,
   instanceId: number,

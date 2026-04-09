@@ -7,7 +7,16 @@ pub(all) enum Metric {
   Cosine
   L2
   Dot
-} derive(Eq, Show)
+} derive(Eq)
+
+///|
+pub impl Show for Metric with output(self, logger) {
+  match self {
+    Cosine => logger.write_string("Cosine")
+    L2 => logger.write_string("L2")
+    Dot => logger.write_string("Dot")
+  }
+}
 
 ///|
 /// Canonical string representation of a Metric.
@@ -357,7 +366,23 @@ pub(all) enum VectorId {
   Int64Id(Int64)
   /// 128-bit byte array ID (UUID, ULID, or any 16-byte identifier)
   Bytes16Id(Bytes16)
-} derive(Show)
+}
+
+///|
+pub impl Show for VectorId with output(self, logger) {
+  match self {
+    Int64Id(v) => {
+      logger.write_string("Int64Id(")
+      Show::output(v, logger)
+      logger.write_string(")")
+    }
+    Bytes16Id(b) => {
+      logger.write_string("Bytes16Id(")
+      Show::output(b, logger)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 pub impl Eq for VectorId with equal(self, other) {
@@ -401,11 +426,43 @@ pub(all) enum AttrValue {
   Int(Int64)
   Float(Double)
   String(String)
-} derive(Eq, Show)
+} derive(Eq)
+
+///|
+pub impl Show for AttrValue with output(self, logger) {
+  match self {
+    Null => logger.write_string("Null")
+    Bool(b) => {
+      logger.write_string("Bool(")
+      Show::output(b, logger)
+      logger.write_string(")")
+    }
+    Int(n) => {
+      logger.write_string("Int(")
+      Show::output(n, logger)
+      logger.write_string(")")
+    }
+    Float(f) => {
+      logger.write_string("Float(")
+      Show::output(f, logger)
+      logger.write_string(")")
+    }
+    String(s) => {
+      logger.write_string("String(")
+      Show::output(s, logger)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 /// Attributes map - empty map as default
-pub(all) struct Attrs(Map[String, AttrValue]) derive(Show)
+pub(all) struct Attrs(Map[String, AttrValue])
+
+///|
+pub impl Show for Attrs with output(self, logger) {
+  Show::output(self.0, logger)
+}
 
 ///|
 /// Search result: id + score + attrs
@@ -413,14 +470,34 @@ pub(all) struct SearchHit {
   id : VectorId
   score : Double
   attrs : Attrs
-} derive(Show)
+}
+
+///|
+pub impl Show for SearchHit with output(self, logger) {
+  logger.write_string("{ id: ")
+  Show::output(self.id, logger)
+  logger.write_string(", score: ")
+  Show::output(self.score, logger)
+  logger.write_string(", attrs: ")
+  Show::output(self.attrs, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Result returned by get(): vector and attrs for an id
 pub(all) struct VectorRecord {
   vector : Array[Double]
   attrs : Attrs
-} derive(Show)
+}
+
+///|
+pub impl Show for VectorRecord with output(self, logger) {
+  logger.write_string("{ vector: ")
+  Show::output(self.vector, logger)
+  logger.write_string(", attrs: ")
+  Show::output(self.attrs, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// HNSW algorithm parameters
@@ -431,7 +508,24 @@ pub(all) struct HNSWParams {
   level_mult : Double // default: 1/ln(M)
   seed : UInt64 // default: 42
   allow_replace_deleted : Bool // default: false
-} derive(Show)
+}
+
+///|
+pub impl Show for HNSWParams with output(self, logger) {
+  logger.write_string("{ m: ")
+  Show::output(self.m, logger)
+  logger.write_string(", ef_construction: ")
+  Show::output(self.ef_construction, logger)
+  logger.write_string(", ef_search: ")
+  Show::output(self.ef_search, logger)
+  logger.write_string(", level_mult: ")
+  Show::output(self.level_mult, logger)
+  logger.write_string(", seed: ")
+  Show::output(self.seed, logger)
+  logger.write_string(", allow_replace_deleted: ")
+  Show::output(self.allow_replace_deleted, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// HNSW parameter constraints
@@ -451,7 +545,16 @@ pub let hnsw_ef_construction_max : Int = 1000
 pub(all) struct IVFParams {
   nlist : Int // default: 64
   nprobe : Int // default: sqrt(nlist)
-} derive(Show)
+}
+
+///|
+pub impl Show for IVFParams with output(self, logger) {
+  logger.write_string("{ nlist: ")
+  Show::output(self.nlist, logger)
+  logger.write_string(", nprobe: ")
+  Show::output(self.nprobe, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// IVF parameter constraints
@@ -466,7 +569,24 @@ pub(all) enum Strategy {
   Bruteforce
   HNSW(HNSWParams)
   IVF(IVFParams)
-} derive(Show)
+}
+
+///|
+pub impl Show for Strategy with output(self, logger) {
+  match self {
+    Bruteforce => logger.write_string("Bruteforce")
+    HNSW(params) => {
+      logger.write_string("HNSW(")
+      Show::output(params, logger)
+      logger.write_string(")")
+    }
+    IVF(params) => {
+      logger.write_string("IVF(")
+      Show::output(params, logger)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 /// Canonical string representation of a Strategy (name only, no params).
@@ -496,7 +616,20 @@ pub(all) struct DatabaseOptions {
   metric : Metric // default: Cosine
   capacity : Int // default: 1024
   strategy : Strategy // default: Bruteforce
-} derive(Show)
+}
+
+///|
+pub impl Show for DatabaseOptions with output(self, logger) {
+  logger.write_string("{ dim: ")
+  Show::output(self.dim, logger)
+  logger.write_string(", metric: ")
+  Show::output(self.metric, logger)
+  logger.write_string(", capacity: ")
+  Show::output(self.capacity, logger)
+  logger.write_string(", strategy: ")
+  Show::output(self.strategy, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Create default HNSW params
@@ -608,6 +741,100 @@ pub fn VectorId::to_display_string(self : VectorId) -> String {
 }
 
 ///|
+/// Encode a VectorId as a 16-byte wire representation.
+///
+/// This is the canonical FFI wire format for VectorId.
+/// - Int64Id(v): bytes 0-7 = v as big-endian Int64, bytes 8-15 = 0x00
+/// - Bytes16Id(b): bytes 0-15 = b as-is
+///
+/// JS callers receive a Uint8Array(16) and must use VectorId::from_wire_bytes
+/// to reconstruct the VectorId.
+pub fn VectorId::to_wire_bytes(self : VectorId) -> Bytes {
+  match self {
+    Int64Id(v) => {
+      let u = v.reinterpret_as_uint64()
+      Bytes::makei(16, fn(i) {
+        match i {
+          0 => ((u >> 56) & 0xFFUL).to_int().to_byte()
+          1 => ((u >> 48) & 0xFFUL).to_int().to_byte()
+          2 => ((u >> 40) & 0xFFUL).to_int().to_byte()
+          3 => ((u >> 32) & 0xFFUL).to_int().to_byte()
+          4 => ((u >> 24) & 0xFFUL).to_int().to_byte()
+          5 => ((u >> 16) & 0xFFUL).to_int().to_byte()
+          6 => ((u >> 8) & 0xFFUL).to_int().to_byte()
+          7 => (u & 0xFFUL).to_int().to_byte()
+          _ => b'\x00'
+        }
+      })
+    }
+    Bytes16Id(b) => {
+      let arr = [
+        b.b0, b.b1, b.b2, b.b3, b.b4, b.b5, b.b6, b.b7, b.b8, b.b9, b.b10,
+        b.b11, b.b12, b.b13, b.b14, b.b15,
+      ]
+      Bytes::from_array(arr[:])
+    }
+  }
+}
+
+///|
+/// Decode a VectorId from a 16-byte wire representation.
+///
+/// Inverse of VectorId::to_wire_bytes.
+/// - If bytes 8-15 are all 0x00, reconstructs as Int64Id (big-endian bytes 0-7).
+/// - Otherwise reconstructs as Bytes16Id.
+///
+/// Returns None if data length is not exactly 16 bytes.
+pub fn VectorId::from_wire_bytes(data : Bytes) -> VectorId? {
+  if data.length() != 16 {
+    return None
+  }
+  // Check if lower 8 bytes are all zero → Int64Id
+  let lower_zero = data[8] == b'\x00' &&
+    data[9] == b'\x00' &&
+    data[10] == b'\x00' &&
+    data[11] == b'\x00' &&
+    data[12] == b'\x00' &&
+    data[13] == b'\x00' &&
+    data[14] == b'\x00' &&
+    data[15] == b'\x00'
+  if lower_zero {
+    let v = (data[0].to_int64() << 56) |
+      (data[1].to_int64() << 48) |
+      (data[2].to_int64() << 40) |
+      (data[3].to_int64() << 32) |
+      (data[4].to_int64() << 24) |
+      (data[5].to_int64() << 16) |
+      (data[6].to_int64() << 8) |
+      data[7].to_int64()
+    Some(Int64Id(v))
+  } else {
+    Some(
+      Bytes16Id(
+        Bytes16::{
+          b0: data[0],
+          b1: data[1],
+          b2: data[2],
+          b3: data[3],
+          b4: data[4],
+          b5: data[5],
+          b6: data[6],
+          b7: data[7],
+          b8: data[8],
+          b9: data[9],
+          b10: data[10],
+          b11: data[11],
+          b12: data[12],
+          b13: data[13],
+          b14: data[14],
+          b15: data[15],
+        },
+      ),
+    )
+  }
+}
+
+///|
 /// Get a value from attrs
 pub fn Attrs::get(self : Attrs, key : String) -> AttrValue? {
   self.0.get(key)
@@ -660,7 +887,20 @@ pub(all) struct NumericRange {
   gte : Double? // greater than or equal
   lt : Double? // less than
   lte : Double? // less than or equal
-} derive(Show)
+}
+
+///|
+pub impl Show for NumericRange with output(self, logger) {
+  logger.write_string("{ gt: ")
+  Show::output(self.gt, logger)
+  logger.write_string(", gte: ")
+  Show::output(self.gte, logger)
+  logger.write_string(", lt: ")
+  Show::output(self.lt, logger)
+  logger.write_string(", lte: ")
+  Show::output(self.lte, logger)
+  logger.write_string(" }")
+}
 
 ///|
 pub fn NumericRange::empty() -> NumericRange {

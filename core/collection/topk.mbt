@@ -109,7 +109,16 @@ pub impl Scored for @types.SearchHit with score(self) -> Double {
 pub(all) struct ScoredItem {
   idx : Int
   s : Double
-} derive(Show)
+}
+
+///|
+pub impl Show for ScoredItem with output(self, logger) {
+  logger.write_string("ScoredItem { idx: ")
+  logger.write_string(self.idx.to_string())
+  logger.write_string(", s: ")
+  logger.write_string(self.s.to_string())
+  logger.write_string(" }")
+}
 
 ///|
 pub impl Scored for ScoredItem with score(self) -> Double {

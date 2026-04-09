@@ -10,7 +10,45 @@ pub(all) suberror GatewayError {
   CollectionExists(String)
   CollectionNotFound(String)
   StorageError(String)
-} derive(Show)
+}
+
+///|
+pub impl Show for GatewayError with output(self, logger) {
+  match self {
+    NotFound(s) => {
+      logger.write_string("NotFound(")
+      Show::output(s, logger)
+      logger.write_string(")")
+    }
+    InvalidInput(s) => {
+      logger.write_string("InvalidInput(")
+      Show::output(s, logger)
+      logger.write_string(")")
+    }
+    DimensionMismatch(expected~, got~) => {
+      logger.write_string("DimensionMismatch(expected: ")
+      Show::output(expected, logger)
+      logger.write_string(", got: ")
+      Show::output(got, logger)
+      logger.write_string(")")
+    }
+    CollectionExists(s) => {
+      logger.write_string("CollectionExists(")
+      Show::output(s, logger)
+      logger.write_string(")")
+    }
+    CollectionNotFound(s) => {
+      logger.write_string("CollectionNotFound(")
+      Show::output(s, logger)
+      logger.write_string(")")
+    }
+    StorageError(s) => {
+      logger.write_string("StorageError(")
+      Show::output(s, logger)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 /// Collection configuration
@@ -19,7 +57,20 @@ pub struct CollectionConfig {
   dim : Int
   metric : @types.Metric
   strategy : @types.Strategy
-} derive(Show)
+}
+
+///|
+pub impl Show for CollectionConfig with output(self, logger) {
+  logger.write_string("{ name: ")
+  Show::output(self.name, logger)
+  logger.write_string(", dim: ")
+  Show::output(self.dim, logger)
+  logger.write_string(", metric: ")
+  Show::output(self.metric, logger)
+  logger.write_string(", strategy: ")
+  Show::output(self.strategy, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Create default collection config
@@ -129,7 +180,18 @@ pub struct PointData {
   id : Int64
   vector : Array[Double]
   payload : @types.Attrs
-} derive(Show)
+}
+
+///|
+pub impl Show for PointData with output(self, logger) {
+  logger.write_string("{ id: ")
+  Show::output(self.id, logger)
+  logger.write_string(", vector: ")
+  Show::output(self.vector, logger)
+  logger.write_string(", payload: ")
+  Show::output(self.payload, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Parse point from JSON
@@ -176,7 +238,14 @@ pub fn PointData::to_json(self : PointData) -> Json {
 /// Upsert request (batch)
 pub struct UpsertRequest {
   points : Array[PointData]
-} derive(Show)
+}
+
+///|
+pub impl Show for UpsertRequest with output(self, logger) {
+  logger.write_string("{ points: ")
+  Show::output(self.points, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Parse upsert request from JSON
@@ -208,7 +277,22 @@ pub struct SearchRequest {
   filter : Json?
   with_payload : Bool
   with_vector : Bool
-} derive(Show)
+}
+
+///|
+pub impl Show for SearchRequest with output(self, logger) {
+  logger.write_string("{ vector: ")
+  Show::output(self.vector, logger)
+  logger.write_string(", limit: ")
+  Show::output(self.limit, logger)
+  logger.write_string(", filter: ")
+  Show::output(self.filter, logger)
+  logger.write_string(", with_payload: ")
+  Show::output(self.with_payload, logger)
+  logger.write_string(", with_vector: ")
+  Show::output(self.with_vector, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Parse search request from JSON
@@ -243,7 +327,20 @@ pub struct SearchHitResponse {
   score : Double
   payload : @types.Attrs?
   vector : Array[Double]?
-} derive(Show)
+}
+
+///|
+pub impl Show for SearchHitResponse with output(self, logger) {
+  logger.write_string("{ id: ")
+  Show::output(self.id, logger)
+  logger.write_string(", score: ")
+  Show::output(self.score, logger)
+  logger.write_string(", payload: ")
+  Show::output(self.payload, logger)
+  logger.write_string(", vector: ")
+  Show::output(self.vector, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Convert search hit to JSON
@@ -268,7 +365,16 @@ pub fn SearchHitResponse::to_json(self : SearchHitResponse) -> Json {
 pub struct SearchResponse {
   result : Array[SearchHitResponse]
   time_ms : Double
-} derive(Show)
+}
+
+///|
+pub impl Show for SearchResponse with output(self, logger) {
+  logger.write_string("{ result: ")
+  Show::output(self.result, logger)
+  logger.write_string(", time_ms: ")
+  Show::output(self.time_ms, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Convert search response to JSON
@@ -283,7 +389,18 @@ pub struct PointResponse {
   id : Int64
   payload : @types.Attrs
   vector : Array[Double]
-} derive(Show)
+}
+
+///|
+pub impl Show for PointResponse with output(self, logger) {
+  logger.write_string("{ id: ")
+  Show::output(self.id, logger)
+  logger.write_string(", payload: ")
+  Show::output(self.payload, logger)
+  logger.write_string(", vector: ")
+  Show::output(self.vector, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Convert point response to JSON
@@ -302,7 +419,20 @@ pub struct ScrollRequest {
   limit : Int
   with_payload : Bool
   with_vector : Bool
-} derive(Show)
+}
+
+///|
+pub impl Show for ScrollRequest with output(self, logger) {
+  logger.write_string("{ offset: ")
+  Show::output(self.offset, logger)
+  logger.write_string(", limit: ")
+  Show::output(self.limit, logger)
+  logger.write_string(", with_payload: ")
+  Show::output(self.with_payload, logger)
+  logger.write_string(", with_vector: ")
+  Show::output(self.with_vector, logger)
+  logger.write_string(" }")
+}
 
 ///|
 pub fn ScrollRequest::from_json(json : Json) -> ScrollRequest? {
@@ -323,7 +453,18 @@ pub struct ScrollPointResponse {
   id : Int64
   payload : @types.Attrs?
   vector : Array[Double]?
-} derive(Show)
+}
+
+///|
+pub impl Show for ScrollPointResponse with output(self, logger) {
+  logger.write_string("{ id: ")
+  Show::output(self.id, logger)
+  logger.write_string(", payload: ")
+  Show::output(self.payload, logger)
+  logger.write_string(", vector: ")
+  Show::output(self.vector, logger)
+  logger.write_string(" }")
+}
 
 ///|
 pub fn ScrollPointResponse::to_json(self : ScrollPointResponse) -> Json {
@@ -343,7 +484,16 @@ pub fn ScrollPointResponse::to_json(self : ScrollPointResponse) -> Json {
 pub struct ScrollResponse {
   points : Array[ScrollPointResponse]
   next_page_offset : Int64?
-} derive(Show)
+}
+
+///|
+pub impl Show for ScrollResponse with output(self, logger) {
+  logger.write_string("{ points: ")
+  Show::output(self.points, logger)
+  logger.write_string(", next_page_offset: ")
+  Show::output(self.next_page_offset, logger)
+  logger.write_string(" }")
+}
 
 ///|
 pub fn ScrollResponse::to_json(self : ScrollResponse) -> Json {
@@ -366,7 +516,22 @@ pub struct CollectionInfo {
   dim : Int
   metric : String
   strategy : String
-} derive(Show)
+}
+
+///|
+pub impl Show for CollectionInfo with output(self, logger) {
+  logger.write_string("{ name: ")
+  Show::output(self.name, logger)
+  logger.write_string(", vectors_count: ")
+  Show::output(self.vectors_count, logger)
+  logger.write_string(", dim: ")
+  Show::output(self.dim, logger)
+  logger.write_string(", metric: ")
+  Show::output(self.metric, logger)
+  logger.write_string(", strategy: ")
+  Show::output(self.strategy, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Convert collection info to JSON
@@ -384,7 +549,14 @@ pub fn CollectionInfo::to_json(self : CollectionInfo) -> Json {
 /// Collections list response
 pub struct CollectionsResponse {
   collections : Array[CollectionInfo]
-} derive(Show)
+}
+
+///|
+pub impl Show for CollectionsResponse with output(self, logger) {
+  logger.write_string("{ collections: ")
+  Show::output(self.collections, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Convert collections list to JSON
@@ -399,7 +571,18 @@ pub struct ApiResponse {
   status : String
   result : Json?
   error : String?
-} derive(Show)
+}
+
+///|
+pub impl Show for ApiResponse with output(self, logger) {
+  logger.write_string("{ status: ")
+  Show::output(self.status, logger)
+  logger.write_string(", result: ")
+  Show::output(self.result, logger)
+  logger.write_string(", error: ")
+  Show::output(self.error, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Create success response

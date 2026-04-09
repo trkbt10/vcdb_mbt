@@ -19,7 +19,19 @@ pub(all) enum PartitionStatus {
   Connected
   /// Shard is unreachable since the given timestamp (nanoseconds).
   Partitioned(Int64)
-} derive(Eq, Show)
+} derive(Eq)
+
+///|
+pub impl Show for PartitionStatus with output(self, logger) {
+  match self {
+    Connected => logger.write_string("Connected")
+    Partitioned(ts) => {
+      logger.write_string("Partitioned(")
+      Show::output(ts, logger)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 /// Tracks partition state across all shards.
@@ -120,7 +132,16 @@ pub(all) enum ConflictResolution {
   KeepRemote
   /// Same timestamp; resolved deterministically by ID.
   TieBreakById
-} derive(Eq, Show)
+} derive(Eq)
+
+///|
+pub impl Show for ConflictResolution with output(self, logger) {
+  match self {
+    KeepLocal => logger.write_string("KeepLocal")
+    KeepRemote => logger.write_string("KeepRemote")
+    TieBreakById => logger.write_string("TieBreakById")
+  }
+}
 
 ///|
 /// Resolve conflicts between local and remote WAL records using LWW.

@@ -1,29 +1,35 @@
 /**
  * @file Internal FFI type definitions for MoonBit JS target interop.
  *
- * This file defines the raw shapes that MoonBit's JS target emits.
- * Nothing here should be re-exported from the public API.
+ * This file mirrors the MoonBit FFI wire format exactly.
+ * It must not contain any JS-side opinions — only what MoonBit emits.
  *
- * Each FFI slice is a minimal interface covering one functional area.
- * Consumers declare which slice they need — they never see the full module.
+ * Wire format for VectorId: Uint8Array of exactly 16 bytes.
+ *   Int64Id(v)    → bytes 0-7 = v big-endian, bytes 8-15 = 0x00
+ *   Bytes16Id(b)  → bytes 0-15 = b as-is
  *
- * When the target changes (e.g. wasm-gc), only this file and the
- * conversion functions in vector-id.ts need to change.
+ * SoT: ffi/exports.mbt, VectorId::to_wire_bytes / VectorId::from_wire_bytes
+ * in core/types/types.mbt.
+ *
+ * When the MoonBit FFI changes, update this file first, then update
+ * packages/core to consume the new shapes.
  */
 
 /* ── MoonBit JS-target primitive representations ─────────────── */
 
-/** MoonBit Int64 as hi/lo i32 pair (JS target specific). */
-export type MbInt64 = { readonly hi: number; readonly lo: number };
-
 /** MoonBit tuple representations in JS target. */
 export type Tuple2<A, B> = { _0: A; _1: B };
 export type Tuple3<A, B, C> = { _0: A; _1: B; _2: C };
-export type Tuple4<A, B, C, D> = { _0: A; _1: B; _2: C; _3: D };
 
 /* ── FFI slices ──────────────────────────────────────────────── */
 
-/** In-memory VectorDB operations. */
+/**
+ * In-memory VectorDB operations.
+ *
+ * VectorId wire format: Uint8Array(16)
+ *   Returned IDs (from search) are Uint8Array(16).
+ *   Passed IDs (to add/upsert/get/has/remove) are Uint8Array(16).
+ */
 export interface VectorDbFfi {
   vcdb_create(dim: number): number;
   vcdb_create_hnsw(dim: number): number;
@@ -31,12 +37,18 @@ export interface VectorDbFfi {
   vcdb_destroy(instanceId: number): void;
   vcdb_size(instanceId: number): number;
   vcdb_dim(instanceId: number): number;
-  vcdb_add(instanceId: number, idHi: number, idLo: number, vector: number[]): number;
-  vcdb_upsert(instanceId: number, idHi: number, idLo: number, vector: number[]): number;
-  vcdb_get(instanceId: number, idHi: number, idLo: number): Tuple2<number[], number>;
-  vcdb_search(instanceId: number, query: number[], k: number): Array<Tuple3<number, number, number>>;
-  vcdb_has(instanceId: number, idHi: number, idLo: number): number;
-  vcdb_remove(instanceId: number, idHi: number, idLo: number): number;
+  /** Returns 0 on success, -2 if already exists, -1 on error. */
+  vcdb_add(instanceId: number, idBytes: Uint8Array, vector: number[]): number;
+  /** Returns 0 on success, -1 on error. */
+  vcdb_upsert(instanceId: number, idBytes: Uint8Array, vector: number[]): number;
+  /** Returns (vector, 1) if found, ([], 0) if not found, ([], -1) on error. */
+  vcdb_get(instanceId: number, idBytes: Uint8Array): Tuple2<number[], number>;
+  /** Returns Array of (idBytes: Uint8Array(16), score). */
+  vcdb_search(instanceId: number, query: number[], k: number): Array<Tuple2<Uint8Array, number>>;
+  /** Returns 1 if exists, 0 if not, -1 on error. */
+  vcdb_has(instanceId: number, idBytes: Uint8Array): number;
+  /** Returns 1 if removed, 0 if not found, -1 on error. */
+  vcdb_remove(instanceId: number, idBytes: Uint8Array): number;
   vcdb_serialize(instanceId: number): Uint8Array;
   vcdb_deserialize(data: Uint8Array): number;
 }
@@ -77,7 +89,14 @@ export interface AsyncStorageCallbacks {
   list(kind: number): Promise<string[]>;
 }
 
-/** Persistent VectorDB operations (WAL + snapshot). */
+/**
+ * Persistent VectorDB operations (WAL + snapshot).
+ *
+ * VectorId wire format: Uint8Array(16)
+ * Points tuple: (idBytes: Uint8Array(16), vector, payloadJson)
+ * Search result: (idBytes: Uint8Array(16), score, payloadJson)
+ * Scroll result: (idBytes: Uint8Array(16), payloadJson)
+ */
 export interface PersistentFfi {
   persistent_register_wal_storage(
     instanceId: number,
@@ -106,110 +125,100 @@ export interface PersistentFfi {
     metric: string,
     strategy: string,
   ): Promise<void>;
+  /** points: Array of (idBytes: Uint8Array(16), vector, payloadJson) */
   persistent_upsert(
     instanceId: number,
-    points: Array<Tuple4<number, number, number[], string>>,
-    timestampNs: MbInt64,
+    points: Array<Tuple3<Uint8Array, number[], string>>,
+    timestampNs: bigint,
   ): Promise<void>;
+  /** Returns Promise<boolean>: true if removed. */
   persistent_remove(
     instanceId: number,
-    idHi: number,
-    idLo: number,
-    timestampNs: MbInt64,
+    idBytes: Uint8Array,
+    timestampNs: bigint,
   ): Promise<boolean>;
   persistent_update_attrs(
     instanceId: number,
-    idHi: number,
-    idLo: number,
+    idBytes: Uint8Array,
     attrsJson: string,
-    timestampNs: MbInt64,
+    timestampNs: bigint,
   ): Promise<boolean>;
   persistent_checkpoint(instanceId: number): Promise<void>;
   persistent_compact(instanceId: number): Promise<number>;
   persistent_destroy(instanceId: number): void;
+  /** Returns Array of (idBytes: Uint8Array(16), score, payloadJson) */
   persistent_search(
     instanceId: number,
     query: number[],
     k: number,
     withPayload: boolean,
     filterJson: string,
-  ): Array<Tuple4<number, number, number, string>>;
+  ): Array<Tuple3<Uint8Array, number, string>>;
+  /** Returns (found, vector, payloadJson) */
   persistent_get(
     instanceId: number,
-    idHi: number,
-    idLo: number,
+    idBytes: Uint8Array,
     withPayload: boolean,
   ): Tuple3<boolean, number[], string>;
-  persistent_has(instanceId: number, idHi: number, idLo: number): boolean;
+  persistent_has(instanceId: number, idBytes: Uint8Array): boolean;
+  /** offset: Uint8Array(16) or empty Uint8Array to start from beginning */
   persistent_scroll(
     instanceId: number,
-    offsetHi: number,
-    offsetLo: number,
-    hasOffset: boolean,
+    offsetBytes: Uint8Array,
     limit: number,
     withPayload: boolean,
-  ): Array<Tuple3<number, number, string>>;
+  ): Array<Tuple2<Uint8Array, string>>;
   persistent_scroll_filtered(
     instanceId: number,
     filterJson: string,
-    offsetHi: number,
-    offsetLo: number,
-    hasOffset: boolean,
+    offsetBytes: Uint8Array,
     limit: number,
     withPayload: boolean,
-  ): Array<Tuple3<number, number, string>>;
+  ): Array<Tuple2<Uint8Array, string>>;
   persistent_count_filtered(instanceId: number, filterJson: string): number;
   persistent_db_size(instanceId: number): number;
   persistent_db_raw_size(instanceId: number): number;
   persistent_db_dim(instanceId: number): number;
 }
 
-/** CRUSH placement & distributed merge operations. */
+/**
+ * CRUSH placement & distributed merge operations.
+ *
+ * VectorId wire format: Uint8Array(16)
+ */
 export interface DistributedFfi {
-  crush_placement_group(idHi: number, idLo: number, pgCount: number): number;
+  /** id_bytes: Uint8Array(16). Returns placement group in [0, pgCount). */
+  crush_placement_group(idBytes: Uint8Array, pgCount: number): number;
+  /** shard hits: (idBytes: Uint8Array(16), score, payloadJson) */
   distributed_merge_search(
-    shardResults: Array<Tuple3<number, Array<Tuple4<number, number, number, string>>, string>>,
+    shardResults: Array<Tuple3<number, Array<Tuple3<Uint8Array, number, string>>, string>>,
     topK: number,
-  ): Tuple3<Array<Tuple4<number, number, number, string>>, number[], Array<Tuple2<number, string>>>;
+  ): Tuple3<Array<Tuple3<Uint8Array, number, string>>, number[], Array<Tuple2<number, string>>>;
+  /** shard entries: (idBytes: Uint8Array(16), attrsJson) */
   distributed_merge_scroll(
-    shardResults: Array<Tuple3<number, Array<Tuple3<number, number, string>>, string>>,
+    shardResults: Array<Tuple3<number, Array<Tuple2<Uint8Array, string>>, string>>,
     limit: number,
-  ): Tuple3<Array<Tuple3<number, number, string>>, number[], Array<Tuple2<number, string>>>;
+  ): Tuple3<Array<Tuple2<Uint8Array, string>>, number[], Array<Tuple2<number, string>>>;
   distributed_merge_count(
     shardResults: Array<Tuple3<number, number, string>>,
   ): Tuple3<number, number[], Array<Tuple2<number, string>>>;
+  /** points: (idBytes: Uint8Array(16), vector, payloadJson) */
   distributed_group_upsert(
-    points: Array<Tuple4<number, number, number[], string>>,
+    points: Array<Tuple3<Uint8Array, number[], string>>,
     pgCount: number,
-  ): Array<Tuple2<number, Array<Tuple4<number, number, number[], string>>>>;
-}
-
-/** Int64 string utilities (internal — not exposed in public API). */
-export interface Int64UtilFfi {
-  parse_int64(input: string): Tuple3<boolean, number, number>;
-  format_int64(hi: number, lo: number): string;
+  ): Array<Tuple2<number, Array<Tuple3<Uint8Array, number[], string>>>>;
 }
 
 /* ── Composite FFI types ────────────────────────────────────── */
 
 /**
- * Persistent + distributed FFI slice.
- *
- * Used by platform adapters that need persistent DB operations,
- * distributed routing, and Int64 utilities in a single FFI handle.
- */
-export type PersistentFFI = PersistentFfi & DistributedFfi & Int64UtilFfi;
-
-/**
  * Complete MoonBit JS-target module interface.
  *
- * This is the intersection of all FFI slices. Only the loader
- * needs this full type — all other code should depend on the
- * specific slice it actually uses.
+ * Only the loader needs this full type.
+ * All other code should depend on the specific slice it actually uses.
  */
 export type WasmModule =
   & VectorDbFfi
   & GatewayFfi
   & PersistentFfi
-  & DistributedFfi
-  & Int64UtilFfi;
+  & DistributedFfi;

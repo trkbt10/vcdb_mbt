@@ -8,7 +8,18 @@ pub struct CrushTarget {
   key : String // Logical storage key
   weight : Double // Device weight (default 1.0)
   zone : String? // Failure domain (optional)
-} derive(Show)
+}
+
+///|
+pub impl Show for CrushTarget with output(self, logger) {
+  logger.write_string("{ key: ")
+  Show::output(self.key, logger)
+  logger.write_string(", weight: ")
+  Show::output(self.weight, logger)
+  logger.write_string(", zone: ")
+  Show::output(self.zone, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Create a simple target with default weight
@@ -38,7 +49,18 @@ pub struct CrushMap {
   pgs : Int // Number of placement groups
   replicas : Int // Number of replicas per placement group
   targets : Array[CrushTarget] // Available storage targets
-} derive(Show)
+}
+
+///|
+pub impl Show for CrushMap with output(self, logger) {
+  logger.write_string("{ pgs: ")
+  Show::output(self.pgs, logger)
+  logger.write_string(", replicas: ")
+  Show::output(self.replicas, logger)
+  logger.write_string(", targets: ")
+  Show::output(self.targets, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Create a simple CRUSH map
@@ -55,7 +77,16 @@ pub fn CrushMap::new(
 pub struct LocateResult {
   pg : Int // Placement group number
   primaries : Array[String] // Ordered list of target keys
-} derive(Show)
+}
+
+///|
+pub impl Show for LocateResult with output(self, logger) {
+  logger.write_string("{ pg: ")
+  Show::output(self.pg, logger)
+  logger.write_string(", primaries: ")
+  Show::output(self.primaries, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// 32-bit mixing hash function for deterministic distribution
@@ -172,7 +203,16 @@ pub fn crush_primary(id : @types.VectorId, map : CrushMap) -> String? {
 pub(all) struct SegmentEntry {
   name : String // Segment name (e.g., "db.pg0.part0")
   target_key : String // Storage target key
-} derive(Show)
+}
+
+///|
+pub impl Show for SegmentEntry with output(self, logger) {
+  logger.write_string("{ name: ")
+  Show::output(self.name, logger)
+  logger.write_string(", target_key: ")
+  Show::output(self.target_key, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Placement manifest
@@ -182,7 +222,22 @@ pub(all) struct PlacementManifest {
   crush : CrushMap // CRUSH configuration used
   epoch : Int // Epoch number for CAS
   commit_ts : Int64 // Commit timestamp
-} derive(Show)
+}
+
+///|
+pub impl Show for PlacementManifest with output(self, logger) {
+  logger.write_string("{ base: ")
+  Show::output(self.base, logger)
+  logger.write_string(", segments: ")
+  Show::output(self.segments, logger)
+  logger.write_string(", crush: ")
+  Show::output(self.crush, logger)
+  logger.write_string(", epoch: ")
+  Show::output(self.epoch, logger)
+  logger.write_string(", commit_ts: ")
+  Show::output(self.commit_ts, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Move plan for rebalancing
@@ -190,7 +245,18 @@ pub(all) struct MovePlan {
   name : String // Segment name
   from : String // Source target key
   to : String // Destination target key
-} derive(Show)
+}
+
+///|
+pub impl Show for MovePlan with output(self, logger) {
+  logger.write_string("{ name: ")
+  Show::output(self.name, logger)
+  logger.write_string(", from: ")
+  Show::output(self.from, logger)
+  logger.write_string(", to: ")
+  Show::output(self.to, logger)
+  logger.write_string(" }")
+}
 
 ///|
 /// Extract placement group number from segment name

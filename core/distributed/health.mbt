@@ -20,7 +20,16 @@ pub(all) enum ShardStatus {
   Degraded
   /// Shard has exceeded the failure threshold and is considered unavailable.
   Failed
-} derive(Eq, Show)
+} derive(Eq)
+
+///|
+pub impl Show for ShardStatus with output(self, logger) {
+  match self {
+    Healthy => logger.write_string("Healthy")
+    Degraded => logger.write_string("Degraded")
+    Failed => logger.write_string("Failed")
+  }
+}
 
 ///|
 /// Health information for a single shard.

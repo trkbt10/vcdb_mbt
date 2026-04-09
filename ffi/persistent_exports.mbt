@@ -11,11 +11,8 @@ fn kind_to_int(kind : @storage.StorageKind) -> Int {
 ///|
 /// Persistent FFI exports — WAL-before-state durable operations.
 ///
-/// Unlike async_exports.mbt (which returns WAL bytes for JS to persist),
-/// these functions handle persistence internally:
-///   1. WAL is written to wal_storage (durable)
-///   2. VectorDB in-memory state is updated
-///   3. Checkpoint is triggered automatically when thresholds are exceeded
+/// Wire format for VectorId: Bytes of exactly 16 bytes.
+/// See VectorId::to_wire_bytes / VectorId::from_wire_bytes for details.
 ///
 /// JS callers must:
 ///   1. Register async storage callbacks via persistent_register_wal_storage /
@@ -24,8 +21,6 @@ fn kind_to_int(kind : @storage.StorageKind) -> Int {
 ///   3. Use persistent_upsert etc. — each returns a Promise
 ///
 /// Read operations (search, get, scroll) are synchronous — no Promise needed.
-///
-/// Mutation operations return @js_async.Promise because they involve async I/O.
 
 ///|
 /// Instance storage for persistent mode.
@@ -38,10 +33,6 @@ let persistent_instances : @hashmap.HashMap[
 ] = @hashmap.new()
 
 // ── Callback name derivation (SoT) ──────────────────────────
-//
-// All callback names are derived from instance_id via these two
-// functions. register, init, and destroy MUST use these — never
-// inline the prefix strings.
 
 ///|
 fn wal_callback_name(instance_id : Int) -> String {
@@ -76,8 +67,6 @@ fn parse_strategy_name(strategy : String) -> @types.Strategy raise Error {
 }
 
 ///|
-/// Create JsAsyncStorageCallbacks from raw JS callback functions.
-/// Adapts the Int-based kind parameter (JS side) to StorageKind (MoonBit side).
 fn make_storage_callbacks(
   read : (String, Int) -> @js_async.Promise[Bytes],
   write : (String, Bytes, Int) -> @js_async.Promise[Unit],
@@ -97,12 +86,6 @@ fn make_storage_callbacks(
 }
 
 ///|
-/// Register WAL storage callbacks for a specific instance.
-/// Must be called BEFORE persistent_init.
-///
-/// Parameters:
-///   instance_id — stable ID for this instance (e.g., FNV-1a hash of DO ID)
-///   read, write, atomic_write, del, exists, list — JS functions returning Promises
 pub fn persistent_register_wal_storage(
   instance_id : Int,
   read : (String, Int) -> @js_async.Promise[Bytes],
@@ -119,8 +102,6 @@ pub fn persistent_register_wal_storage(
 }
 
 ///|
-/// Register snapshot storage callbacks for a specific instance.
-/// Must be called BEFORE persistent_init.
 pub fn persistent_register_snapshot_storage(
   instance_id : Int,
   read : (String, Int) -> @js_async.Promise[Bytes],
@@ -137,19 +118,6 @@ pub fn persistent_register_snapshot_storage(
 }
 
 ///|
-/// Initialize a persistent VectorDB instance.
-/// Loads WAL + snapshot from registered storage, replays, builds VectorDB.
-///
-/// Parameters:
-///   instance_id — stable ID (same as used in register_*_storage calls)
-///   collection_name — determines WAL/snapshot file names
-///     (e.g., "questions" → "questions.vwal" + "questions.data.bin")
-///   base_path — optional prefix path (empty string for root)
-///   dim — vector dimension
-///   capacity — initial capacity hint
-///
-/// Returns a Promise that resolves when initialization is complete.
-/// The instance is then available for persistent_upsert, persistent_search, etc.
 pub fn persistent_init(
   instance_id : Int,
   collection_name : String,
@@ -209,62 +177,70 @@ fn try_get_persistent_db(
 }
 
 ///|
-/// Upsert points with WAL-before-state guarantee.
-/// Each point is (id_hi, id_lo, vector, payload_json).
-/// Returns a Promise that resolves when WAL is durable and state is updated.
+/// Upsert points. Each point is (id_bytes: Bytes, vector, payload_json).
+/// id_bytes must be exactly 16 bytes (wire format).
 pub fn persistent_upsert(
   instance_id : Int,
-  points : Array[(Int, Int, Array[Double], String)],
+  points : Array[(Bytes, Array[Double], String)],
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(async fn() {
     let db = get_persistent_db(instance_id)
-    let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = points.map(fn(
-        p,
-      ) {
-        let (id_hi, id_lo, vector, payload_json) = p
-        let vid = vid_from_pair(id_hi, id_lo)
-        let attrs = parse_json_to_attrs(payload_json)
-        (vid, vector, attrs)
-      },
-    )
+    let typed_points : Array[(@types.VectorId, Array[Double], @types.Attrs)] = []
+    for p in points {
+      let (id_bytes, vector, payload_json) = p
+      match @types.VectorId::from_wire_bytes(id_bytes) {
+        Some(vid) => {
+          let attrs = parse_json_to_attrs(payload_json)
+          typed_points.push((vid, vector, attrs))
+        }
+        None => raise @storage.AsyncIOFailed("persistent_upsert: invalid id_bytes")
+      }
+    }
     db.upsert(typed_points, timestamp_ns)
   })
 }
 
 ///|
-/// Remove a vector with WAL-before-state guarantee.
-/// Returns a Promise that resolves to true if the vector was found and removed.
+/// Remove a vector. id_bytes must be exactly 16 bytes (wire format).
 pub fn persistent_remove(
   instance_id : Int,
-  id_hi : Int,
-  id_lo : Int,
+  id_bytes : Bytes,
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Bool] {
   @js_async.Promise::from_async(async fn() {
     let db = get_persistent_db(instance_id)
-    db.remove(vid_from_pair(id_hi, id_lo), timestamp_ns)
+    match @types.VectorId::from_wire_bytes(id_bytes) {
+      Some(vid) => db.remove(vid, timestamp_ns)
+      None => raise @storage.AsyncIOFailed("persistent_remove: invalid id_bytes")
+    }
   })
 }
 
 ///|
-/// Update attributes with WAL-before-state guarantee.
+/// Update attributes. id_bytes must be exactly 16 bytes (wire format).
 pub fn persistent_update_attrs(
   instance_id : Int,
-  id_hi : Int,
-  id_lo : Int,
+  id_bytes : Bytes,
   attrs_json : String,
   timestamp_ns : Int64,
 ) -> @js_async.Promise[Bool] {
   @js_async.Promise::from_async(async fn() {
     let db = get_persistent_db(instance_id)
-    let attrs = parse_json_to_attrs(attrs_json)
-    db.update_attrs(vid_from_pair(id_hi, id_lo), attrs, timestamp_ns)
+    match @types.VectorId::from_wire_bytes(id_bytes) {
+      Some(vid) => {
+        let attrs = parse_json_to_attrs(attrs_json)
+        db.update_attrs(vid, attrs, timestamp_ns)
+      }
+      None =>
+        raise @storage.AsyncIOFailed(
+          "persistent_update_attrs: invalid id_bytes",
+        )
+    }
   })
 }
 
 ///|
-/// Force a checkpoint (snapshot + WAL truncate).
 pub fn persistent_checkpoint(instance_id : Int) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(async fn() {
     let db = get_persistent_db(instance_id)
@@ -273,7 +249,6 @@ pub fn persistent_checkpoint(instance_id : Int) -> @js_async.Promise[Unit] {
 }
 
 ///|
-/// Compact HNSW index. Returns removed count.
 pub fn persistent_compact(instance_id : Int) -> @js_async.Promise[Int] {
   @js_async.Promise::from_async(async fn() {
     let db = get_persistent_db(instance_id)
@@ -282,31 +257,32 @@ pub fn persistent_compact(instance_id : Int) -> @js_async.Promise[Int] {
 }
 
 ///|
-/// Destroy a persistent instance and clear its storage callbacks.
 pub fn persistent_destroy(instance_id : Int) -> Unit {
   persistent_instances.remove(instance_id)
   @storage.clear_js_async_callbacks(wal_callback_name(instance_id))
   @storage.clear_js_async_callbacks(snapshot_callback_name(instance_id))
 }
 
-// ── Synchronous read operations (no Promise needed) ──────────
+// ── Synchronous read operations ──────────────────────────────
 
 ///|
 /// Search by vector similarity.
+/// Returns Array of (id_bytes: Bytes, score: Double, payload_json: String).
+/// Each id_bytes is exactly 16 bytes in wire format.
 pub fn persistent_search(
   instance_id : Int,
   query : Array[Double],
   k : Int,
   with_payload : Bool,
   filter_json : String,
-) -> Array[(Int, Int, Double, String)] {
+) -> Array[(Bytes, Double, String)] {
   let db = match try_get_persistent_db(instance_id) {
     Some(db) => db
     None => return []
   }
   let filter = @filter.parse_filter_json(filter_json)
   let hits = db.search(query, k, filter)
-  let results : Array[(Int, Int, Double, String)] = []
+  let results : Array[(Bytes, Double, String)] = []
   for hit in hits {
     let payload_json = if with_payload {
       match db.get(hit.id) {
@@ -316,112 +292,121 @@ pub fn persistent_search(
     } else {
       ""
     }
-    let (hi, lo) = vid_to_pair(hit.id)
-    results.push((hi, lo, hit.score, payload_json))
+    results.push((@types.VectorId::to_wire_bytes(hit.id), hit.score, payload_json))
   }
   results
 }
 
 ///|
 /// Get a single vector and payload.
+/// id_bytes must be exactly 16 bytes (wire format).
+/// Returns (found: Bool, vector: Array[Double], payload_json: String).
 pub fn persistent_get(
   instance_id : Int,
-  id_hi : Int,
-  id_lo : Int,
+  id_bytes : Bytes,
   with_payload : Bool,
 ) -> (Bool, Array[Double], String) {
   let db = match try_get_persistent_db(instance_id) {
     Some(db) => db
     None => return (false, [], "")
   }
-  let vid = vid_from_pair(id_hi, id_lo)
-  match db.get(vid) {
-    Some(record) => {
-      let payload = if with_payload {
-        @codec.attrs_to_json(Some(record.attrs))
-      } else {
-        ""
+  match @types.VectorId::from_wire_bytes(id_bytes) {
+    Some(vid) =>
+      match db.get(vid) {
+        Some(record) => {
+          let payload = if with_payload {
+            @codec.attrs_to_json(Some(record.attrs))
+          } else {
+            ""
+          }
+          (true, record.vector, payload)
+        }
+        None => (false, [], "")
       }
-      (true, record.vector, payload)
-    }
     None => (false, [], "")
   }
 }
 
 ///|
-pub fn persistent_has(instance_id : Int, id_hi : Int, id_lo : Int) -> Bool {
+/// id_bytes must be exactly 16 bytes (wire format).
+pub fn persistent_has(instance_id : Int, id_bytes : Bytes) -> Bool {
   match try_get_persistent_db(instance_id) {
-    Some(db) => db.has(vid_from_pair(id_hi, id_lo))
+    Some(db) =>
+      match @types.VectorId::from_wire_bytes(id_bytes) {
+        Some(vid) => db.has(vid)
+        None => false
+      }
     None => false
   }
 }
 
 ///|
+/// Scroll through entries.
+/// offset_bytes: 16 bytes (wire format) or empty Bytes to start from beginning.
+/// Returns Array of (id_bytes: Bytes, payload_json: String).
 pub fn persistent_scroll(
   instance_id : Int,
-  offset_hi : Int,
-  offset_lo : Int,
-  has_offset : Bool,
+  offset_bytes : Bytes,
   limit : Int,
   with_payload : Bool,
-) -> Array[(Int, Int, String)] {
+) -> Array[(Bytes, String)] {
   let db = match try_get_persistent_db(instance_id) {
     Some(db) => db
     None => return []
   }
-  let offset_i64 : Int64? = if has_offset {
-    Some(vid_from_pair(offset_hi, offset_lo).to_int64())
+  let offset_id : Int64? = if offset_bytes.length() == 16 {
+    match @types.VectorId::from_wire_bytes(offset_bytes) {
+      Some(vid) => Some(vid.to_int64())
+      None => None
+    }
   } else {
     None
   }
-  let entries = db.scroll(offset=offset_i64, limit~)
-  let results : Array[(Int, Int, String)] = []
-  for entry in entries {
+  let entries = db.scroll(offset=offset_id, limit~)
+  entries.map(fn(entry) {
     let (vid, record) = entry
     let payload = if with_payload {
       @codec.attrs_to_json(Some(record.attrs))
     } else {
       ""
     }
-    let (hi, lo) = vid_to_pair(vid)
-    results.push((hi, lo, payload))
-  }
-  results
+    (@types.VectorId::to_wire_bytes(vid), payload)
+  })
 }
 
 ///|
+/// Filtered scroll.
+/// offset_bytes: 16 bytes (wire format) or empty Bytes to start from beginning.
 pub fn persistent_scroll_filtered(
   instance_id : Int,
   filter_json : String,
-  offset_hi : Int,
-  offset_lo : Int,
-  has_offset : Bool,
+  offset_bytes : Bytes,
   limit : Int,
   with_payload : Bool,
-) -> Array[(Int, Int, String)] {
+) -> Array[(Bytes, String)] {
   let db = match try_get_persistent_db(instance_id) {
     Some(db) => db
     None => return []
   }
-  let offset_i64 : Int64? = if has_offset {
-    Some(vid_from_pair(offset_hi, offset_lo).to_int64())
+  let offset_id : Int64? = if offset_bytes.length() == 16 {
+    match @types.VectorId::from_wire_bytes(offset_bytes) {
+      Some(vid) => Some(vid.to_int64())
+      None => None
+    }
   } else {
     None
   }
   let filter = @filter.parse_filter_json(filter_json)
-  let entries = db.scroll_filtered(expr=filter, offset=offset_i64, limit~)
-  let results : Array[(Int, Int, String)] = []
-  for entry in entries {
+  let entries = db.scroll_filtered(expr=filter, offset=offset_id, limit~)
+  entries.map(fn(entry) {
     let (vid, record) = entry
     let payload = if with_payload {
       @codec.attrs_to_json(Some(record.attrs))
     } else {
       ""
     }
-    let (hi, lo) = vid_to_pair(vid)
-    results.push((hi, lo, payload))
-  }
-  results
+    (@types.VectorId::to_wire_bytes(vid), payload)
+  })
 }
 
 ///|
