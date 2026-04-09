@@ -36,7 +36,7 @@ pub async fn[S : @storage.AsyncStorage] handle_delete_collection(CollectionManag
 
 pub async fn[S : @storage.AsyncStorage] handle_get_collection(CollectionManager[S], String) -> Result[CollectionInfo, GatewayError]
 
-pub fn[W, S] handle_get_point(@vcdb.PersistentDB[W, S], Int64) -> Result[PointResponse, GatewayError]
+pub fn[W, S] handle_get_point(@vcdb.PersistentDB[W, S], @types.VectorId) -> Result[PointResponse, GatewayError]
 
 pub fn handle_health() -> Json
 
@@ -156,7 +156,7 @@ pub fn PointData::to_json(Self) -> Json
 pub impl Show for PointData
 
 pub struct PointResponse {
-  id : Int64
+  id : @types.VectorId
   payload : @types.Attrs
   vector : Array[Double]
 }
@@ -164,7 +164,7 @@ pub fn PointResponse::to_json(Self) -> Json
 pub impl Show for PointResponse
 
 pub struct ScrollPointResponse {
-  id : Int64
+  id : @types.VectorId
   payload : @types.Attrs?
   vector : Array[Double]?
 }
@@ -182,13 +182,13 @@ pub impl Show for ScrollRequest
 
 pub struct ScrollResponse {
   points : Array[ScrollPointResponse]
-  next_page_offset : Int64?
+  next_page_offset : @types.VectorId?
 }
 pub fn ScrollResponse::to_json(Self) -> Json
 pub impl Show for ScrollResponse
 
 pub struct SearchHitResponse {
-  id : Int64
+  id : @types.VectorId
   score : Double
   payload : @types.Attrs?
   vector : Array[Double]?

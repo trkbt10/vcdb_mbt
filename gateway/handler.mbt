@@ -31,12 +31,7 @@ pub fn[W, S] handle_search(
     } else {
       None
     }
-    results.push({
-      id: hit.id.as_int64().unwrap(),
-      score: hit.score,
-      payload,
-      vector,
-    })
+    results.push({ id: hit.id, score: hit.score, payload, vector })
   }
   Ok({ result: results, time_ms: 0.0 })
 }
@@ -45,12 +40,12 @@ pub fn[W, S] handle_search(
 /// Handle get point by ID (sync)
 pub fn[W, S] handle_get_point(
   db : @vcdb.PersistentDB[W, S],
-  id : Int64,
+  id : @types.VectorId,
 ) -> Result[PointResponse, GatewayError] {
-  let vec_id = @types.VectorId::from_int64(id)
-  match db.get(vec_id) {
+  match db.get(id) {
     Some(record) => Ok({ id, payload: record.attrs, vector: record.vector })
-    None => Err(NotFound("Point with id " + id.to_string() + " not found"))
+    None =>
+      Err(NotFound("Point with id " + id.to_display_string() + " not found"))
   }
 }
 
@@ -64,12 +59,13 @@ pub fn[W, S] handle_scroll(
     Some(o) => Some(@types.VectorId::from_int64(o))
     None => None
   }
-  let entries = db.scroll(offset=vid_offset, limit=req.limit)
+  // Use scroll_filtered (> offset) semantics directly for Bytes16Id compatibility
+  let entries = db.scroll_filtered(offset=vid_offset, limit=req.limit)
   let points : Array[ScrollPointResponse] = []
   for i, entry in entries {
     let (id, record) = entry
     points.push({
-      id: id.as_int64().unwrap(),
+      id,
       payload: if req.with_payload {
         Some(record.attrs)
       } else {
@@ -83,11 +79,11 @@ pub fn[W, S] handle_scroll(
     })
     ignore(i)
   }
-  let next_page_offset = if entries.length() < req.limit {
+  let next_page_offset : @types.VectorId? = if entries.length() < req.limit {
     None
   } else {
     match entries.last() {
-      Some((id, _)) => Some(id.as_int64().unwrap() + 1L)
+      Some((id, _)) => Some(id)
       None => None
     }
   }
@@ -281,8 +277,8 @@ pub async fn[S : @storage.AsyncStorage] execute_request(
     }
     ("GET", ["collections", name, "points", id_str]) => {
       let parse_result : Result[Int64, _] = try? @string.parse_int64(id_str)
-      let id : Int64 = match parse_result {
-        Ok(i) => i
+      let id : @types.VectorId = match parse_result {
+        Ok(i) => @types.VectorId::from_int64(i)
         Err(_) => return ApiResponse::err("Invalid point ID")
       }
       match

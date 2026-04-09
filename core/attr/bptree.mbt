@@ -264,7 +264,7 @@ fn serialize_bptree(tree : BPTree) -> Bytes {
 
 ///|
 /// Deserialize a B+ tree node graph
-fn deserialize_bptree(data : Bytes) -> BPTree {
+fn deserialize_bptree(data : Bytes, version : UInt) -> BPTree {
   let r = @binary.BinaryReader::new(data)
   let order = r.read_u32().reinterpret_as_int()
   let root_idx = r.read_i32()
@@ -280,11 +280,17 @@ fn deserialize_bptree(data : Bytes) -> BPTree {
         let posting_count = r.read_u32().reinterpret_as_int()
         let value : Array[@types.VectorId] = []
         for _ in 0..<posting_count {
-          let wire_len = r.read_u32().reinterpret_as_int()
-          let wire = r.read_bytes(wire_len)
-          match @types.VectorId::from_wire_bytes(wire) {
-            Some(id) => value.push(id)
-            None => ()
+          if version <= 1U {
+            // v1: fixed 8-byte Int64
+            value.push(@types.Int64Id(r.read_i64()))
+          } else {
+            // v2+: length-prefixed wire bytes
+            let wire_len = r.read_u32().reinterpret_as_int()
+            let wire = r.read_bytes(wire_len)
+            match @types.VectorId::from_wire_bytes(wire) {
+              Some(id) => value.push(id)
+              None => ()
+            }
           }
         }
         entries.push({ key, value })
@@ -848,7 +854,7 @@ pub fn BPTreeAttrIndex::range(
 /// Serialize a B+ tree attribute index, including node graphs and stored attrs
 pub fn BPTreeAttrIndex::serialize(self : BPTreeAttrIndex) -> Bytes {
   let w = @binary.BinaryWriter::new()
-  w.push_u32(1U)
+  w.push_u32(2U) // v2: VectorId wire bytes format
   w.push_u32(self.order.reinterpret_as_uint())
   let data_count = self.data.length()
   w.push_u32(data_count.reinterpret_as_uint())
@@ -877,31 +883,38 @@ pub fn BPTreeAttrIndex::serialize(self : BPTreeAttrIndex) -> Bytes {
 /// Deserialize a B+ tree attribute index from serialized bytes
 pub fn BPTreeAttrIndex::deserialize(data : Bytes) -> BPTreeAttrIndex {
   let r = @binary.BinaryReader::new(data)
-  let _version = r.read_u32()
+  let version = r.read_u32()
   let order = r.read_u32().reinterpret_as_int()
   let data_map : Map[@types.VectorId, @types.Attrs] = {}
   let data_count = r.read_u32().reinterpret_as_int()
   for _ in 0..<data_count {
-    let wire_len = r.read_u32().reinterpret_as_int()
-    let wire = r.read_bytes(wire_len)
-    match @types.VectorId::from_wire_bytes(wire) {
-      Some(id) => data_map.set(id, read_attrs(r))
-      None => {
-        let _ = read_attrs(r)
-      } // skip invalid ID entry
+    if version <= 1U {
+      // v1: fixed 8-byte Int64 key
+      let id = @types.Int64Id(r.read_i64())
+      data_map.set(id, read_attrs(r))
+    } else {
+      // v2+: length-prefixed wire bytes key
+      let wire_len = r.read_u32().reinterpret_as_int()
+      let wire = r.read_bytes(wire_len)
+      match @types.VectorId::from_wire_bytes(wire) {
+        Some(id) => data_map.set(id, read_attrs(r))
+        None => {
+          let _ = read_attrs(r)
+        }
+      }
     }
   }
   let field_trees : Map[String, BPTree] = {}
   let field_tree_count = r.read_u32().reinterpret_as_int()
   for _ in 0..<field_tree_count {
     let field = read_string(r)
-    field_trees.set(field, deserialize_bptree(read_prefixed_bytes(r)))
+    field_trees.set(field, deserialize_bptree(read_prefixed_bytes(r), version))
   }
   let exists_trees : Map[String, BPTree] = {}
   let exists_tree_count = r.read_u32().reinterpret_as_int()
   for _ in 0..<exists_tree_count {
     let field = read_string(r)
-    exists_trees.set(field, deserialize_bptree(read_prefixed_bytes(r)))
+    exists_trees.set(field, deserialize_bptree(read_prefixed_bytes(r), version))
   }
   { field_trees, exists_trees, data: data_map, order }
 }

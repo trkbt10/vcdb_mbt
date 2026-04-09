@@ -9,7 +9,7 @@
 
 ///|
 /// Index file version
-pub let index_version : Byte = b'\x01'
+pub let index_version : Byte = b'\x02'
 
 ///|
 /// Index file header
@@ -152,11 +152,13 @@ pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
   let r = @binary.BinaryReader::new(data)
 
   // Header (12 bytes)
-  match @codec.read_header(r) {
+  let idx_version : Byte = match @codec.read_header(r) {
     None => return None
     Some((file_type, version)) =>
-      if file_type != Index || version != index_version {
+      if file_type != Index || (version != b'\x01' && version != b'\x02') {
         return None
+      } else {
+        version
       }
   }
 
@@ -182,12 +184,17 @@ pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
 
   // Entries
   let entries : Array[IndexEntry] = []
-  while r.remaining() >= 20 {
-    // Minimum entry: id(8) + nameLen(4) + name(0) + offset(4) + length(4)
-    let id_wire_len = r.read_u32().reinterpret_as_int()
-    let id = match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
-      Some(v) => v
-      None => @types.Int64Id(0L)
+  while r.remaining() >= 16 {
+    let id = if idx_version == b'\x01' {
+      // v1: fixed 8-byte Int64
+      @types.Int64Id(r.read_u64().reinterpret_as_int64())
+    } else {
+      // v2+: length-prefixed wire bytes
+      let id_wire_len = r.read_u32().reinterpret_as_int()
+      match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
+        Some(v) => v
+        None => @types.Int64Id(0L)
+      }
     }
     let name_len = r.read_u32().reinterpret_as_int()
 

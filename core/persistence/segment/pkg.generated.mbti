@@ -60,6 +60,7 @@ pub impl Show for IndexHeader
 pub struct SegmentReader {
   name : String
   data : Bytes
+  version : Byte
 }
 pub fn SegmentReader::collect(Self) -> Array[(@types.VectorId, Array[Double], @types.Attrs)]
 pub fn SegmentReader::from_bytes(String, Bytes) -> Self?

@@ -493,7 +493,7 @@ test "request/scroll_points" {
           _ => assert_true(false)
         }
         match result.get("next_page_offset") {
-          Some(Number(offset, ..)) => assert_eq(offset, 2.0)
+          Some(Number(offset, ..)) => assert_eq(offset, 1.0)
           _ => assert_true(false)
         }
       }

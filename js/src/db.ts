@@ -33,8 +33,9 @@ import {
   nowNs,
 } from "./ffi/vector-id.js";
 
-/** Auto-incrementing instance ID for PersistentDB instances without explicit IDs. */
-let nextPersistentInstanceId = 1;
+/** Generate a unique instance ID using random values to avoid collisions across workers. */
+const generateInstanceId = (): number =>
+  Math.floor(Math.random() * 0x7FFFFFFF) + 1;
 
 const parsePayload = (json: string): Record<string, unknown> | null => {
   if (!json) return null;
@@ -188,7 +189,7 @@ export class PersistentDB {
 
   static async create(options: PersistentDBOptions): Promise<PersistentDB> {
     const ffi = getPersistentFfi();
-    const instanceId = options.instanceId ?? nextPersistentInstanceId++;
+    const instanceId = options.instanceId ?? generateInstanceId();
     const {
       dim,
       capacity,

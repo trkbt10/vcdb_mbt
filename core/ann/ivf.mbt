@@ -223,6 +223,8 @@ pub fn ivf_find(
 /// Serialize IVF state to bytes
 pub fn ivf_serialize(state : IVFState, dim : Int) -> Bytes {
   let w = @binary.BinaryWriter::new()
+  // Version marker: v2 uses VectorId wire bytes
+  w.push_u32(2U)
   // Write centroid_count
   w.push_i32(state.centroid_count)
   // Write centroids (flattened array)
@@ -247,8 +249,15 @@ pub fn ivf_serialize(state : IVFState, dim : Int) -> Bytes {
 /// Deserialize IVF state from bytes
 pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
   let r = @binary.BinaryReader::new(data)
+  // Detect format version: v2 starts with 0x00000002, old format starts with centroid_count
+  let first_u32 = r.read_u32()
+  let version = if first_u32 == 2U { 2 } else { 1 }
   // Read centroid_count
-  state.centroid_count = r.read_i32()
+  state.centroid_count = if version >= 2 {
+    r.read_i32()
+  } else {
+    first_u32.reinterpret_as_int()
+  }
   // Read centroids
   let centroid_len = state.nlist * dim
   for i in 0..<centroid_len {
@@ -267,14 +276,22 @@ pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
   for li in 0..<nlist {
     let list_len = r.read_u32().reinterpret_as_int()
     for _ in 0..<list_len {
-      let wire_len = r.read_u32().reinterpret_as_int()
-      let wire = r.read_bytes(wire_len)
-      match @types.VectorId::from_wire_bytes(wire) {
-        Some(id) => {
-          state.lists[li].push(id)
-          state.id_to_list.set(id, li)
+      if version >= 2 {
+        let wire_len = r.read_u32().reinterpret_as_int()
+        let wire = r.read_bytes(wire_len)
+        match @types.VectorId::from_wire_bytes(wire) {
+          Some(id) => {
+            state.lists[li].push(id)
+            state.id_to_list.set(id, li)
+          }
+          None => ()
         }
-        None => ()
+      } else {
+        // v1: fixed 8-byte Int64
+        let id_val = r.read_u64().reinterpret_as_int64()
+        let id = @types.Int64Id(id_val)
+        state.lists[li].push(id)
+        state.id_to_list.set(id, li)
       }
     }
   }

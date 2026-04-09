@@ -6,7 +6,7 @@
 
 ///|
 /// Segment format version
-pub let segment_version : Byte = b'\x01'
+pub let segment_version : Byte = b'\x02'
 
 ///|
 /// Data pointer - reference to a record within a segment
@@ -119,6 +119,7 @@ pub fn SegmentWriter::get_name(self : SegmentWriter) -> String {
 pub struct SegmentReader {
   name : String
   data : Bytes
+  version : Byte
 }
 
 ///|
@@ -131,8 +132,8 @@ pub fn SegmentReader::from_bytes(name : String, data : Bytes) -> SegmentReader? 
   match @codec.read_header(r) {
     None => None
     Some((file_type, version)) =>
-      if file_type == Segment && version == segment_version {
-        Some({ name, data })
+      if file_type == Segment && (version == b'\x01' || version == b'\x02') {
+        Some({ name, data, version })
       } else {
         None
       }
@@ -153,10 +154,16 @@ pub fn SegmentReader::read_at(
   let r = @binary.BinaryReader::new(self.data)
   r.skip(offset)
   // Read ID
-  let id_wire_len = r.read_u32().reinterpret_as_int()
-  let id = match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
-    Some(v) => v
-    None => @types.Int64Id(0L)
+  let id = if self.version == b'\x01' {
+    // v1: fixed 8-byte Int64
+    @types.Int64Id(r.read_u64().reinterpret_as_int64())
+  } else {
+    // v2+: length-prefixed wire bytes
+    let id_wire_len = r.read_u32().reinterpret_as_int()
+    match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
+      Some(v) => v
+      None => @types.Int64Id(0L)
+    }
   }
   // Read lengths
   let attrs_len = r.read_u32().reinterpret_as_int()
@@ -190,10 +197,14 @@ pub fn SegmentReader::collect(
   r.skip(@codec.header_size) // Skip header
   while r.remaining() >= 16 {
     // Read ID
-    let id_wire_len = r.read_u32().reinterpret_as_int()
-    let id = match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
-      Some(v) => v
-      None => @types.Int64Id(0L)
+    let id = if self.version == b'\x01' {
+      @types.Int64Id(r.read_u64().reinterpret_as_int64())
+    } else {
+      let id_wire_len = r.read_u32().reinterpret_as_int()
+      match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
+        Some(v) => v
+        None => @types.Int64Id(0L)
+      }
     }
     // Read lengths
     let attrs_len = r.read_u32().reinterpret_as_int()

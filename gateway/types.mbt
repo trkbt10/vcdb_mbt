@@ -323,7 +323,7 @@ pub fn SearchRequest::from_json(json : Json) -> SearchRequest? {
 ///|
 /// Search hit (result item)
 pub struct SearchHitResponse {
-  id : Int64
+  id : @types.VectorId
   score : Double
   payload : @types.Attrs?
   vector : Array[Double]?
@@ -345,8 +345,12 @@ pub impl Show for SearchHitResponse with output(self, logger) {
 ///|
 /// Convert search hit to JSON
 pub fn SearchHitResponse::to_json(self : SearchHitResponse) -> Json {
+  let id_json : Json = match self.id {
+    Int64Id(v) => v.to_double().to_json()
+    Bytes16Id(_) => self.id.to_display_string().to_json()
+  }
   let parts : Array[(String, Json)] = [
-    ("id", self.id.to_double().to_json()),
+    ("id", id_json),
     ("score", self.score.to_json()),
   ]
   match self.payload {
@@ -386,7 +390,7 @@ pub fn SearchResponse::to_json(self : SearchResponse) -> Json {
 ///|
 /// Point response (for get operations)
 pub struct PointResponse {
-  id : Int64
+  id : @types.VectorId
   payload : @types.Attrs
   vector : Array[Double]
 }
@@ -405,8 +409,12 @@ pub impl Show for PointResponse with output(self, logger) {
 ///|
 /// Convert point response to JSON
 pub fn PointResponse::to_json(self : PointResponse) -> Json {
+  let id_json : Json = match self.id {
+    Int64Id(v) => v.to_double().to_json()
+    Bytes16Id(_) => self.id.to_display_string().to_json()
+  }
   json_object([
-    ("id", self.id.to_double().to_json()),
+    ("id", id_json),
     ("payload", attrs_to_json(self.payload)),
     ("vector", vector_to_json(self.vector)),
   ])
@@ -450,7 +458,7 @@ pub fn ScrollRequest::from_json(json : Json) -> ScrollRequest? {
 
 ///|
 pub struct ScrollPointResponse {
-  id : Int64
+  id : @types.VectorId
   payload : @types.Attrs?
   vector : Array[Double]?
 }
@@ -468,7 +476,11 @@ pub impl Show for ScrollPointResponse with output(self, logger) {
 
 ///|
 pub fn ScrollPointResponse::to_json(self : ScrollPointResponse) -> Json {
-  let parts : Array[(String, Json)] = [("id", self.id.to_double().to_json())]
+  let id_json : Json = match self.id {
+    Int64Id(v) => v.to_double().to_json()
+    Bytes16Id(_) => self.id.to_display_string().to_json()
+  }
+  let parts : Array[(String, Json)] = [("id", id_json)]
   match self.payload {
     Some(payload) => parts.push(("payload", attrs_to_json(payload)))
     None => ()
@@ -483,7 +495,7 @@ pub fn ScrollPointResponse::to_json(self : ScrollPointResponse) -> Json {
 ///|
 pub struct ScrollResponse {
   points : Array[ScrollPointResponse]
-  next_page_offset : Int64?
+  next_page_offset : @types.VectorId?
 }
 
 ///|
@@ -501,8 +513,13 @@ pub fn ScrollResponse::to_json(self : ScrollResponse) -> Json {
     ("points", Json::array(self.points.map(fn(point) { point.to_json() }))),
   ]
   match self.next_page_offset {
-    Some(offset) =>
-      parts.push(("next_page_offset", offset.to_double().to_json()))
+    Some(offset) => {
+      let offset_json : Json = match offset {
+        Int64Id(v) => v.to_double().to_json()
+        Bytes16Id(_) => offset.to_display_string().to_json()
+      }
+      parts.push(("next_page_offset", offset_json))
+    }
     None => ()
   }
   json_object(parts)
