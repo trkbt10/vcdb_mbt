@@ -21,7 +21,7 @@ test "attr/basic_eq" {
   inspect(result_a.length(), content="2")
   let result_b = index.eq("category", @types.String("B"))
   inspect(result_b.length(), content="1")
-  inspect(result_b[0].to_int64(), content="2")
+  inspect(result_b[0], content="Int64Id(2)")
 }
 
 ///|
@@ -120,13 +120,13 @@ test "basic/type_disambiguation" {
   index.set_attrs(id3, attrs3)
   let result_int = index.eq("val", @types.Int(1L))
   inspect(result_int.length(), content="1")
-  inspect(result_int[0].to_int64(), content="1")
+  inspect(result_int[0], content="Int64Id(1)")
   let result_float = index.eq("val", @types.Float(1.0))
   inspect(result_float.length(), content="1")
-  inspect(result_float[0].to_int64(), content="2")
+  inspect(result_float[0], content="Int64Id(2)")
   let result_string = index.eq("val", @types.String("1"))
   inspect(result_string.length(), content="1")
-  inspect(result_string[0].to_int64(), content="3")
+  inspect(result_string[0], content="Int64Id(3)")
 }
 
 ///|
@@ -148,4 +148,39 @@ test "basic/attrs_defensive_copy" {
   }
   let results = index.eq("tag", @types.String("A"))
   inspect(results.length(), content="1")
+}
+
+///|
+/// Bytes16Id works in BasicAttrIndex: set, get, eq, exists, remove, range
+test "basic/bytes16id_full_operations" {
+  let index = BasicAttrIndex::new()
+  let uuid_id = @types.VectorId::from_uuid_string(
+    "550e8400-e29b-41d4-a716-446655440000",
+  ).unwrap()
+  let int_id = @types.VectorId::from_int(1)
+  let attrs_uuid = @types.empty_attrs()
+  attrs_uuid.set("type", @types.String("product"))
+  attrs_uuid.set("score", @types.Int(90L))
+  let attrs_int = @types.empty_attrs()
+  attrs_int.set("type", @types.String("product"))
+  attrs_int.set("score", @types.Int(50L))
+  index.set_attrs(uuid_id, attrs_uuid)
+  index.set_attrs(int_id, attrs_int)
+  // Size
+  inspect(index.size(), content="2")
+  // Get
+  inspect(index.get_attrs(uuid_id) is Some(_), content="true")
+  // Eq
+  inspect(index.eq("type", @types.String("product")).length(), content="2")
+  // Exists
+  inspect(index.exists("score").length(), content="2")
+  // Range
+  match index.range("score", @types.NumericRange::between(80.0, 100.0)) {
+    Some(ids) => inspect(ids.length(), content="1")
+    None => inspect(false, content="true")
+  }
+  // Remove Bytes16Id
+  index.remove_id(uuid_id)
+  inspect(index.size(), content="1")
+  inspect(index.eq("type", @types.String("product")).length(), content="1")
 }

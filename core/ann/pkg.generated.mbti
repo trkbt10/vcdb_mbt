@@ -89,7 +89,7 @@ pub struct IVFState {
   mut centroid_count : Int
   centroids : Array[Double]
   lists : Array[Array[@types.VectorId]]
-  id_to_list : Map[Int64, Int]
+  id_to_list : Map[@types.VectorId, Int]
 }
 pub fn IVFState::new(@types.IVFParams, @types.Metric, Int) -> Self
 

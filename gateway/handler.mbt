@@ -31,7 +31,12 @@ pub fn[W, S] handle_search(
     } else {
       None
     }
-    results.push({ id: hit.id.to_int64(), score: hit.score, payload, vector })
+    results.push({
+      id: hit.id.as_int64().unwrap(),
+      score: hit.score,
+      payload,
+      vector,
+    })
   }
   Ok({ result: results, time_ms: 0.0 })
 }
@@ -55,12 +60,16 @@ pub fn[W, S] handle_scroll(
   db : @vcdb.PersistentDB[W, S],
   req : ScrollRequest,
 ) -> Result[ScrollResponse, GatewayError] {
-  let entries = db.scroll(offset=req.offset, limit=req.limit)
+  let vid_offset = match req.offset {
+    Some(o) => Some(@types.VectorId::from_int64(o))
+    None => None
+  }
+  let entries = db.scroll(offset=vid_offset, limit=req.limit)
   let points : Array[ScrollPointResponse] = []
   for i, entry in entries {
     let (id, record) = entry
     points.push({
-      id: id.to_int64(),
+      id: id.as_int64().unwrap(),
       payload: if req.with_payload {
         Some(record.attrs)
       } else {
@@ -78,7 +87,7 @@ pub fn[W, S] handle_scroll(
     None
   } else {
     match entries.last() {
-      Some((id, _)) => Some(id.to_int64() + 1L)
+      Some((id, _)) => Some(id.as_int64().unwrap() + 1L)
       None => None
     }
   }

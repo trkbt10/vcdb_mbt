@@ -25,7 +25,7 @@ pub fn attr_value_to_number(value : @types.AttrValue) -> Double? {
 /// Sorted entry for numeric index (value, id) pair
 pub struct NumEntry {
   value : Double
-  id : Int64
+  id : @types.VectorId
 }
 
 ///|
@@ -101,7 +101,10 @@ pub fn sort_num_entries(arr : Array[NumEntry]) -> Unit {
 ///|
 /// Remove an Int64 value from an array using swap-and-pop
 /// Returns true if the value was found and removed
-pub fn remove_int64_swap(arr : Array[Int64], value : Int64) -> Bool {
+pub fn remove_vectorid_swap(
+  arr : Array[@types.VectorId],
+  value : @types.VectorId,
+) -> Bool {
   let mut found_idx = -1
   for i in 0..<arr.length() {
     if arr[i] == value {
@@ -124,7 +127,10 @@ pub fn remove_int64_swap(arr : Array[Int64], value : Int64) -> Bool {
 ///|
 /// Remove a NumEntry by id from an array using swap-and-pop
 /// Returns true if the entry was found and removed
-pub fn remove_num_entry_swap(arr : Array[NumEntry], id : Int64) -> Bool {
+pub fn remove_num_entry_swap(
+  arr : Array[NumEntry],
+  id : @types.VectorId,
+) -> Bool {
   let mut found_idx = -1
   for i in 0..<arr.length() {
     if arr[i].id == id {

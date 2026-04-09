@@ -1,12 +1,18 @@
 ///|
-/// remove_int64_swap utility function
-test "attr/remove_int64_swap" {
-  let arr : Array[Int64] = [1L, 2L, 3L, 4L, 5L]
-  inspect(remove_int64_swap(arr, 3L), content="true")
+/// remove_vectorid_swap utility function
+test "attr/remove_vectorid_swap" {
+  let arr : Array[@types.VectorId] = [
+    @types.Int64Id(1L),
+    @types.Int64Id(2L),
+    @types.Int64Id(3L),
+    @types.Int64Id(4L),
+    @types.Int64Id(5L),
+  ]
+  inspect(remove_vectorid_swap(arr, @types.Int64Id(3L)), content="true")
   inspect(arr.length(), content="4")
-  inspect(remove_int64_swap(arr, 99L), content="false")
+  inspect(remove_vectorid_swap(arr, @types.Int64Id(99L)), content="false")
   inspect(arr.length(), content="4")
-  inspect(remove_int64_swap(arr, 5L), content="true")
+  inspect(remove_vectorid_swap(arr, @types.Int64Id(5L)), content="true")
   inspect(arr.length(), content="3")
 }
 
@@ -14,13 +20,13 @@ test "attr/remove_int64_swap" {
 /// remove_num_entry_swap utility function
 test "attr/remove_num_entry_swap" {
   let arr : Array[NumEntry] = [
-    NumEntry::{ value: 1.0, id: 10L },
-    NumEntry::{ value: 2.0, id: 20L },
-    NumEntry::{ value: 3.0, id: 30L },
+    NumEntry::{ value: 1.0, id: @types.Int64Id(10L) },
+    NumEntry::{ value: 2.0, id: @types.Int64Id(20L) },
+    NumEntry::{ value: 3.0, id: @types.Int64Id(30L) },
   ]
-  inspect(remove_num_entry_swap(arr, 20L), content="true")
+  inspect(remove_num_entry_swap(arr, @types.Int64Id(20L)), content="true")
   inspect(arr.length(), content="2")
-  inspect(remove_num_entry_swap(arr, 99L), content="false")
+  inspect(remove_num_entry_swap(arr, @types.Int64Id(99L)), content="false")
   inspect(arr.length(), content="2")
 }
 

@@ -101,14 +101,8 @@ test "wire/bytes16_not_confused_with_int64" {
 test "wire/invalid_length_returns_none" {
   assert_eq(@types.VectorId::from_wire_bytes(b""), None)
   assert_eq(@types.VectorId::from_wire_bytes(b"\x00\x01"), None)
-  assert_eq(
-    @types.VectorId::from_wire_bytes(Bytes::make(15, b'\x00')),
-    None,
-  )
-  assert_eq(
-    @types.VectorId::from_wire_bytes(Bytes::make(17, b'\x00')),
-    None,
-  )
+  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(15, b'\x00')), None)
+  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(17, b'\x00')), None)
 }
 
 ///|
@@ -129,11 +123,7 @@ test "ffi/int64_add_has_get_remove" {
 }
 
 ///|
-/// Bytes16Id wire format: encode/decode round-trip is correct at the type level.
-/// NOTE: vcdb_add with Bytes16Id is blocked by BPTreeAttrIndex::set_attrs
-/// which calls VectorId::to_int64() and aborts on Bytes16Id.
-/// This is a known limitation in core/attr/bptree.mbt that must be fixed
-/// before Bytes16Id can be used in write operations.
+/// Bytes16Id wire format: encode/decode round-trip at the type level.
 test "ffi/bytes16_wire_roundtrip_only" {
   let uuid = "550e8400-e29b-41d4-a716-446655440000"
   let id = @types.VectorId::from_uuid_string(uuid).unwrap()
@@ -141,6 +131,54 @@ test "ffi/bytes16_wire_roundtrip_only" {
   assert_eq(wire.length(), 16)
   let decoded = @types.VectorId::from_wire_bytes(wire)
   assert_eq(decoded, Some(id))
+}
+
+///|
+/// Bytes16Id (UUID) can be added, has'd, get'd, searched, and removed
+test "ffi/bytes16_full_db_operations" {
+  let inst = vcdb_create(4)
+  let uuid = "550e8400-e29b-41d4-a716-446655440000"
+  let id = @types.VectorId::from_uuid_string(uuid).unwrap()
+  let wire = @types.VectorId::to_wire_bytes(id)
+  // Add
+  let add_result = vcdb_add(inst, wire, [1.0, 0.0, 0.0, 0.0])
+  assert_eq(add_result, 0)
+  // Has
+  let has_result = vcdb_has(inst, wire)
+  assert_eq(has_result, 1)
+  // Get
+  let get_result = vcdb_get(inst, wire)
+  assert_eq(get_result.1, 1)
+  // Search
+  let search_results = vcdb_search(inst, [1.0, 0.0, 0.0, 0.0], 1)
+  assert_eq(search_results.length(), 1)
+  let decoded = @types.VectorId::from_wire_bytes(search_results[0].0)
+  assert_eq(decoded, Some(id))
+  // Remove
+  let remove_result = vcdb_remove(inst, wire)
+  assert_eq(remove_result, 1)
+  let has_after = vcdb_has(inst, wire)
+  assert_eq(has_after, 0)
+  vcdb_destroy(inst)
+}
+
+///|
+/// Mixed Int64Id and Bytes16Id in same DB
+test "ffi/mixed_int64_and_bytes16" {
+  let inst = vcdb_create(3)
+  let int_id = @types.Int64Id(42L)
+  let uuid_id = @types.VectorId::from_uuid_string(
+    "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  ).unwrap()
+  let w_int = int_id.to_wire_bytes()
+  let w_uuid = uuid_id.to_wire_bytes()
+  let _ = vcdb_add(inst, w_int, [1.0, 0.0, 0.0])
+  let _ = vcdb_add(inst, w_uuid, [0.0, 1.0, 0.0])
+  assert_eq(vcdb_has(inst, w_int), 1)
+  assert_eq(vcdb_has(inst, w_uuid), 1)
+  let results = vcdb_search(inst, [1.0, 0.0, 0.0], 2)
+  assert_eq(results.length(), 2)
+  vcdb_destroy(inst)
 }
 
 ///|

@@ -57,7 +57,7 @@ test "transport_point/jsonl_roundtrip_hi_lo_id" {
   let point = TransportPoint::{ id, vector: [1.0], attrs }
   let line = point.to_jsonl()
   let restored = TransportPoint::from_jsonl(line).unwrap()
-  assert_eq(restored.id.to_int64(), 0x0001000200030004L)
+  assert_eq(restored.id, @types.VectorId::from_int64(0x0001000200030004L))
 }
 
 ///|

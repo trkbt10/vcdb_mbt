@@ -44,8 +44,8 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB:
 pub fn[W, S] PersistentDB::metric(Self[W, S]) -> @types.Metric
 pub fn[W, S] PersistentDB::raw_size(Self[W, S]) -> Int
 pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB::remove(Self[W, S], @types.VectorId, Int64) -> Bool
-pub fn[W, S] PersistentDB::scroll(Self[W, S], offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
-pub fn[W, S] PersistentDB::scroll_filtered(Self[W, S], expr? : @filter.FilterExpr?, offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
+pub fn[W, S] PersistentDB::scroll(Self[W, S], offset? : @types.VectorId?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
+pub fn[W, S] PersistentDB::scroll_filtered(Self[W, S], expr? : @filter.FilterExpr?, offset? : @types.VectorId?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
 pub fn[W, S] PersistentDB::search(Self[W, S], Array[Double], Int, @filter.FilterExpr?) -> Array[@types.SearchHit]
 pub fn[W, S] PersistentDB::search_with_expr(Self[W, S], Array[Double], Int, @filter.FilterExpr?, @attr.BPTreeAttrIndex?, @filter.FilterStrategy) -> Array[@types.SearchHit]
 pub fn[W, S] PersistentDB::search_with_filter(Self[W, S], Array[Double], Int, ((@types.VectorId, @types.Attrs) -> Bool)?) -> Array[@types.SearchHit]
@@ -81,8 +81,8 @@ pub fn VectorDB::metric(Self) -> @types.Metric
 pub fn VectorDB::new(@types.DatabaseOptions) -> Self
 pub fn VectorDB::raw_size(Self) -> Int
 pub fn VectorDB::remove(Self, @types.VectorId) -> Bool
-pub fn VectorDB::scroll(Self, offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
-pub fn VectorDB::scroll_filtered(Self, expr? : @filter.FilterExpr?, offset? : Int64?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
+pub fn VectorDB::scroll(Self, offset? : @types.VectorId?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
+pub fn VectorDB::scroll_filtered(Self, expr? : @filter.FilterExpr?, offset? : @types.VectorId?, limit? : Int) -> Array[(@types.VectorId, @types.VectorRecord)]
 pub fn VectorDB::search(Self, Array[Double], Int, ((@types.VectorId, @types.Attrs) -> Bool)?) -> Array[@types.SearchHit]
 pub fn VectorDB::search_with_expr(Self, Array[Double], Int, @filter.FilterExpr?, @attr.BPTreeAttrIndex?, @filter.FilterStrategy) -> Array[@types.SearchHit]
 pub fn VectorDB::serialize(Self) -> Bytes

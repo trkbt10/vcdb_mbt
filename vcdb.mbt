@@ -322,12 +322,16 @@ pub fn VectorDB::get(
 /// compatibility with gateway which passes `last_id + 1`).
 pub fn VectorDB::scroll(
   self : VectorDB,
-  offset? : Int64? = None,
+  offset? : @types.VectorId? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
   // Convert >= semantics to > semantics by subtracting 1 from offset
   let adjusted = match offset {
-    Some(o) => Some(o - 1L)
+    Some(vid) =>
+      match vid {
+        Int64Id(o) => Some(@types.Int64Id(o - 1L))
+        Bytes16Id(_) => Some(vid) // For Bytes16Id, pass through as-is
+      }
     None => None
   }
   self.scroll_filtered(expr=None, offset=adjusted, limit~)
@@ -353,19 +357,19 @@ pub fn VectorDB::scroll(
 pub fn VectorDB::scroll_filtered(
   self : VectorDB,
   expr? : @filter.FilterExpr? = None,
-  offset? : Int64? = None,
+  offset? : @types.VectorId? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
-  let threshold = offset.unwrap_or(-9223372036854775808L)
   let candidates = match expr {
     Some(e) => @filter.resolve_candidates_bptree(e, self.attr_index)
     None => self.attr_index.all_ids()
   }
-  candidates.sort_by(fn(a, b) { a.to_int64().compare(b.to_int64()) })
+  candidates.sort_by(fn(a, b) { a.compare(b) })
   let points : Array[(@types.VectorId, @types.VectorRecord)] = []
   for id in candidates {
-    if id.to_int64() <= threshold {
-      continue
+    match offset {
+      Some(cursor) => if id.compare(cursor) <= 0 { continue }
+      None => ()
     }
     if self.is_tombstoned(id) {
       continue

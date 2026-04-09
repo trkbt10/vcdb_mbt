@@ -24,14 +24,17 @@ import type {
   SearchHit,
   PointRecord,
   ScrollEntry,
-} from "./index.js";
+} from "./types.js";
 import type { StorageAdapter, StorageKindType } from "./storage/types.js";
-import { getVectorDbFfi } from "./ffi/loader.js";
+import { getVectorDbFfi, getPersistentFfi } from "./ffi/loader.js";
 import {
   int64ToWireBytes,
   wireBytesBigInt,
   nowNs,
 } from "./ffi/vector-id.js";
+
+/** Auto-incrementing instance ID for PersistentDB instances without explicit IDs. */
+let nextPersistentInstanceId = 1;
 
 const parsePayload = (json: string): Record<string, unknown> | null => {
   if (!json) return null;
@@ -165,12 +168,12 @@ export class VectorDB {
 /* ══════════════════════════════════════════════════════════════ */
 
 export interface PersistentDBOptions {
-  ffi: PersistentFfi;
-  instanceId: number;
+  /** Explicit instance ID. If omitted, auto-assigned. Useful when a stable ID is needed (e.g. Durable Objects). */
+  instanceId?: number;
   dim: number;
   capacity: number;
-  metric: Metric;
-  strategy: Strategy;
+  metric?: Metric;
+  strategy?: Strategy;
   walStorage: AsyncStorageCallbacks;
   snapshotStorage: AsyncStorageCallbacks;
   collectionName?: string;
@@ -178,21 +181,21 @@ export interface PersistentDBOptions {
 }
 
 export class PersistentDB {
-  constructor(
+  private constructor(
     private readonly ffi: PersistentFfi,
     private readonly instanceId: number,
   ) {}
 
   static async create(options: PersistentDBOptions): Promise<PersistentDB> {
+    const ffi = getPersistentFfi();
+    const instanceId = options.instanceId ?? nextPersistentInstanceId++;
     const {
-      ffi,
-      instanceId,
       dim,
       capacity,
-      metric,
-      strategy,
       walStorage,
       snapshotStorage,
+      metric = "cosine",
+      strategy = "hnsw",
       collectionName = "db",
       basePath = "",
     } = options;
@@ -331,46 +334,3 @@ export function storageToCallbacks(adapter: StorageAdapter, kind: StorageKindTyp
   };
 }
 
-/* ══════════════════════════════════════════════════════════════ */
-/*  Standalone registration and init                            */
-/* ══════════════════════════════════════════════════════════════ */
-
-export function registerPersistentStorage(
-  ffi: PersistentFfi,
-  instanceId: number,
-  walStorage: AsyncStorageCallbacks,
-  snapshotStorage: AsyncStorageCallbacks,
-): void {
-  ffi.persistent_register_wal_storage(
-    instanceId,
-    walStorage.read, walStorage.write, walStorage.atomicWrite,
-    walStorage.del, walStorage.exists, walStorage.list,
-  );
-  ffi.persistent_register_snapshot_storage(
-    instanceId,
-    snapshotStorage.read, snapshotStorage.write, snapshotStorage.atomicWrite,
-    snapshotStorage.del, snapshotStorage.exists, snapshotStorage.list,
-  );
-}
-
-export async function initPersistentDB(
-  ffi: PersistentFfi,
-  instanceId: number,
-  dim: number,
-  capacity: number,
-  options?: {
-    metric?: Metric;
-    strategy?: Strategy;
-    collectionName?: string;
-    basePath?: string;
-  },
-): Promise<void> {
-  await ffi.persistent_init(
-    instanceId,
-    options?.collectionName ?? "db",
-    options?.basePath ?? "",
-    dim, capacity,
-    options?.metric ?? "cosine",
-    options?.strategy ?? "hnsw",
-  );
-}

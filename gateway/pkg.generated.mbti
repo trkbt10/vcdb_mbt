@@ -76,17 +76,19 @@ pub(all) suberror GatewayError {
   CollectionExists(String)
   CollectionNotFound(String)
   StorageError(String)
-} derive(Show)
+}
+pub impl Show for GatewayError
 
 // Types and methods
 pub struct ApiResponse {
   status : String
   result : Json?
   error : String?
-} derive(Show)
+}
 pub fn ApiResponse::err(String) -> Self
 pub fn ApiResponse::ok(Json) -> Self
 pub fn ApiResponse::to_json(Self) -> Json
+pub impl Show for ApiResponse
 
 pub struct Collection[S] {
   config : CollectionConfig
@@ -98,10 +100,11 @@ pub struct CollectionConfig {
   dim : Int
   metric : @types.Metric
   strategy : @types.Strategy
-} derive(Show)
+}
 pub fn CollectionConfig::default(String, Int) -> Self
 pub fn CollectionConfig::from_json(Json) -> Result[Self, String]
 pub fn CollectionConfig::to_json(Self) -> Json
+pub impl Show for CollectionConfig
 
 pub struct CollectionInfo {
   name : String
@@ -109,8 +112,9 @@ pub struct CollectionInfo {
   dim : Int
   metric : String
   strategy : String
-} derive(Show)
+}
 pub fn CollectionInfo::to_json(Self) -> Json
+pub impl Show for CollectionInfo
 
 pub struct CollectionManager[S] {
   collections : Map[String, Collection[S]]
@@ -138,52 +142,59 @@ pub fn[S] CollectionManager::with_storage(S, base_path? : String, checkpoint_thr
 
 pub struct CollectionsResponse {
   collections : Array[CollectionInfo]
-} derive(Show)
+}
 pub fn CollectionsResponse::to_json(Self) -> Json
+pub impl Show for CollectionsResponse
 
 pub struct PointData {
   id : Int64
   vector : Array[Double]
   payload : @types.Attrs
-} derive(Show)
+}
 pub fn PointData::from_json(Json) -> Self?
 pub fn PointData::to_json(Self) -> Json
+pub impl Show for PointData
 
 pub struct PointResponse {
   id : Int64
   payload : @types.Attrs
   vector : Array[Double]
-} derive(Show)
+}
 pub fn PointResponse::to_json(Self) -> Json
+pub impl Show for PointResponse
 
 pub struct ScrollPointResponse {
   id : Int64
   payload : @types.Attrs?
   vector : Array[Double]?
-} derive(Show)
+}
 pub fn ScrollPointResponse::to_json(Self) -> Json
+pub impl Show for ScrollPointResponse
 
 pub struct ScrollRequest {
   offset : Int64?
   limit : Int
   with_payload : Bool
   with_vector : Bool
-} derive(Show)
+}
 pub fn ScrollRequest::from_json(Json) -> Self?
+pub impl Show for ScrollRequest
 
 pub struct ScrollResponse {
   points : Array[ScrollPointResponse]
   next_page_offset : Int64?
-} derive(Show)
+}
 pub fn ScrollResponse::to_json(Self) -> Json
+pub impl Show for ScrollResponse
 
 pub struct SearchHitResponse {
   id : Int64
   score : Double
   payload : @types.Attrs?
   vector : Array[Double]?
-} derive(Show)
+}
 pub fn SearchHitResponse::to_json(Self) -> Json
+pub impl Show for SearchHitResponse
 
 pub struct SearchRequest {
   vector : Array[Double]
@@ -191,19 +202,22 @@ pub struct SearchRequest {
   filter : Json?
   with_payload : Bool
   with_vector : Bool
-} derive(Show)
+}
 pub fn SearchRequest::from_json(Json) -> Self?
+pub impl Show for SearchRequest
 
 pub struct SearchResponse {
   result : Array[SearchHitResponse]
   time_ms : Double
-} derive(Show)
+}
 pub fn SearchResponse::to_json(Self) -> Json
+pub impl Show for SearchResponse
 
 pub struct UpsertRequest {
   points : Array[PointData]
-} derive(Show)
+}
 pub fn UpsertRequest::from_json(Json) -> Self?
+pub impl Show for UpsertRequest
 
 // Type aliases
 

@@ -194,7 +194,8 @@ pub fn persistent_upsert(
           let attrs = parse_json_to_attrs(payload_json)
           typed_points.push((vid, vector, attrs))
         }
-        None => raise @storage.AsyncIOFailed("persistent_upsert: invalid id_bytes")
+        None =>
+          raise @storage.AsyncIOFailed("persistent_upsert: invalid id_bytes")
       }
     }
     db.upsert(typed_points, timestamp_ns)
@@ -212,7 +213,8 @@ pub fn persistent_remove(
     let db = get_persistent_db(instance_id)
     match @types.VectorId::from_wire_bytes(id_bytes) {
       Some(vid) => db.remove(vid, timestamp_ns)
-      None => raise @storage.AsyncIOFailed("persistent_remove: invalid id_bytes")
+      None =>
+        raise @storage.AsyncIOFailed("persistent_remove: invalid id_bytes")
     }
   })
 }
@@ -292,7 +294,9 @@ pub fn persistent_search(
     } else {
       ""
     }
-    results.push((@types.VectorId::to_wire_bytes(hit.id), hit.score, payload_json))
+    results.push(
+      (@types.VectorId::to_wire_bytes(hit.id), hit.score, payload_json),
+    )
   }
   results
 }
@@ -354,11 +358,8 @@ pub fn persistent_scroll(
     Some(db) => db
     None => return []
   }
-  let offset_id : Int64? = if offset_bytes.length() == 16 {
-    match @types.VectorId::from_wire_bytes(offset_bytes) {
-      Some(vid) => Some(vid.to_int64())
-      None => None
-    }
+  let offset_id : @types.VectorId? = if offset_bytes.length() == 16 {
+    @types.VectorId::from_wire_bytes(offset_bytes)
   } else {
     None
   }
@@ -388,11 +389,8 @@ pub fn persistent_scroll_filtered(
     Some(db) => db
     None => return []
   }
-  let offset_id : Int64? = if offset_bytes.length() == 16 {
-    match @types.VectorId::from_wire_bytes(offset_bytes) {
-      Some(vid) => Some(vid.to_int64())
-      None => None
-    }
+  let offset_id : @types.VectorId? = if offset_bytes.length() == 16 {
+    @types.VectorId::from_wire_bytes(offset_bytes)
   } else {
     None
   }

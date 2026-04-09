@@ -2,9 +2,9 @@
 /// Basic Attribute Index - Hash map based implementation
 /// Provides fast equality lookups and range queries via sorted numeric arrays.
 pub struct BasicAttrIndex {
-  data : Map[Int64, @types.Attrs] // id -> attrs
-  eq_map : Map[String, Map[String, Array[Int64]]] // key -> value -> ids
-  exists_map : Map[String, Array[Int64]] // key -> ids with that key
+  data : Map[@types.VectorId, @types.Attrs] // id -> attrs
+  eq_map : Map[String, Map[String, Array[@types.VectorId]]] // key -> value -> ids
+  exists_map : Map[String, Array[@types.VectorId]] // key -> ids with that key
   num_map : Map[String, (Array[NumEntry], Bool)] // key -> (sorted entries, dirty flag)
 }
 
@@ -20,7 +20,7 @@ fn add_to_num_index(
   num_map : Map[String, (Array[NumEntry], Bool)],
   key : String,
   value : Double,
-  id : Int64,
+  id : @types.VectorId,
 ) -> Unit {
   match num_map.get(key) {
     None => num_map.set(key, ([{ value, id }], true))
@@ -36,7 +36,7 @@ fn add_to_num_index(
 fn remove_from_num_index(
   num_map : Map[String, (Array[NumEntry], Bool)],
   key : String,
-  id : Int64,
+  id : @types.VectorId,
 ) -> Unit {
   match num_map.get(key) {
     None => ()
@@ -54,31 +54,30 @@ pub fn BasicAttrIndex::set_attrs(
   id : @types.VectorId,
   attrs : @types.Attrs,
 ) -> Unit {
-  let id_val = id.to_int64()
   // Remove old attrs from indexes if present
-  match self.data.get(id_val) {
+  match self.data.get(id) {
     None => ()
     Some(old_attrs) =>
       for_each_attr(old_attrs, fn(key, value) {
-        remove_from_eq_index(self.eq_map, key, value, id_val)
-        remove_from_exists_index(self.exists_map, key, id_val)
+        remove_from_eq_index(self.eq_map, key, value, id)
+        remove_from_exists_index(self.exists_map, key, id)
         match attr_value_to_number(value) {
-          Some(_) => remove_from_num_index(self.num_map, key, id_val)
+          Some(_) => remove_from_num_index(self.num_map, key, id)
           None => ()
         }
       })
   }
   // Add new attrs to indexes
   for_each_attr(attrs, fn(key, value) {
-    add_to_eq_index(self.eq_map, key, value, id_val)
-    add_to_exists_index(self.exists_map, key, id_val)
+    add_to_eq_index(self.eq_map, key, value, id)
+    add_to_exists_index(self.exists_map, key, id)
     match attr_value_to_number(value) {
-      Some(num) => add_to_num_index(self.num_map, key, num, id_val)
+      Some(num) => add_to_num_index(self.num_map, key, num, id)
       None => ()
     }
   })
   // Store attrs (defensive copy to prevent external mutation)
-  self.data.set(id_val, attrs.copy())
+  self.data.set(id, attrs.copy())
 }
 
 ///|
@@ -87,7 +86,7 @@ pub fn BasicAttrIndex::get_attrs(
   self : BasicAttrIndex,
   id : @types.VectorId,
 ) -> @types.Attrs? {
-  self.data.get(id.to_int64())
+  self.data.get(id)
 }
 
 ///|
@@ -96,19 +95,18 @@ pub fn BasicAttrIndex::remove_id(
   self : BasicAttrIndex,
   id : @types.VectorId,
 ) -> Unit {
-  let id_val = id.to_int64()
-  match self.data.get(id_val) {
+  match self.data.get(id) {
     None => ()
     Some(old_attrs) => {
       for_each_attr(old_attrs, fn(key, value) {
-        remove_from_eq_index(self.eq_map, key, value, id_val)
-        remove_from_exists_index(self.exists_map, key, id_val)
+        remove_from_eq_index(self.eq_map, key, value, id)
+        remove_from_exists_index(self.exists_map, key, id)
         match attr_value_to_number(value) {
-          Some(_) => remove_from_num_index(self.num_map, key, id_val)
+          Some(_) => remove_from_num_index(self.num_map, key, id)
           None => ()
         }
       })
-      self.data.remove(id_val)
+      self.data.remove(id)
     }
   }
 }
@@ -126,7 +124,7 @@ pub fn BasicAttrIndex::eq(
     Some(value_map) =>
       match value_map.get(value_key) {
         None => []
-        Some(ids) => ids_to_vector_ids(ids)
+        Some(ids) => ids.copy()
       }
   }
 }
@@ -139,7 +137,7 @@ pub fn BasicAttrIndex::exists(
 ) -> Array[@types.VectorId] {
   match self.exists_map.get(key) {
     None => []
-    Some(ids) => ids_to_vector_ids(ids)
+    Some(ids) => ids.copy()
   }
 }
 
@@ -200,7 +198,7 @@ pub fn BasicAttrIndex::range(
           } else {
             let result : Array[@types.VectorId] = []
             for i = lo_idx; i < hi_idx; i = i + 1 {
-              result.push(@types.Int64Id(sorted_arr[i].id))
+              result.push(sorted_arr[i].id)
             }
             Some(result)
           }

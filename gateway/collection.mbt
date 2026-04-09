@@ -138,7 +138,7 @@ pub async fn[S : @storage.AsyncStorage] CollectionManager::remove_point(
   }
   if !col.db.has(id) {
     return Err(
-      NotFound("Point with id " + id.to_int64().to_string() + " not found"),
+      NotFound("Point with id " + id.to_display_string() + " not found"),
     )
   }
   let _ = col.db.remove(id, timestamp_ns)

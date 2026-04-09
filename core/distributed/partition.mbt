@@ -158,9 +158,9 @@ pub fn resolve_conflicts_lww(
   remote_records : Array[@wal.WalRecord],
 ) -> (Array[@wal.WalRecord], Array[ConflictRecord]) {
   // Index records by ID, keeping only the latest per ID within each set
-  let local_by_id : Map[Int64, @wal.WalRecord] = {}
+  let local_by_id : Map[@types.VectorId, @wal.WalRecord] = {}
   for record in local_records {
-    let id_key = record.id.to_int64()
+    let id_key = record.id
     match local_by_id.get(id_key) {
       Some(existing) =>
         if record.timestamp > existing.timestamp {
@@ -170,9 +170,9 @@ pub fn resolve_conflicts_lww(
     }
   }
 
-  let remote_by_id : Map[Int64, @wal.WalRecord] = {}
+  let remote_by_id : Map[@types.VectorId, @wal.WalRecord] = {}
   for record in remote_records {
-    let id_key = record.id.to_int64()
+    let id_key = record.id
     match remote_by_id.get(id_key) {
       Some(existing) =>
         if record.timestamp > existing.timestamp {
@@ -184,7 +184,7 @@ pub fn resolve_conflicts_lww(
 
   let merged : Array[@wal.WalRecord] = []
   let conflicts : Array[ConflictRecord] = []
-  let seen : Map[Int64, Bool] = {}
+  let seen : Map[@types.VectorId, Bool] = {}
 
   // Process all local records
   for id_key in local_by_id.keys() {

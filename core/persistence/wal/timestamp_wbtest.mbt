@@ -25,7 +25,7 @@ test "timestamp/encode_decode_int64id" {
   match decoded {
     Some(rec) => {
       inspect(rec.timestamp, content="1000000")
-      inspect(rec.id.to_int64(), content="1")
+      inspect(rec.id, content="Int64Id(1)")
       inspect(rec.record_type == WalRecordType::Upsert, content="true")
     }
     None => inspect(false, content="true")
@@ -102,8 +102,8 @@ test "timestamp/filter_by_cutoff" {
   // Filter at timestamp 200 — should include records at 100 and 200
   let filtered = filter_wal_by_timestamp(segment, 200L)
   inspect(filtered.length(), content="2")
-  inspect(filtered[0].id.to_int64(), content="1")
-  inspect(filtered[1].id.to_int64(), content="2")
+  inspect(filtered[0].id, content="Int64Id(1)")
+  inspect(filtered[1].id, content="Int64Id(2)")
 }
 
 ///|
@@ -132,7 +132,7 @@ test "timestamp/filter_always_includes_zero_timestamp" {
   // cutoff=100: record with ts=0 always included; record with ts=500 excluded
   let filtered = filter_wal_by_timestamp(segment, 100L)
   inspect(filtered.length(), content="1")
-  inspect(filtered[0].id.to_int64(), content="1")
+  inspect(filtered[0].id, content="Int64Id(1)")
 }
 
 ///|

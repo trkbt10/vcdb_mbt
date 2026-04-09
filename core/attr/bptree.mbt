@@ -14,7 +14,7 @@ fn make_exists_key() -> Bytes {
 /// B+ Tree leaf entry
 priv struct BPLeafEntry {
   key : Bytes
-  value : Array[Int64]
+  value : Array[@types.VectorId]
 }
 
 ///|
@@ -44,7 +44,7 @@ struct BPTree {
 pub struct BPTreeAttrIndex {
   field_trees : Map[String, BPTree] // Per-field B+ trees
   exists_trees : Map[String, BPTree] // Existence B+ trees
-  data : Map[Int64, @types.Attrs] // Direct storage for attrs
+  data : Map[@types.VectorId, @types.Attrs] // Direct storage for attrs
   order : Int // Node order (default 128)
 }
 
@@ -241,7 +241,9 @@ fn serialize_bptree(tree : BPTree) -> Bytes {
           write_prefixed_bytes(w, entry.key)
           w.push_u32(entry.value.length().reinterpret_as_uint())
           for id in entry.value {
-            w.push_i64(id)
+            let wire = id.to_wire_bytes()
+            w.push_u32(wire.length().reinterpret_as_uint())
+            w.push_bytes(wire)
           }
         }
         w.push_i32(next)
@@ -276,9 +278,14 @@ fn deserialize_bptree(data : Bytes) -> BPTree {
       for _ in 0..<entry_count {
         let key = read_prefixed_bytes(r)
         let posting_count = r.read_u32().reinterpret_as_int()
-        let value : Array[Int64] = []
+        let value : Array[@types.VectorId] = []
         for _ in 0..<posting_count {
-          value.push(r.read_i64())
+          let wire_len = r.read_u32().reinterpret_as_int()
+          let wire = r.read_bytes(wire_len)
+          match @types.VectorId::from_wire_bytes(wire) {
+            Some(id) => value.push(id)
+            None => ()
+          }
         }
         entries.push({ key, value })
       }
@@ -363,7 +370,10 @@ fn find_entry(entries : Array[BPLeafEntry], key : Bytes) -> Int {
 
 ///|
 /// Insert ID into posting list (deduped)
-fn insert_into_posting(list : Array[Int64], id : Int64) -> Unit {
+fn insert_into_posting(
+  list : Array[@types.VectorId],
+  id : @types.VectorId,
+) -> Unit {
   for existing in list {
     if existing == id {
       return
@@ -374,8 +384,18 @@ fn insert_into_posting(list : Array[Int64], id : Int64) -> Unit {
 
 ///|
 /// Remove ID from posting list
-fn remove_from_posting(list : Array[Int64], id : Int64) -> Unit {
-  let _ = remove_int64_swap(list, id)
+fn remove_from_posting(
+  list : Array[@types.VectorId],
+  id : @types.VectorId,
+) -> Unit {
+  for i in 0..<list.length() {
+    if list[i] == id {
+      let last = list.length() - 1
+      list[i] = list[last]
+      let _ = list.pop()
+      return
+    }
+  }
 }
 
 ///|
@@ -509,7 +529,7 @@ fn handle_overflow(tree : BPTree, path : Array[Int]) -> Unit {
 
 ///|
 /// Insert posting into B+ tree
-fn bptree_insert(tree : BPTree, key : Bytes, id : Int64) -> Unit {
+fn bptree_insert(tree : BPTree, key : Bytes, id : @types.VectorId) -> Unit {
   let path = find_leaf_path(tree, key)
   let leaf_idx = path[path.length() - 1]
   match tree.nodes[leaf_idx] {
@@ -521,7 +541,7 @@ fn bptree_insert(tree : BPTree, key : Bytes, id : Int64) -> Unit {
         insert_into_posting(entries[entry_idx].value, id)
       } else {
         // Create new entry
-        let new_list : Array[Int64] = [id]
+        let new_list : Array[@types.VectorId] = [id]
         entries.push({ key, value: new_list })
         // Sort entries by key
         entries.sort_by(fn(a, b) { bytes_compare(a.key, b.key) })
@@ -537,7 +557,7 @@ fn bptree_insert(tree : BPTree, key : Bytes, id : Int64) -> Unit {
 
 ///|
 /// Remove posting from B+ tree
-fn bptree_remove(tree : BPTree, key : Bytes, id : Int64) -> Unit {
+fn bptree_remove(tree : BPTree, key : Bytes, id : @types.VectorId) -> Unit {
   let leaf_idx = find_leaf(tree, key)
   match tree.nodes[leaf_idx] {
     Leaf(entries, _) => {
@@ -563,7 +583,7 @@ fn bptree_remove(tree : BPTree, key : Bytes, id : Int64) -> Unit {
 
 ///|
 /// Lookup posting list for key
-fn bptree_lookup(tree : BPTree, key : Bytes) -> Array[Int64]? {
+fn bptree_lookup(tree : BPTree, key : Bytes) -> Array[@types.VectorId]? {
   let leaf_idx = find_leaf(tree, key)
   match tree.nodes[leaf_idx] {
     Leaf(entries, _) => {
@@ -585,8 +605,8 @@ fn bptree_range(
   lo : Bytes?,
   hi : Bytes?,
   range : @types.NumericRange,
-) -> Array[Int64] {
-  let result : Array[Int64] = []
+) -> Array[@types.VectorId] {
+  let result : Array[@types.VectorId] = []
   let mut current = match lo {
     Some(start_key) => find_leaf(tree, start_key)
     None => {
@@ -701,23 +721,22 @@ pub fn BPTreeAttrIndex::set_attrs(
   id : @types.VectorId,
   attrs : @types.Attrs,
 ) -> Unit {
-  let id_val = id.to_int64()
   // Remove old attrs from trees
-  match self.data.get(id_val) {
+  match self.data.get(id) {
     None => ()
     Some(old_attrs) =>
       for_each_attr(old_attrs, fn(key, value) {
         // Remove from field tree
         match self.field_trees.get(key) {
           None => ()
-          Some(tree) => bptree_remove(tree, encode_attr_value(value), id_val)
+          Some(tree) => bptree_remove(tree, encode_attr_value(value), id)
         }
         // Remove from exists tree
         match self.exists_trees.get(key) {
           None => ()
           Some(tree) => {
             let exists_key = make_exists_key()
-            bptree_remove(tree, exists_key, id_val)
+            bptree_remove(tree, exists_key, id)
           }
         }
       })
@@ -726,14 +745,14 @@ pub fn BPTreeAttrIndex::set_attrs(
   for_each_attr(attrs, fn(key, value) {
     // Add to field tree
     let field_tree = get_or_create_field_tree(self, key)
-    bptree_insert(field_tree, encode_attr_value(value), id_val)
+    bptree_insert(field_tree, encode_attr_value(value), id)
     // Add to exists tree
     let exists_tree = get_or_create_exists_tree(self, key)
     let exists_key = make_exists_key()
-    bptree_insert(exists_tree, exists_key, id_val)
+    bptree_insert(exists_tree, exists_key, id)
   })
   // Store attrs (defensive copy to prevent external mutation)
-  self.data.set(id_val, attrs.copy())
+  self.data.set(id, attrs.copy())
 }
 
 ///|
@@ -742,7 +761,7 @@ pub fn BPTreeAttrIndex::get_attrs(
   self : BPTreeAttrIndex,
   id : @types.VectorId,
 ) -> @types.Attrs? {
-  self.data.get(id.to_int64())
+  self.data.get(id)
 }
 
 ///|
@@ -751,24 +770,23 @@ pub fn BPTreeAttrIndex::remove_id(
   self : BPTreeAttrIndex,
   id : @types.VectorId,
 ) -> Unit {
-  let id_val = id.to_int64()
-  match self.data.get(id_val) {
+  match self.data.get(id) {
     None => ()
     Some(old_attrs) => {
       for_each_attr(old_attrs, fn(key, value) {
         match self.field_trees.get(key) {
           None => ()
-          Some(tree) => bptree_remove(tree, encode_attr_value(value), id_val)
+          Some(tree) => bptree_remove(tree, encode_attr_value(value), id)
         }
         match self.exists_trees.get(key) {
           None => ()
           Some(tree) => {
             let exists_key = make_exists_key()
-            bptree_remove(tree, exists_key, id_val)
+            bptree_remove(tree, exists_key, id)
           }
         }
       })
-      self.data.remove(id_val)
+      self.data.remove(id)
     }
   }
 }
@@ -786,7 +804,7 @@ pub fn BPTreeAttrIndex::eq(
       let encoded = encode_attr_value(value)
       match bptree_lookup(tree, encoded) {
         None => []
-        Some(list) => ids_to_vector_ids(list)
+        Some(list) => list.copy()
       }
     }
   }
@@ -804,7 +822,7 @@ pub fn BPTreeAttrIndex::exists(
       let exists_key = make_exists_key()
       match bptree_lookup(tree, exists_key) {
         None => []
-        Some(list) => ids_to_vector_ids(list)
+        Some(list) => list.copy()
       }
     }
   }
@@ -821,7 +839,7 @@ pub fn BPTreeAttrIndex::range(
     None => Some([])
     Some(tree) => {
       let list = bptree_range(tree, None, None, range)
-      Some(ids_to_vector_ids(list))
+      Some(list.copy())
     }
   }
 }
@@ -835,7 +853,9 @@ pub fn BPTreeAttrIndex::serialize(self : BPTreeAttrIndex) -> Bytes {
   let data_count = self.data.length()
   w.push_u32(data_count.reinterpret_as_uint())
   for id_val, attrs in self.data {
-    w.push_i64(id_val)
+    let wire = id_val.to_wire_bytes()
+    w.push_u32(wire.length().reinterpret_as_uint())
+    w.push_bytes(wire)
     write_attrs(w, attrs)
   }
   let field_tree_count = self.field_trees.length()
@@ -859,11 +879,17 @@ pub fn BPTreeAttrIndex::deserialize(data : Bytes) -> BPTreeAttrIndex {
   let r = @binary.BinaryReader::new(data)
   let _version = r.read_u32()
   let order = r.read_u32().reinterpret_as_int()
-  let data_map : Map[Int64, @types.Attrs] = {}
+  let data_map : Map[@types.VectorId, @types.Attrs] = {}
   let data_count = r.read_u32().reinterpret_as_int()
   for _ in 0..<data_count {
-    let id_val = r.read_i64()
-    data_map.set(id_val, read_attrs(r))
+    let wire_len = r.read_u32().reinterpret_as_int()
+    let wire = r.read_bytes(wire_len)
+    match @types.VectorId::from_wire_bytes(wire) {
+      Some(id) => data_map.set(id, read_attrs(r))
+      None => {
+        let _ = read_attrs(r)
+      } // skip invalid ID entry
+    }
   }
   let field_trees : Map[String, BPTree] = {}
   let field_tree_count = r.read_u32().reinterpret_as_int()
@@ -893,7 +919,7 @@ pub fn BPTreeAttrIndex::all_ids(
 ) -> Array[@types.VectorId] {
   let result : Array[@types.VectorId] = []
   for id_val, _ in self.data {
-    result.push(@types.Int64Id(id_val))
+    result.push(id_val)
   }
   result
 }

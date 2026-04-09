@@ -155,7 +155,9 @@ pub fn vcdb_upsert(
     (Some(db), Some(id)) => {
       let attrs = @types.empty_attrs()
       run_async(async fn() noraise {
-        db.upsert([(id, vector, attrs)], 0L) catch { _ => () }
+        db.upsert([(id, vector, attrs)], 0L) catch {
+          _ => ()
+        }
       })
       0
     }
@@ -185,10 +187,7 @@ pub fn vcdb_remove(instance_id : Int, id_bytes : Bytes) -> Int {
 ///|
 /// Get a vector by id. id_bytes must be exactly 16 bytes (wire format).
 /// Returns (vector, 1) if found, ([], 0) if not found, ([], -1) on error.
-pub fn vcdb_get(
-  instance_id : Int,
-  id_bytes : Bytes,
-) -> (Array[Double], Int) {
+pub fn vcdb_get(instance_id : Int, id_bytes : Bytes) -> (Array[Double], Int) {
   match (instances.get(instance_id), vid_decode(id_bytes)) {
     (Some(db), Some(id)) =>
       match db.get(id) {

@@ -702,16 +702,6 @@ pub fn VectorId::from_uuid_string(s : String) -> VectorId? {
 }
 
 ///|
-/// Get the underlying Int64 value. Returns None for Bytes16Id.
-/// Prefer pattern-matching on the enum directly for new code.
-pub fn VectorId::to_int64(self : VectorId) -> Int64 {
-  match self {
-    Int64Id(v) => v
-    Bytes16Id(_) => abort("VectorId::to_int64 called on Bytes16Id")
-  }
-}
-
-///|
 /// Get the underlying Int64 value as an option. Returns None for Bytes16Id.
 pub fn VectorId::as_int64(self : VectorId) -> Int64? {
   match self {
@@ -769,8 +759,22 @@ pub fn VectorId::to_wire_bytes(self : VectorId) -> Bytes {
     }
     Bytes16Id(b) => {
       let arr = [
-        b.b0, b.b1, b.b2, b.b3, b.b4, b.b5, b.b6, b.b7, b.b8, b.b9, b.b10,
-        b.b11, b.b12, b.b13, b.b14, b.b15,
+        b.b0,
+        b.b1,
+        b.b2,
+        b.b3,
+        b.b4,
+        b.b5,
+        b.b6,
+        b.b7,
+        b.b8,
+        b.b9,
+        b.b10,
+        b.b11,
+        b.b12,
+        b.b13,
+        b.b14,
+        b.b15,
       ]
       Bytes::from_array(arr[:])
     }
@@ -810,26 +814,24 @@ pub fn VectorId::from_wire_bytes(data : Bytes) -> VectorId? {
     Some(Int64Id(v))
   } else {
     Some(
-      Bytes16Id(
-        Bytes16::{
-          b0: data[0],
-          b1: data[1],
-          b2: data[2],
-          b3: data[3],
-          b4: data[4],
-          b5: data[5],
-          b6: data[6],
-          b7: data[7],
-          b8: data[8],
-          b9: data[9],
-          b10: data[10],
-          b11: data[11],
-          b12: data[12],
-          b13: data[13],
-          b14: data[14],
-          b15: data[15],
-        },
-      ),
+      Bytes16Id(Bytes16::{
+        b0: data[0],
+        b1: data[1],
+        b2: data[2],
+        b3: data[3],
+        b4: data[4],
+        b5: data[5],
+        b6: data[6],
+        b7: data[7],
+        b8: data[8],
+        b9: data[9],
+        b10: data[10],
+        b11: data[11],
+        b12: data[12],
+        b13: data[13],
+        b14: data[14],
+        b15: data[15],
+      }),
     )
   }
 }

@@ -3,9 +3,11 @@
  *
  * Wraps DistributedFfi with JS-idiomatic types, hiding MoonBit
  * tuple encoding and wire-format byte conversions.
+ *
+ * All functions require loadModule() to have been called first.
  */
-import type { DistributedFfi } from "./ffi/types.js";
-import type { VectorId, SearchHit, ScrollEntry } from "./index.js";
+import type { VectorId, SearchHit, ScrollEntry } from "./types.js";
+import { getDistributedFfi } from "./ffi/loader.js";
 import { int64ToWireBytes, wireBytesBigInt } from "./ffi/vector-id.js";
 
 const parsePayload = (json: string): Record<string, unknown> | null => {
@@ -49,17 +51,15 @@ export interface UpsertGroup {
 /* ── Placement ───────────────────────────────────────────────── */
 
 export function placementGroup(
-  ffi: DistributedFfi,
   id: VectorId,
   pgCount: number,
 ): number {
-  return ffi.crush_placement_group(int64ToWireBytes(id), pgCount);
+  return getDistributedFfi().crush_placement_group(int64ToWireBytes(id), pgCount);
 }
 
 /* ── Upsert grouping ─────────────────────────────────────────── */
 
 export function groupUpsert(
-  ffi: DistributedFfi,
   points: ReadonlyArray<{
     id: VectorId;
     vector: number[];
@@ -67,6 +67,7 @@ export function groupUpsert(
   }>,
   pgCount: number,
 ): UpsertGroup[] {
+  const ffi = getDistributedFfi();
   const ffiPoints = points.map((p) => ({
     _0: int64ToWireBytes(p.id),
     _1: p.vector,
@@ -88,10 +89,10 @@ export function groupUpsert(
 /* ── Merge operations ────────────────────────────────────────── */
 
 export function mergeSearch(
-  ffi: DistributedFfi,
   shardResults: readonly ShardSearchResult[],
   topK: number,
 ): MergedResult<readonly SearchHit[]> {
+  const ffi = getDistributedFfi();
   const ffiInput = shardResults.map((r) => {
     if ("error" in r) {
       return { _0: r.shardIndex, _1: [] as Array<{ _0: Uint8Array; _1: number; _2: string }>, _2: r.error };
@@ -118,10 +119,10 @@ export function mergeSearch(
 }
 
 export function mergeScroll(
-  ffi: DistributedFfi,
   shardResults: readonly ShardScrollResult[],
   limit: number,
 ): MergedResult<readonly ScrollEntry[]> {
+  const ffi = getDistributedFfi();
   const ffiInput = shardResults.map((r) => {
     if ("error" in r) {
       return { _0: r.shardIndex, _1: [] as Array<{ _0: Uint8Array; _1: string }>, _2: r.error };
@@ -146,9 +147,9 @@ export function mergeScroll(
 }
 
 export function mergeCount(
-  ffi: DistributedFfi,
   shardResults: readonly ShardCountResult[],
 ): MergedResult<number> {
+  const ffi = getDistributedFfi();
   const ffiInput = shardResults.map((r) => {
     if ("error" in r) {
       return { _0: r.shardIndex, _1: 0, _2: r.error };

@@ -1,43 +1,44 @@
 /**
- * @vcdb/server — Vector database server package.
+ * @file vcdb — public API entry point.
  *
- * This file is the single source of truth for all public domain types.
- * Storage adapters and DB classes are imported via subpath exports.
+ * Exports the core database classes, domain types, and storage utilities.
+ * Internal FFI details (wire format, loader, WASM module) are not exposed.
  */
 
-/* ── Domain types (SoT) ─────────────────────────────────────── */
+/* ── Domain types ───────────────────────────────────────────── */
 
-/** Unique identifier for a vector. Uses bigint for full Int64 range. */
-export type VectorId = bigint;
+export type {
+  VectorId,
+  Metric,
+  Strategy,
+  SearchResult,
+  SearchHit,
+  PointRecord,
+  ScrollEntry,
+} from "./types.js";
 
-/** Distance/similarity metric. */
-export type Metric = "cosine" | "l2" | "dot";
+/* ── Module loader ──────────────────────────────────────────── */
 
-/** ANN (Approximate Nearest Neighbor) indexing strategy. */
-export type Strategy = "bruteforce" | "hnsw" | "ivf";
+export { loadModule, isModuleLoaded } from "./ffi/loader.js";
 
-/** A single search result (score only, no payload). */
-export interface SearchResult {
-  readonly id: VectorId;
-  readonly score: number;
-}
+/* ── Database classes ───────────────────────────────────────── */
 
-/** A search result with optional payload. */
-export interface SearchHit {
-  readonly id: VectorId;
-  readonly score: number;
-  readonly payload: Record<string, unknown> | null;
-}
+export {
+  VectorDB,
+  PersistentDB,
+  kvStoreToCallbacks,
+  storageToCallbacks,
+} from "./db.js";
+export type {
+  PersistentDBOptions,
+  KeyValueStore,
+} from "./db.js";
 
-/** A point record retrieved by ID. */
-export interface PointRecord {
-  readonly found: boolean;
-  readonly vector: number[];
-  readonly payload: Record<string, unknown> | null;
-}
+/* ── Storage types ──────────────────────────────────────────── */
 
-/** An entry from scroll (cursor-based iteration). */
-export interface ScrollEntry {
-  readonly id: VectorId;
-  readonly payload: Record<string, unknown> | null;
-}
+export type { AsyncStorageCallbacks } from "./ffi/types.js";
+export type {
+  StorageAdapter,
+  StorageKind,
+  StorageKindType,
+} from "./storage/types.js";

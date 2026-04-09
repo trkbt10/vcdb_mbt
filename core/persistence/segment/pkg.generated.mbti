@@ -31,18 +31,21 @@ pub(all) struct DataPointer {
   segment : String
   offset : Int
   length : Int
-} derive(Eq, Show)
+} derive(Eq)
+pub impl Show for DataPointer
 
 pub struct DecodedIndexFile {
   header : IndexHeader
   entries : Array[IndexEntry]
   ann : Bytes?
-} derive(Show)
+}
+pub impl Show for DecodedIndexFile
 
 pub(all) struct IndexEntry {
   id : @types.VectorId
   ptr : DataPointer
-} derive(Show)
+}
+pub impl Show for IndexEntry
 
 pub(all) struct IndexHeader {
   metric_code : Int
@@ -50,8 +53,9 @@ pub(all) struct IndexHeader {
   count : Int
   strategy_code : Int
   has_ann : Bool
-} derive(Show)
+}
 pub fn IndexHeader::from_store(@store.CoreStore, @types.Strategy, Bool) -> Self
+pub impl Show for IndexHeader
 
 pub struct SegmentReader {
   name : String

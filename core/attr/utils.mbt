@@ -13,27 +13,17 @@ fn for_each_attr(
 }
 
 ///|
-/// Convert internal Int64 id list to VectorId list.
-fn ids_to_vector_ids(ids : Array[Int64]) -> Array[@types.VectorId] {
-  let result : Array[@types.VectorId] = []
-  for id in ids {
-    result.push(@types.Int64Id(id))
-  }
-  result
-}
-
-///|
 /// Add ID to the equality index for a key-value pair.
 fn add_to_eq_index(
-  eq_map : Map[String, Map[String, Array[Int64]]],
+  eq_map : Map[String, Map[String, Array[@types.VectorId]]],
   key : String,
   value : @types.AttrValue,
-  id : Int64,
+  id : @types.VectorId,
 ) -> Unit {
   let value_key = attr_value_to_key(value)
   match eq_map.get(key) {
     None => {
-      let value_map : Map[String, Array[Int64]] = {}
+      let value_map : Map[String, Array[@types.VectorId]] = {}
       value_map.set(value_key, [id])
       eq_map.set(key, value_map)
     }
@@ -48,10 +38,10 @@ fn add_to_eq_index(
 ///|
 /// Remove ID from the equality index for a key-value pair.
 fn remove_from_eq_index(
-  eq_map : Map[String, Map[String, Array[Int64]]],
+  eq_map : Map[String, Map[String, Array[@types.VectorId]]],
   key : String,
   value : @types.AttrValue,
-  id : Int64,
+  id : @types.VectorId,
 ) -> Unit {
   let value_key = attr_value_to_key(value)
   match eq_map.get(key) {
@@ -60,7 +50,7 @@ fn remove_from_eq_index(
       match value_map.get(value_key) {
         None => ()
         Some(ids) => {
-          let _ = remove_int64_swap(ids, id)
+          let _ = remove_vectorid_swap(ids, id)
         }
       }
   }
@@ -69,9 +59,9 @@ fn remove_from_eq_index(
 ///|
 /// Add ID to the exists index for a key.
 fn add_to_exists_index(
-  exists_map : Map[String, Array[Int64]],
+  exists_map : Map[String, Array[@types.VectorId]],
   key : String,
-  id : Int64,
+  id : @types.VectorId,
 ) -> Unit {
   match exists_map.get(key) {
     None => exists_map.set(key, [id])
@@ -82,14 +72,14 @@ fn add_to_exists_index(
 ///|
 /// Remove ID from the exists index for a key.
 fn remove_from_exists_index(
-  exists_map : Map[String, Array[Int64]],
+  exists_map : Map[String, Array[@types.VectorId]],
   key : String,
-  id : Int64,
+  id : @types.VectorId,
 ) -> Unit {
   match exists_map.get(key) {
     None => ()
     Some(ids) => {
-      let _ = remove_int64_swap(ids, id)
+      let _ = remove_vectorid_swap(ids, id)
     }
   }
 }

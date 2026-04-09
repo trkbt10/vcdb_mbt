@@ -28,9 +28,9 @@ test "attr/bptree_remove_id" {
 /// Root leaf split creates two linked leaves
 test "bptree/root_leaf_split" {
   let tree = BPTree::new(2)
-  bptree_insert(tree, encode_attr_value(@types.Int(10L)), 10L)
-  bptree_insert(tree, encode_attr_value(@types.Int(20L)), 20L)
-  bptree_insert(tree, encode_attr_value(@types.Int(30L)), 30L)
+  bptree_insert(tree, encode_attr_value(@types.Int(10L)), @types.Int64Id(10L))
+  bptree_insert(tree, encode_attr_value(@types.Int(20L)), @types.Int64Id(20L))
+  bptree_insert(tree, encode_attr_value(@types.Int(30L)), @types.Int64Id(30L))
   inspect(tree.root_idx != 0, content="true")
   match tree.nodes[tree.root_idx] {
     Leaf(_, _) => inspect(false, content="true")
@@ -76,7 +76,7 @@ test "bptree/branch_split_propagation" {
     bptree_insert(
       tree,
       encode_attr_value(@types.Int(i.to_int64() * 10L)),
-      i.to_int64(),
+      @types.VectorId::from_int(i),
     )
   }
   match tree.nodes[tree.root_idx] {
@@ -312,13 +312,13 @@ test "bptree/unicode_strings" {
   index.set_attrs(id3, attrs3)
   let r1 = index.eq("name", @types.String("hello"))
   inspect(r1.length(), content="1")
-  inspect(r1[0].to_int64(), content="1")
+  inspect(r1[0], content="Int64Id(1)")
   let r2 = index.eq("name", @types.String("héllo"))
   inspect(r2.length(), content="1")
-  inspect(r2[0].to_int64(), content="2")
+  inspect(r2[0], content="Int64Id(2)")
   let r3 = index.eq("name", @types.String("日本語"))
   inspect(r3.length(), content="1")
-  inspect(r3[0].to_int64(), content="3")
+  inspect(r3[0], content="Int64Id(3)")
 }
 
 ///|
@@ -337,5 +337,159 @@ test "bptree/attrs_defensive_copy" {
         Some(@types.String(s)) => inspect(s, content="A")
         _ => inspect(false, content="true")
       }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Bytes16Id (UUID/128-bit) tests
+// ══════════════════════════════════════════════════════════════
+
+///|
+fn make_test_bytes16(seed : Int) -> @types.VectorId {
+  let b = (seed & 0xFF).to_byte()
+  @types.Bytes16Id(@types.Bytes16::{
+    b0: b,
+    b1: b'\x0e',
+    b2: b'\x84',
+    b3: b'\x00',
+    b4: b'\xe2',
+    b5: b'\x9b',
+    b6: b'\x41',
+    b7: b'\xd4',
+    b8: b'\xa7',
+    b9: b'\x16',
+    b10: b'\x44',
+    b11: b'\x66',
+    b12: b'\x55',
+    b13: b'\x44',
+    b14: b'\x00',
+    b15: b,
+  })
+}
+
+///|
+/// Bytes16Id can be stored and retrieved via set_attrs/get_attrs
+test "bptree/bytes16id_set_get" {
+  let index = BPTreeAttrIndex::new()
+  let id = make_test_bytes16(1)
+  let attrs = @types.empty_attrs()
+  attrs.set("name", @types.String("product-A"))
+  index.set_attrs(id, attrs)
+  match index.get_attrs(id) {
+    None => inspect(false, content="true")
+    Some(stored) =>
+      match stored.get("name") {
+        Some(@types.String(s)) => inspect(s, content="product-A")
+        _ => inspect(false, content="true")
+      }
+  }
+}
+
+///|
+/// Bytes16Id eq() lookup returns correct results
+test "bptree/bytes16id_eq_lookup" {
+  let index = BPTreeAttrIndex::new()
+  let id1 = make_test_bytes16(1)
+  let id2 = make_test_bytes16(2)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("category", @types.String("tool"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("category", @types.String("tool"))
+  index.set_attrs(id1, attrs1)
+  index.set_attrs(id2, attrs2)
+  let results = index.eq("category", @types.String("tool"))
+  inspect(results.length(), content="2")
+}
+
+///|
+/// Bytes16Id exists() and remove_id work correctly
+test "bptree/bytes16id_exists_remove" {
+  let index = BPTreeAttrIndex::new()
+  let id = make_test_bytes16(42)
+  let attrs = @types.empty_attrs()
+  attrs.set("status", @types.String("active"))
+  index.set_attrs(id, attrs)
+  inspect(index.exists("status").length(), content="1")
+  inspect(index.size(), content="1")
+  index.remove_id(id)
+  inspect(index.exists("status").length(), content="0")
+  inspect(index.size(), content="0")
+}
+
+///|
+/// Mixed Int64Id and Bytes16Id coexist in BPTree
+test "bptree/mixed_int64_bytes16" {
+  let index = BPTreeAttrIndex::new()
+  let int_id = @types.VectorId::from_int(1)
+  let uuid_id = make_test_bytes16(99)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("type", @types.String("question"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("type", @types.String("question"))
+  attrs2.set("source", @types.String("uuid"))
+  index.set_attrs(int_id, attrs1)
+  index.set_attrs(uuid_id, attrs2)
+  inspect(index.size(), content="2")
+  inspect(index.eq("type", @types.String("question")).length(), content="2")
+  inspect(index.exists("source").length(), content="1")
+  // Remove Int64Id only
+  index.remove_id(int_id)
+  inspect(index.size(), content="1")
+  inspect(index.eq("type", @types.String("question")).length(), content="1")
+}
+
+///|
+/// BPTree serialize/deserialize preserves Bytes16Id entries
+test "bptree/bytes16id_serialize_roundtrip" {
+  let index = BPTreeAttrIndex::new(order=4)
+  // Add Bytes16Id entries
+  for i in 0..<16 {
+    let id = make_test_bytes16(i)
+    let attrs = @types.empty_attrs()
+    attrs.set("score", @types.Int(i.to_int64() * 10L))
+    attrs.set("group", @types.String("g" + (i % 4).to_string()))
+    index.set_attrs(id, attrs)
+  }
+  // Add some Int64Id entries too
+  for i in 0..<8 {
+    let id = @types.VectorId::from_int(i + 1000)
+    let attrs = @types.empty_attrs()
+    attrs.set("score", @types.Int((i + 100).to_int64()))
+    attrs.set("group", @types.String("int"))
+    index.set_attrs(id, attrs)
+  }
+  inspect(index.size(), content="24")
+  // Serialize and deserialize
+  let roundtripped = BPTreeAttrIndex::deserialize(index.serialize())
+  inspect(roundtripped.size(), content="24")
+  // Verify Bytes16Id entry is retrievable
+  let id0 = make_test_bytes16(0)
+  match roundtripped.get_attrs(id0) {
+    None => inspect(false, content="true")
+    Some(stored) =>
+      match stored.get("score") {
+        Some(@types.Int(n)) => inspect(n, content="0")
+        _ => inspect(false, content="true")
+      }
+  }
+  // Verify eq query works across mixed IDs
+  inspect(roundtripped.eq("group", @types.String("int")).length(), content="8")
+  inspect(roundtripped.eq("group", @types.String("g0")).length(), content="4")
+}
+
+///|
+/// BPTree range queries work with Bytes16Id numeric attrs
+test "bptree/bytes16id_range" {
+  let index = BPTreeAttrIndex::new()
+  for i in 1..<=5 {
+    let id = make_test_bytes16(i)
+    let attrs = @types.empty_attrs()
+    attrs.set("score", @types.Int(i.to_int64() * 10L))
+    index.set_attrs(id, attrs)
+  }
+  let range = @types.NumericRange::between(20.0, 40.0)
+  match index.range("score", range) {
+    Some(ids) => inspect(ids.length(), content="3")
+    None => inspect(false, content="true")
   }
 }

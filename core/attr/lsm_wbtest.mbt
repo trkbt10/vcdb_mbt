@@ -172,3 +172,31 @@ test "lsm/attrs_defensive_copy" {
       }
   }
 }
+
+///|
+/// Bytes16Id works in LSMAttrIndex: set, get, eq, exists, range, remove
+test "lsm/bytes16id_full_operations" {
+  let index = LSMAttrIndex::new()
+  let uuid_id = @types.VectorId::from_uuid_string(
+    "550e8400-e29b-41d4-a716-446655440000",
+  ).unwrap()
+  let int_id = @types.VectorId::from_int(1)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("type", @types.String("product"))
+  attrs1.set("score", @types.Int(90L))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("type", @types.String("product"))
+  attrs2.set("score", @types.Int(50L))
+  index.set_attrs(uuid_id, attrs1)
+  index.set_attrs(int_id, attrs2)
+  inspect(index.size(), content="2")
+  inspect(index.eq("type", @types.String("product")).length(), content="2")
+  inspect(index.exists("score").length(), content="2")
+  match index.range("score", @types.NumericRange::between(80.0, 100.0)) {
+    Some(ids) => inspect(ids.length(), content="1")
+    None => inspect(false, content="true")
+  }
+  index.remove_id(uuid_id)
+  inspect(index.size(), content="1")
+  inspect(index.eq("type", @types.String("product")).length(), content="1")
+}

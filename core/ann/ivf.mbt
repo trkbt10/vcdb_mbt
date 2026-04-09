@@ -8,7 +8,7 @@ pub struct IVFState {
   mut centroid_count : Int
   centroids : Array[Double] // flattened: centroids[c*dim..(c+1)*dim]
   lists : Array[Array[@types.VectorId]] // posting lists
-  id_to_list : Map[Int64, Int] // id -> list index
+  id_to_list : Map[@types.VectorId, Int] // id -> list index
 }
 
 ///|
@@ -89,12 +89,12 @@ pub fn ivf_add(
       }
       state.centroid_count = state.centroid_count + 1
       state.lists[c].push(id)
-      state.id_to_list.set(id.to_int64(), c)
+      state.id_to_list.set(id, c)
     } else {
       // Find nearest centroid
       let c = nearest_centroid(state, store, vec)
       state.lists[c].push(id)
-      state.id_to_list.set(id.to_int64(), c)
+      state.id_to_list.set(id, c)
     }
   })
 }
@@ -111,21 +111,21 @@ pub fn ivf_assign(
     // Always assign to nearest existing centroid (no bootstrap)
     let c = nearest_centroid(state, store, vec)
     state.lists[c].push(id)
-    state.id_to_list.set(id.to_int64(), c)
+    state.id_to_list.set(id, c)
   })
 }
 
 ///|
 /// Remove a vector from IVF
 pub fn ivf_remove(state : IVFState, id : @types.VectorId) -> Unit {
-  match state.id_to_list.get(id.to_int64()) {
+  match state.id_to_list.get(id) {
     None => ()
     Some(li) => {
       let arr = state.lists[li]
       // Find and remove id from list
       let mut found_idx = -1
       for i in 0..<arr.length() {
-        if arr[i].to_int64() == id.to_int64() {
+        if arr[i] == id {
           found_idx = i
           break
         }
@@ -138,7 +138,7 @@ pub fn ivf_remove(state : IVFState, id : @types.VectorId) -> Unit {
         }
         let _ = arr.pop()
       }
-      state.id_to_list.remove(id.to_int64())
+      state.id_to_list.remove(id)
     }
   }
 }
@@ -235,7 +235,9 @@ pub fn ivf_serialize(state : IVFState, dim : Int) -> Bytes {
   for list in state.lists {
     w.push_u32(list.length().reinterpret_as_uint())
     for id in list {
-      w.push_u64(id.to_int64().reinterpret_as_uint64())
+      let wire = id.to_wire_bytes()
+      w.push_u32(wire.length().reinterpret_as_uint())
+      w.push_bytes(wire)
     }
   }
   w.concat()
@@ -265,10 +267,15 @@ pub fn ivf_deserialize(state : IVFState, data : Bytes, dim : Int) -> Unit {
   for li in 0..<nlist {
     let list_len = r.read_u32().reinterpret_as_int()
     for _ in 0..<list_len {
-      let id_val = r.read_u64().reinterpret_as_int64()
-      let id = @types.Int64Id(id_val)
-      state.lists[li].push(id)
-      state.id_to_list.set(id_val, li)
+      let wire_len = r.read_u32().reinterpret_as_int()
+      let wire = r.read_bytes(wire_len)
+      match @types.VectorId::from_wire_bytes(wire) {
+        Some(id) => {
+          state.lists[li].push(id)
+          state.id_to_list.set(id, li)
+        }
+        None => ()
+      }
     }
   }
 }
@@ -315,7 +322,7 @@ pub fn ivf_train(
       }
       let c = nearest_centroid(state, store, vec)
       state.lists[c].push(id)
-      state.id_to_list.set(id.to_int64(), c)
+      state.id_to_list.set(id, c)
     }
     // Update centroids
     for c in 0..<centroid_count {

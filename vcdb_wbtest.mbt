@@ -22,7 +22,7 @@ test "vectordb/bruteforce" {
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
   // Remove
   let removed = db.remove(@types.VectorId::from_int(2))
   inspect(removed, content="true")
@@ -51,7 +51,7 @@ test "vectordb/hnsw" {
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -76,7 +76,7 @@ test "vectordb/ivf" {
   // Search
   let results = db.search([1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -99,7 +99,7 @@ test "vectordb/serialization" {
   // Search should work
   let results = db2.search([1.0, 0.0, 0.0], 1, None)
   inspect(results.length(), content="1")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -122,7 +122,7 @@ test "vectordb/serialization_preserves_metadata_index" {
     @filter.PreFilter,
   )
   inspect(results.length(), content="1")
-  inspect(results[0].id.to_int64(), content="2")
+  inspect(results[0].id, content="Int64Id(2)")
 }
 
 ///|
@@ -169,7 +169,7 @@ test "vectordb/search_with_expr_postfilter" {
     @filter.PostFilter,
   )
   inspect(results.length(), content="1")
-  inspect(results[0].id.to_int64(), content="2")
+  inspect(results[0].id, content="Int64Id(2)")
 }
 
 ///|
@@ -278,7 +278,7 @@ test "vectordb/find" {
   let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   // Find best match
   match db.find([1.0, 0.0], None) {
-    Some(hit) => inspect(hit.id.to_int64(), content="1")
+    Some(hit) => inspect(hit.id, content="Int64Id(1)")
     None => inspect(false, content="true")
   }
 }
@@ -336,7 +336,7 @@ test "vectordb/update_attrs_updates_metadata_index" {
   )
   inspect(draft_results.length(), content="0")
   inspect(published_results.length(), content="1")
-  inspect(published_results[0].id.to_int64(), content="1")
+  inspect(published_results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -357,7 +357,7 @@ test "vectordb/hnsw_remove" {
   inspect(db.raw_size(), content="3")
   // Search should not find id1
   let results = db.search([1.0, 0.0], 10, None)
-  let has_id1 = results.iter().any(fn(h) { h.id.to_int64() == 1L })
+  let has_id1 = results.iter().any(fn(h) { h.id == @types.Int64Id(1L) })
   inspect(has_id1, content="false")
 }
 
@@ -520,18 +520,18 @@ test "vectordb/upsert_reindex_hnsw" {
   let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], @types.empty_attrs())
   // Search for [1, 0] should find id=1 as best
   let results1 = db.search([1.0, 0.0], 1, None)
-  inspect(results1[0].id.to_int64(), content="1")
+  inspect(results1[0].id, content="Int64Id(1)")
   // Upsert to change id=1 to point in opposite direction
   let _ = db.upsert(id, [0.0, 1.0], @types.empty_attrs())
   // Now search for [1, 0] should NOT find id=1 as best
   let results2 = db.search([1.0, 0.0], 2, None)
   // id=2 should be better match now (both point to [0, 1])
   // Actually both now point to [0, 1], so neither is a good match for [1, 0]
-  let _ = results2[0].id.to_int64()
+  let _ = results2[0].id
   // After update, id=1 has vector [0, 1], so searching for [0, 1] should find it
   let results3 = db.search([0.0, 1.0], 1, None)
   inspect(
-    results3[0].id.to_int64() == 1L || results3[0].id.to_int64() == 2L,
+    results3[0].id == @types.Int64Id(1L) || results3[0].id == @types.Int64Id(2L),
     content="true",
   )
 }
@@ -664,7 +664,7 @@ test "vectordb/search_dimension_correct" {
     @filter.PreFilter,
   )
   inspect(results.length(), content="1")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -689,7 +689,7 @@ test "vectordb/hnsw_tombstone_delete_add" {
   // Search should find the new vector
   let results = db.search([0.0, 1.0, 0.0], 1, None)
   inspect(results.length(), content="1")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -766,7 +766,7 @@ test "vectordb/prefilter_excludes_tombstoned" {
   )
   // Should only find id2 (id1 is tombstoned)
   inspect(results.length(), content="1")
-  inspect(results[0].id.to_int64(), content="2")
+  inspect(results[0].id, content="Int64Id(2)")
 }
 
 ///|
@@ -786,8 +786,8 @@ test "vectordb/scroll_filtered_basic" {
   // Verify ascending ID order
   let (id0, _) = results[0]
   let (id1, _) = results[1]
-  inspect(id0.to_int64(), content="1")
-  inspect(id1.to_int64(), content="3")
+  inspect(id0, content="Int64Id(1)")
+  inspect(id1, content="Int64Id(3)")
 }
 
 ///|
@@ -808,27 +808,19 @@ test "vectordb/scroll_filtered_pagination" {
   let page1 = db.scroll_filtered(expr=Some(expr), limit=2)
   inspect(page1.length(), content="2")
   let (last_id, _) = page1[1]
-  inspect(last_id.to_int64(), content="2")
+  inspect(last_id, content="Int64Id(2)")
   // Page 2: next 2 (offset = last seen ID)
-  let page2 = db.scroll_filtered(
-    expr=Some(expr),
-    offset=Some(last_id.to_int64()),
-    limit=2,
-  )
+  let page2 = db.scroll_filtered(expr=Some(expr), offset=Some(last_id), limit=2)
   inspect(page2.length(), content="2")
   let (p2_first, _) = page2[0]
   let (p2_last, _) = page2[1]
-  inspect(p2_first.to_int64(), content="3")
-  inspect(p2_last.to_int64(), content="4")
+  inspect(p2_first, content="Int64Id(3)")
+  inspect(p2_last, content="Int64Id(4)")
   // Page 3: last 1
-  let page3 = db.scroll_filtered(
-    expr=Some(expr),
-    offset=Some(p2_last.to_int64()),
-    limit=2,
-  )
+  let page3 = db.scroll_filtered(expr=Some(expr), offset=Some(p2_last), limit=2)
   inspect(page3.length(), content="1")
   let (p3_first, _) = page3[0]
-  inspect(p3_first.to_int64(), content="5")
+  inspect(p3_first, content="Int64Id(5)")
 }
 
 ///|
@@ -862,8 +854,8 @@ test "vectordb/scroll_filtered_must_not" {
   inspect(results.length(), content="2")
   let (id0, _) = results[0]
   let (id1, _) = results[1]
-  inspect(id0.to_int64(), content="1")
-  inspect(id1.to_int64(), content="3")
+  inspect(id0, content="Int64Id(1)")
+  inspect(id1, content="Int64Id(3)")
 }
 
 ///|
@@ -881,7 +873,7 @@ test "vectordb/scroll_filtered_is_null" {
   let results = db.scroll_filtered(expr=Some(expr), limit=10)
   inspect(results.length(), content="1")
   let (id0, _) = results[0]
-  inspect(id0.to_int64(), content="2")
+  inspect(id0, content="Int64Id(2)")
 }
 
 ///|
@@ -912,7 +904,7 @@ test "vectordb/scroll_filtered_should_min2" {
   let results = db.scroll_filtered(expr=Some(expr), limit=10)
   inspect(results.length(), content="1")
   let (id0, _) = results[0]
-  inspect(id0.to_int64(), content="1")
+  inspect(id0, content="Int64Id(1)")
 }
 
 ///|
@@ -963,8 +955,8 @@ test "vectordb/scroll_filtered_hnsw_tombstone" {
   inspect(results.length(), content="2")
   let (id0, _) = results[0]
   let (id1, _) = results[1]
-  inspect(id0.to_int64(), content="1")
-  inspect(id1.to_int64(), content="3")
+  inspect(id0, content="Int64Id(1)")
+  inspect(id1, content="Int64Id(3)")
 }
 
 ///|

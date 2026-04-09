@@ -1,7 +1,7 @@
 {
-  "name": "@vcdb/server",
-  "version": "0.1.0",
-  "description": "vcdb vector database HTTP server with pluggable storage backends",
+  "name": "vcdb",
+  "version": "0.3.0",
+  "description": "Minimal, dependency-free vector database with pluggable ANN strategies (bruteforce, HNSW, IVF), attribute filtering, and persistence. Powered by MoonBit WASM. Runs in Node.js, browsers, and edge runtimes.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,27 +13,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-
-    "./ffi/types": {
-      "types": "./dist/ffi/types.d.ts",
-      "import": "./dist/ffi/types.js"
-    },
-    "./loader": {
-      "types": "./dist/ffi/loader.d.ts",
-      "import": "./dist/ffi/loader.js"
-    },
-    "./wasm/lib.js": {
-      "types": "./dist/wasm/lib.d.ts",
-      "default": "./dist/wasm/lib.js"
-    },
-
-    "./persistent": {
-      "types": "./dist/persistent.d.ts",
-      "import": "./dist/persistent.js"
-    },
-    "./db": {
-      "types": "./dist/db.d.ts",
-      "import": "./dist/db.js"
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
     },
     "./distributed": {
       "types": "./dist/distributed.d.ts",
@@ -43,7 +25,6 @@
       "types": "./dist/gateway.d.ts",
       "import": "./dist/gateway.js"
     },
-
     "./storage/memory": {
       "types": "./dist/storage/memory.d.ts",
       "import": "./dist/storage/memory.js"
@@ -81,9 +62,10 @@
       "import": "./dist/storage/do-kv.js"
     }
   },
+  "sideEffects": false,
   "scripts": {
     "build:moon": "cd .. && moon build --target js ffi",
-    "copy:moon": "cp ../_build/js/debug/build/ffi/ffi.js dist/wasm/lib.js && cp ../_build/js/debug/build/ffi/moonbit.d.ts dist/wasm/",
+    "copy:moon": "mkdir -p dist/wasm && cp ../_build/js/debug/build/ffi/ffi.js dist/wasm/lib.js && cp ../_build/js/debug/build/ffi/moonbit.d.ts dist/wasm/ && cp src/wasm/lib.d.ts dist/wasm/",
     "build:ts": "tsc",
     "build": "npm run build:moon && npm run build:ts && npm run copy:moon",
     "start": "node dist/server.js",
@@ -92,28 +74,46 @@
     "prepublishOnly": "npm run clean && npm run build",
     "test": "bash e2e-test.sh",
     "test:smoke": "node test/smoke.test.mjs",
+    "test:contract": "node test/contract.test.mjs",
     "test:spec": "npx tsx spec/node.runner.ts",
     "test:spec:browser": "npx tsx spec/browser.runner.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.typecheck.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.typecheck.json",
+    "pack:check": "npm pack --dry-run"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "playwright": "^1.58.2",
     "typescript": "^5.3.0"
   },
+  "peerDependencies": {
+    "hono": ">=4",
+    "@hono/node-server": ">=1"
+  },
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    },
+    "@hono/node-server": {
+      "optional": true
+    }
+  },
   "keywords": [
     "vector-database",
     "vcdb",
-    "storage",
+    "ann",
+    "hnsw",
+    "ivf",
+    "similarity-search",
+    "wasm",
+    "moonbit",
     "indexeddb",
     "opfs",
-    "http-server",
-    "rest-api"
+    "storage"
   ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/trkbt10/vcdb.git",
+    "url": "https://github.com/trkbt10/vcdb_mbt.git",
     "directory": "js"
   },
   "files": [
@@ -122,9 +122,5 @@
   ],
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {
-    "@hono/node-server": "^1.19.10",
-    "hono": "^4.12.4"
   }
 }

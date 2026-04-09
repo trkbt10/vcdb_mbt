@@ -397,7 +397,7 @@ pub fn[W, S] PersistentDB::has(
 /// Scroll through vectors in ascending ID order.
 pub fn[W, S] PersistentDB::scroll(
   self : PersistentDB[W, S],
-  offset? : Int64? = None,
+  offset? : @types.VectorId? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
   self.engine.scroll(offset~, limit~)
@@ -408,7 +408,7 @@ pub fn[W, S] PersistentDB::scroll(
 pub fn[W, S] PersistentDB::scroll_filtered(
   self : PersistentDB[W, S],
   expr? : @filter.FilterExpr? = None,
-  offset? : Int64? = None,
+  offset? : @types.VectorId? = None,
   limit? : Int = 10,
 ) -> Array[(@types.VectorId, @types.VectorRecord)] {
   self.engine.scroll_filtered(expr~, offset~, limit~)

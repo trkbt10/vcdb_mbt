@@ -315,10 +315,22 @@ test "wire/bytes16_roundtrip" {
 test "wire/bytes16_with_lower_nonzero_is_bytes16id" {
   // All upper 8 bytes zero, but lower byte 15 = 0x01
   let b = @types.Bytes16::{
-    b0: b'\x00', b1: b'\x00', b2: b'\x00', b3: b'\x00',
-    b4: b'\x00', b5: b'\x00', b6: b'\x00', b7: b'\x00',
-    b8: b'\x00', b9: b'\x00', b10: b'\x00', b11: b'\x00',
-    b12: b'\x00', b13: b'\x00', b14: b'\x00', b15: b'\x01',
+    b0: b'\x00',
+    b1: b'\x00',
+    b2: b'\x00',
+    b3: b'\x00',
+    b4: b'\x00',
+    b5: b'\x00',
+    b6: b'\x00',
+    b7: b'\x00',
+    b8: b'\x00',
+    b9: b'\x00',
+    b10: b'\x00',
+    b11: b'\x00',
+    b12: b'\x00',
+    b13: b'\x00',
+    b14: b'\x00',
+    b15: b'\x01',
   }
   let id = @types.Bytes16Id(b)
   let wire = id.to_wire_bytes()
@@ -336,10 +348,22 @@ test "wire/bytes16_with_lower_nonzero_is_bytes16id" {
 /// This is a known, documented, accepted behavior.
 test "wire/bytes16_all_zeros_decodes_as_int64id_zero" {
   let b = @types.Bytes16::{
-    b0: b'\x00', b1: b'\x00', b2: b'\x00', b3: b'\x00',
-    b4: b'\x00', b5: b'\x00', b6: b'\x00', b7: b'\x00',
-    b8: b'\x00', b9: b'\x00', b10: b'\x00', b11: b'\x00',
-    b12: b'\x00', b13: b'\x00', b14: b'\x00', b15: b'\x00',
+    b0: b'\x00',
+    b1: b'\x00',
+    b2: b'\x00',
+    b3: b'\x00',
+    b4: b'\x00',
+    b5: b'\x00',
+    b6: b'\x00',
+    b7: b'\x00',
+    b8: b'\x00',
+    b9: b'\x00',
+    b10: b'\x00',
+    b11: b'\x00',
+    b12: b'\x00',
+    b13: b'\x00',
+    b14: b'\x00',
+    b15: b'\x00',
   }
   let id = @types.Bytes16Id(b)
   let wire = id.to_wire_bytes()
@@ -356,14 +380,8 @@ test "wire/invalid_lengths" {
   assert_eq(@types.VectorId::from_wire_bytes(b""), None)
   assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(1, b'\x00')), None)
   assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(8, b'\x00')), None)
-  assert_eq(
-    @types.VectorId::from_wire_bytes(Bytes::make(15, b'\x00')),
-    None,
-  )
-  assert_eq(
-    @types.VectorId::from_wire_bytes(Bytes::make(17, b'\x00')),
-    None,
-  )
+  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(15, b'\x00')), None)
+  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(17, b'\x00')), None)
 }
 
 // ── Wire format ↔ WAL format consistency ─────────────────────
@@ -380,7 +398,10 @@ test "wire_wal/int64_full_roundtrip" {
   let decoded_in = @types.VectorId::from_wire_bytes(wire_in).unwrap()
   // Encode to WAL v3 and decode back
   let wal_record = WalRecord::upsert(
-    decoded_in, [1.0], @types.empty_attrs(), timestamp=100L,
+    decoded_in,
+    [1.0],
+    @types.empty_attrs(),
+    timestamp=100L,
   )
   let encoded = encode_wal_record(wal_record)
   let r = @binary.BinaryReader::new(encoded)
@@ -397,7 +418,10 @@ test "wire_wal/bytes16_full_roundtrip" {
   let wire_in = original.to_wire_bytes()
   let decoded_in = @types.VectorId::from_wire_bytes(wire_in).unwrap()
   let wal_record = WalRecord::upsert(
-    decoded_in, [2.0], @types.empty_attrs(), timestamp=200L,
+    decoded_in,
+    [2.0],
+    @types.empty_attrs(),
+    timestamp=200L,
   )
   let encoded = encode_wal_record(wal_record)
   let r = @binary.BinaryReader::new(encoded)
@@ -441,7 +465,10 @@ test "wire_wal/int64_boundary_values" {
   for id in ids {
     let wire_in = id.to_wire_bytes()
     let wal_record = WalRecord::upsert(
-      id, [1.0], @types.empty_attrs(), timestamp=1L,
+      id,
+      [1.0],
+      @types.empty_attrs(),
+      timestamp=1L,
     )
     let encoded = encode_wal_record(wal_record)
     let r = @binary.BinaryReader::new(encoded)
@@ -474,10 +501,8 @@ test "wire_wal/bytes16_from_hi_lo_roundtrip" {
 /// Various UUID strings: wire round-trip preserves exact bytes
 test "wire_wal/uuid_strings_roundtrip" {
   let uuids = [
-    "00000000-0000-0000-0000-000000000001",
-    "ffffffff-ffff-ffff-ffff-ffffffffffff",
-    "550e8400-e29b-41d4-a716-446655440000",
-    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    "00000000-0000-0000-0000-000000000001", "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    "550e8400-e29b-41d4-a716-446655440000", "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
     "01234567-89ab-cdef-0123-456789abcdef",
   ]
   for uuid in uuids {

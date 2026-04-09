@@ -75,8 +75,16 @@ jobs:
           npm run build:ts
           npm run copy:moon
 
+      - name: TypeScript type check
+        working-directory: js
+        run: npm run typecheck
+
       - name: Run WASM smoke test
         run: node js/test/smoke.test.mjs
 
       - name: Run FFI contract test
         run: node js/test/contract.test.mjs
+
+      - name: Validate npm package
+        working-directory: js
+        run: npm pack --dry-run

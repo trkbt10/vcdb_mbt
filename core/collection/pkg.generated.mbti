@@ -31,7 +31,8 @@ pub fn[T] MaxHeap::push(Self[T], T) -> Unit
 pub(all) struct ScoredItem {
   idx : Int
   s : Double
-} derive(Show)
+}
+pub impl Show for ScoredItem
 pub impl Scored for ScoredItem
 
 // Type aliases

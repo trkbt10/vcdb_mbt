@@ -18,7 +18,7 @@ import type {
 } from "./types.js";
 
 let module: WasmModule | null = null;
-const DEFAULT_LIB_PATH = "./lib.js";
+const DEFAULT_LIB_PATH = "../wasm/lib.js";
 
 /**
  * Load the MoonBit JS module.

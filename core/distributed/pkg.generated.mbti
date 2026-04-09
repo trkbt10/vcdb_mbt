@@ -62,7 +62,8 @@ pub(all) enum ConflictResolution {
   KeepLocal
   KeepRemote
   TieBreakById
-} derive(Eq, Show)
+} derive(Eq)
+pub impl Show for ConflictResolution
 
 pub struct DistributedDB[T] {
   shard_count : Int
@@ -117,7 +118,8 @@ pub fn PartitionState::resolve_partition(Self, Int) -> Unit
 pub(all) enum PartitionStatus {
   Connected
   Partitioned(Int64)
-} derive(Eq, Show)
+} derive(Eq)
+pub impl Show for PartitionStatus
 
 pub(all) struct QuorumConfig {
   n : Int
@@ -227,7 +229,8 @@ pub(all) enum ShardStatus {
   Healthy
   Degraded
   Failed
-} derive(Eq, Show)
+} derive(Eq)
+pub impl Show for ShardStatus
 
 pub(all) struct TransportPoint {
   id : @types.VectorId

@@ -116,9 +116,9 @@ test "edge/dim/single_dimension" {
     let results = db.search([1.0], 3, None)
 
     // Dot product with [1.0]: 7 > 5 > 3
-    inspect(results[0].id.to_int64(), content="3")
-    inspect(results[1].id.to_int64(), content="1")
-    inspect(results[2].id.to_int64(), content="2")
+    inspect(results[0].id, content="Int64Id(3)")
+    inspect(results[1].id, content="Int64Id(1)")
+    inspect(results[2].id, content="Int64Id(2)")
   })
 }
 
@@ -147,7 +147,7 @@ test "edge/dim/high_dimension" {
     query[100] = 1.0
 
     let results = db.search(query, 1, None)
-    inspect(results[0].id.to_int64(), content="2") // id=2 has hot at 100
+    inspect(results[0].id, content="Int64Id(2)") // id=2 has hot at 100
   })
 }
 
@@ -193,9 +193,9 @@ test "edge/score/identical_scores" {
     inspect(results[2].score, content="1")
 
     // All 3 IDs should be present
-    let ids : Array[Int64] = results
+    let ids : Array[@types.VectorId] = results
       .iter()
-      .map(fn(h) { h.id.to_int64() })
+      .map(fn(h) { h.id })
       .collect()
     inspect(ids.length(), content="3")
   })
@@ -233,9 +233,9 @@ test "edge/score/close_scores" {
     let results = db.search([1.0], 3, None)
 
     // Should be ordered correctly despite tiny differences
-    inspect(results[0].id.to_int64(), content="3")
-    inspect(results[1].id.to_int64(), content="2")
-    inspect(results[2].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(3)")
+    inspect(results[1].id, content="Int64Id(2)")
+    inspect(results[2].id, content="Int64Id(1)")
   })
 }
 
@@ -270,7 +270,7 @@ test "edge/vector/zero_vector_l2" {
     let results = db.search([0.0, 0.0, 0.0], 2, None)
 
     // Zero to zero distance = 0 (score = 0)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     inspect(results[0].score, content="0")
   })
 }
@@ -355,7 +355,7 @@ test "edge/hnsw/single_node" {
 
     let results = db.search([1.0, 0.0, 0.0], 10, None)
     inspect(results.length(), content="1")
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
   })
 }
 
@@ -387,7 +387,10 @@ test "edge/hnsw/high_tombstone_ratio" {
     inspect(results.length() <= 2, content="true")
 
     for hit in results {
-      let id = hit.id.to_int64()
+      let id = match hit.id {
+        Int64Id(v) => v
+        _ => abort("")
+      }
       inspect(id >= 19L, content="true")
     }
   })

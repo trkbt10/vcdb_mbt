@@ -51,7 +51,7 @@ async fn demo_bruteforce() -> Unit {
       Some(@types.String(s)) => s
       _ => "unknown"
     }
-    println("  \{i + 1}. \{name} (id=\{hit.id.to_int64()}, score=\{hit.score})")
+    println("  \{i + 1}. \{name} (id=\{hit.id}, score=\{hit.score})")
   }
   println("")
 }
@@ -89,7 +89,7 @@ async fn demo_hnsw() -> Unit {
       _ => "?"
     }
     println(
-      "  \{i + 1}. index=\{idx} (id=\{hit.id.to_int64()}, score=\{format_score(hit.score)})",
+      "  \{i + 1}. index=\{idx} (id=\{hit.id}, score=\{format_score(hit.score)})",
     )
   }
   println("")
@@ -249,19 +249,19 @@ async fn demo_metrics() -> Unit {
   println("Cosine (direction only):")
   let r_cos = db_cosine.search(query, 3, None)
   for hit in r_cos {
-    println("  id=\{hit.id.to_int64()}, score=\{format_score(hit.score)}")
+    println("  id=\{hit.id}, score=\{format_score(hit.score)}")
   }
 
   println("Dot (direction + magnitude):")
   let r_dot = db_dot.search(query, 3, None)
   for hit in r_dot {
-    println("  id=\{hit.id.to_int64()}, score=\{format_score(hit.score)}")
+    println("  id=\{hit.id}, score=\{format_score(hit.score)}")
   }
 
   println("L2 (distance, negated):")
   let r_l2 = db_l2.search(query, 3, None)
   for hit in r_l2 {
-    println("  id=\{hit.id.to_int64()}, score=\{format_score(hit.score)}")
+    println("  id=\{hit.id}, score=\{format_score(hit.score)}")
   }
 }
 

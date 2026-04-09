@@ -6,7 +6,7 @@
 /// Memtable entry
 priv struct MemtableEntry {
   _key : Bytes
-  value : Array[Int64]? // None = tombstone
+  value : Array[@types.VectorId]? // None = tombstone
   _seq : Int // Sequence number for ordering
 }
 
@@ -29,7 +29,7 @@ fn Memtable::new() -> Memtable {
 pub struct LSMAttrIndex {
   memtable : Memtable // Value memtable
   exists_memtable : Memtable // Existence memtable
-  data : Map[Int64, @types.Attrs] // Direct attrs storage
+  data : Map[@types.VectorId, @types.Attrs] // Direct attrs storage
   flush_threshold : Int // Auto-flush threshold (default 1000)
 }
 
@@ -90,7 +90,11 @@ fn lsm_encode_exists_key(attr_key : String) -> Bytes {
 
 ///|
 /// Insert or update value in memtable
-fn memtable_put(mt : Memtable, key : Bytes, value : Array[Int64]?) -> Unit {
+fn memtable_put(
+  mt : Memtable,
+  key : Bytes,
+  value : Array[@types.VectorId]?,
+) -> Unit {
   let key_str = lsm_bytes_to_hex(key)
   let seq = mt.next_seq
   mt.next_seq = seq + 1
@@ -107,7 +111,7 @@ fn memtable_put(mt : Memtable, key : Bytes, value : Array[Int64]?) -> Unit {
 
 ///|
 /// Lookup value in memtable
-fn memtable_get(mt : Memtable, key : Bytes) -> Array[Int64]?? {
+fn memtable_get(mt : Memtable, key : Bytes) -> Array[@types.VectorId]?? {
   let key_str = lsm_bytes_to_hex(key)
   match mt.entries.get(key_str) {
     None => None
@@ -117,7 +121,7 @@ fn memtable_get(mt : Memtable, key : Bytes) -> Array[Int64]?? {
 
 ///|
 /// Add ID to posting list in memtable
-fn memtable_add_id(mt : Memtable, key : Bytes, id : Int64) -> Unit {
+fn memtable_add_id(mt : Memtable, key : Bytes, id : @types.VectorId) -> Unit {
   let key_str = lsm_bytes_to_hex(key)
   match mt.entries.get(key_str) {
     None => memtable_put(mt, key, Some([id]))
@@ -143,7 +147,7 @@ fn memtable_add_id(mt : Memtable, key : Bytes, id : Int64) -> Unit {
 
 ///|
 /// Remove ID from posting list in memtable
-fn memtable_remove_id(mt : Memtable, key : Bytes, id : Int64) -> Unit {
+fn memtable_remove_id(mt : Memtable, key : Bytes, id : @types.VectorId) -> Unit {
   let key_str = lsm_bytes_to_hex(key)
   match mt.entries.get(key_str) {
     None => ()
@@ -151,7 +155,7 @@ fn memtable_remove_id(mt : Memtable, key : Bytes, id : Int64) -> Unit {
       match entry.value {
         None => ()
         Some(list) => {
-          let _ = remove_int64_swap(list, id)
+          let _ = remove_vectorid_swap(list, id)
           // Mark as tombstone if empty
           if list.is_empty() {
             memtable_put(mt, key, None)
@@ -168,27 +172,26 @@ pub fn LSMAttrIndex::set_attrs(
   id : @types.VectorId,
   attrs : @types.Attrs,
 ) -> Unit {
-  let id_val = id.to_int64()
   // Remove old attrs
-  match self.data.get(id_val) {
+  match self.data.get(id) {
     None => ()
     Some(old_attrs) =>
       for_each_attr(old_attrs, fn(key, value) {
         let mem_key = lsm_encode_memtable_key(key, value)
-        memtable_remove_id(self.memtable, mem_key, id_val)
+        memtable_remove_id(self.memtable, mem_key, id)
         let exists_key = lsm_encode_exists_key(key)
-        memtable_remove_id(self.exists_memtable, exists_key, id_val)
+        memtable_remove_id(self.exists_memtable, exists_key, id)
       })
   }
   // Add new attrs
   for_each_attr(attrs, fn(key, value) {
     let mem_key = lsm_encode_memtable_key(key, value)
-    memtable_add_id(self.memtable, mem_key, id_val)
+    memtable_add_id(self.memtable, mem_key, id)
     let exists_key = lsm_encode_exists_key(key)
-    memtable_add_id(self.exists_memtable, exists_key, id_val)
+    memtable_add_id(self.exists_memtable, exists_key, id)
   })
   // Store attrs (defensive copy to prevent external mutation)
-  self.data.set(id_val, attrs.copy())
+  self.data.set(id, attrs.copy())
 }
 
 ///|
@@ -197,7 +200,7 @@ pub fn LSMAttrIndex::get_attrs(
   self : LSMAttrIndex,
   id : @types.VectorId,
 ) -> @types.Attrs? {
-  self.data.get(id.to_int64())
+  self.data.get(id)
 }
 
 ///|
@@ -206,17 +209,16 @@ pub fn LSMAttrIndex::remove_id(
   self : LSMAttrIndex,
   id : @types.VectorId,
 ) -> Unit {
-  let id_val = id.to_int64()
-  match self.data.get(id_val) {
+  match self.data.get(id) {
     None => ()
     Some(old_attrs) => {
       for_each_attr(old_attrs, fn(key, value) {
         let mem_key = lsm_encode_memtable_key(key, value)
-        memtable_remove_id(self.memtable, mem_key, id_val)
+        memtable_remove_id(self.memtable, mem_key, id)
         let exists_key = lsm_encode_exists_key(key)
-        memtable_remove_id(self.exists_memtable, exists_key, id_val)
+        memtable_remove_id(self.exists_memtable, exists_key, id)
       })
-      self.data.remove(id_val)
+      self.data.remove(id)
     }
   }
 }
@@ -234,7 +236,7 @@ pub fn LSMAttrIndex::eq(
     Some(value_opt) =>
       match value_opt {
         None => [] // Tombstone
-        Some(list) => ids_to_vector_ids(list)
+        Some(list) => list.copy()
       }
   }
 }
@@ -251,7 +253,7 @@ pub fn LSMAttrIndex::exists(
     Some(value_opt) =>
       match value_opt {
         None => []
-        Some(list) => ids_to_vector_ids(list)
+        Some(list) => list.copy()
       }
   }
 }
@@ -266,7 +268,7 @@ pub fn LSMAttrIndex::range(
 ) -> Array[@types.VectorId]? {
   // Scan through data for matching numeric values
   let result : Array[@types.VectorId] = []
-  let seen : Map[Int64, Bool] = {}
+  let seen : Map[@types.VectorId, Bool] = {}
   for entry in self.data {
     let (id_val, attrs) = entry
     match attrs.get(key) {
@@ -277,7 +279,7 @@ pub fn LSMAttrIndex::range(
           Some(num) =>
             if range.matches(num) && !seen.contains(id_val) {
               seen.set(id_val, true)
-              result.push(@types.Int64Id(id_val))
+              result.push(id_val)
             }
         }
     }

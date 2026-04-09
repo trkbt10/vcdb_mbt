@@ -104,8 +104,10 @@ pub fn encode_index_file(
 
   // Entries
   for entry in entries {
-    // ID (8 bytes for 64-bit support)
-    w.push_u64(entry.id.to_int64().reinterpret_as_uint64())
+    // ID (wire format: length-prefixed bytes)
+    let id_wire = entry.id.to_wire_bytes()
+    w.push_u32(id_wire.length().reinterpret_as_uint())
+    w.push_bytes(id_wire)
 
     // Segment name
     let name_bytes = @codec.encode_utf8(entry.ptr.segment)
@@ -182,7 +184,11 @@ pub fn decode_index_file(data : Bytes) -> DecodedIndexFile? {
   let entries : Array[IndexEntry] = []
   while r.remaining() >= 20 {
     // Minimum entry: id(8) + nameLen(4) + name(0) + offset(4) + length(4)
-    let id = @types.Int64Id(r.read_u64().reinterpret_as_int64())
+    let id_wire_len = r.read_u32().reinterpret_as_int()
+    let id = match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
+      Some(v) => v
+      None => @types.Int64Id(0L)
+    }
     let name_len = r.read_u32().reinterpret_as_int()
 
     if r.remaining() < name_len + 8 {

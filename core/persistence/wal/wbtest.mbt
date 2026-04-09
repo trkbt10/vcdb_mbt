@@ -26,7 +26,7 @@ test "wal/record_roundtrip" {
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) => {
-      inspect(r.id.to_int64(), content="42")
+      inspect(r.id, content="Int64Id(42)")
       inspect(r.record_type == WalRecordType::Upsert, content="true")
       match r.vector {
         Some(v) => inspect(v.length(), content="3")
@@ -226,7 +226,7 @@ test "wal/attr_types_roundtrip" {
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) => {
-      inspect(r.id.to_int64(), content="999")
+      inspect(r.id, content="Int64Id(999)")
       inspect(r.record_type == WalRecordType::Upsert, content="true")
       match r.vector {
         Some(v) => {
@@ -270,7 +270,7 @@ test "wal/set_attrs_record" {
   match decoded {
     Some(r) => {
       inspect(r.record_type == WalRecordType::SetAttrs, content="true")
-      inspect(r.id.to_int64(), content="100")
+      inspect(r.id, content="Int64Id(100)")
       inspect(r.vector is None, content="true")
       inspect(r.attrs is Some(_), content="true")
     }
@@ -287,7 +287,7 @@ test "wal/remove_record" {
   match decoded {
     Some(r) => {
       inspect(r.record_type == WalRecordType::Remove, content="true")
-      inspect(r.id.to_int64(), content="50")
+      inspect(r.id, content="Int64Id(50)")
       inspect(r.vector is None, content="true")
     }
     None => inspect(false, content="true")
@@ -343,7 +343,7 @@ test "wal/empty_attrs" {
   let decoded = decode_wal_record(reader)
   match decoded {
     Some(r) => {
-      inspect(r.id.to_int64(), content="1")
+      inspect(r.id, content="Int64Id(1)")
       match r.attrs {
         Some(a) => {
           // Empty attrs should decode as empty map

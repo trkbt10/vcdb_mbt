@@ -40,7 +40,7 @@ pub fn merge_search(
     if score_cmp != 0 {
       score_cmp
     } else {
-      a.id.to_int64().compare(b.id.to_int64())
+      a.id.compare(b.id)
     }
   })
 
@@ -85,7 +85,7 @@ pub fn merge_scroll(
   }
 
   // Sort by ID ascending
-  all_entries.sort_by(fn(a, b) { a.id.to_int64().compare(b.id.to_int64()) })
+  all_entries.sort_by(fn(a, b) { a.id.compare(b.id) })
 
   let entries = if limit >= all_entries.length() {
     all_entries

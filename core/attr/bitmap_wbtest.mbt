@@ -82,3 +82,25 @@ test "bitmap/attrs_defensive_copy" {
       }
   }
 }
+
+///|
+/// Bytes16Id works in BitmapAttrIndex: mixed with Int64Id
+test "bitmap/bytes16id_mixed_operations" {
+  let index = BitmapAttrIndex::new()
+  let uuid_id = @types.VectorId::from_uuid_string(
+    "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  ).unwrap()
+  let int_id = @types.VectorId::from_int(1)
+  let attrs1 = @types.empty_attrs()
+  attrs1.set("type", @types.String("product"))
+  let attrs2 = @types.empty_attrs()
+  attrs2.set("type", @types.String("product"))
+  index.set_attrs(uuid_id, attrs1)
+  index.set_attrs(int_id, attrs2)
+  inspect(index.size(), content="2")
+  inspect(index.eq("type", @types.String("product")).length(), content="2")
+  inspect(index.get_attrs(uuid_id) is Some(_), content="true")
+  index.remove_id(uuid_id)
+  inspect(index.size(), content="1")
+  inspect(index.eq("type", @types.String("product")).length(), content="1")
+}

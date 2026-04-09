@@ -277,14 +277,14 @@ pub fn get_candidates_basic(
       }
       // For min == 1 (OR), union all candidate sets
       let all : Array[@types.VectorId] = []
-      let seen : Map[Int64, Bool] = {}
+      let seen : Map[@types.VectorId, Bool] = {}
       for e in exprs {
         match get_candidates_basic(e, index) {
           None => return None
           Some(candidates) =>
             for id in candidates {
-              if !seen.contains(id.to_int64()) {
-                seen.set(id.to_int64(), true)
+              if !seen.contains(id) {
+                seen.set(id, true)
                 all.push(id)
               }
             }
@@ -321,7 +321,7 @@ pub fn resolve_candidates_bptree(
       let present = id_set_from(index.exists(key))
       let result : Array[@types.VectorId] = []
       for id in index.all_ids() {
-        if !present.contains(id.to_int64()) {
+        if !present.contains(id) {
           result.push(id)
         }
       }
@@ -337,15 +337,15 @@ pub fn resolve_candidates_bptree(
     }
     MustNot(exprs) => {
       // All IDs minus the union of each sub-expression's candidates
-      let excluded : Map[Int64, Bool] = {}
+      let excluded : Map[@types.VectorId, Bool] = {}
       for e in exprs {
         for id in resolve_candidates_bptree(e, index) {
-          excluded.set(id.to_int64(), true)
+          excluded.set(id, true)
         }
       }
       let result : Array[@types.VectorId] = []
       for id in index.all_ids() {
-        if !excluded.contains(id.to_int64()) {
+        if !excluded.contains(id) {
           result.push(id)
         }
       }
@@ -359,11 +359,11 @@ pub fn resolve_candidates_bptree(
       if min == 1 {
         // OR: union of all sub-expressions
         let all : Array[@types.VectorId] = []
-        let seen : Map[Int64, Bool] = {}
+        let seen : Map[@types.VectorId, Bool] = {}
         for e in exprs {
           for id in resolve_candidates_bptree(e, index) {
-            if !seen.contains(id.to_int64()) {
-              seen.set(id.to_int64(), true)
+            if !seen.contains(id) {
+              seen.set(id, true)
               all.push(id)
             }
           }
@@ -371,10 +371,10 @@ pub fn resolve_candidates_bptree(
         all
       } else {
         // min > 1: count how many sub-expressions each ID satisfies
-        let counts : Map[Int64, Int] = {}
+        let counts : Map[@types.VectorId, Int] = {}
         for e in exprs {
           for id in resolve_candidates_bptree(e, index) {
-            let key = id.to_int64()
+            let key = id
             match counts.get(key) {
               Some(c) => counts.set(key, c + 1)
               None => counts.set(key, 1)
@@ -384,7 +384,7 @@ pub fn resolve_candidates_bptree(
         let result : Array[@types.VectorId] = []
         for id_val, count in counts {
           if count >= min {
-            result.push(@types.Int64Id(id_val))
+            result.push(id_val)
           }
         }
         result
@@ -394,11 +394,11 @@ pub fn resolve_candidates_bptree(
 }
 
 ///|
-/// Build a set of Int64 from an ID array (for fast membership tests).
-fn id_set_from(ids : Array[@types.VectorId]) -> Map[Int64, Bool] {
-  let s : Map[Int64, Bool] = {}
+/// Build a set of VectorId from an ID array (for fast membership tests).
+fn id_set_from(ids : Array[@types.VectorId]) -> Map[@types.VectorId, Bool] {
+  let s : Map[@types.VectorId, Bool] = {}
   for id in ids {
-    s.set(id.to_int64(), true)
+    s.set(id, true)
   }
   s
 }
@@ -409,13 +409,13 @@ fn intersect_ids(
   a : Array[@types.VectorId],
   b : Array[@types.VectorId],
 ) -> Array[@types.VectorId] {
-  let b_set : Map[Int64, Bool] = {}
+  let b_set : Map[@types.VectorId, Bool] = {}
   for id in b {
-    b_set.set(id.to_int64(), true)
+    b_set.set(id, true)
   }
   let result : Array[@types.VectorId] = []
   for id in a {
-    if b_set.contains(id.to_int64()) {
+    if b_set.contains(id) {
       result.push(id)
     }
   }

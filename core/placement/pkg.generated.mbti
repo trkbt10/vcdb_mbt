@@ -72,17 +72,19 @@ pub struct CrushMap {
   pgs : Int
   replicas : Int
   targets : Array[CrushTarget]
-} derive(Show)
+}
 pub fn CrushMap::new(Int, Int, Array[CrushTarget]) -> Self
+pub impl Show for CrushMap
 
 pub struct CrushTarget {
   key : String
   weight : Double
   zone : String?
-} derive(Show)
+}
 pub fn CrushTarget::new(String) -> Self
 pub fn CrushTarget::with_weight(String, Double) -> Self
 pub fn CrushTarget::with_zone(String, Double, String) -> Self
+pub impl Show for CrushTarget
 
 pub struct LoadDistributedResult {
   store : @store.CoreStore
@@ -93,7 +95,8 @@ pub struct LoadDistributedResult {
 pub struct LocateResult {
   pg : Int
   primaries : Array[String]
-} derive(Show)
+}
+pub impl Show for LocateResult
 
 pub(all) struct MemorySegment {
   name : String
@@ -111,7 +114,8 @@ pub(all) struct MovePlan {
   name : String
   from : String
   to : String
-} derive(Show)
+}
+pub impl Show for MovePlan
 
 pub(all) struct PlacementManifest {
   base : String
@@ -119,7 +123,8 @@ pub(all) struct PlacementManifest {
   crush : CrushMap
   epoch : Int
   commit_ts : Int64
-} derive(Show)
+}
+pub impl Show for PlacementManifest
 
 pub(all) enum RebalancePhase {
   Planning
@@ -127,14 +132,16 @@ pub(all) enum RebalancePhase {
   Updating
   Complete
   Failed(String)
-} derive(Eq, Show)
+} derive(Eq)
+pub impl Show for RebalancePhase
 
 pub(all) struct RebalanceProgress {
   phase : RebalancePhase
   moves_total : Int
   moves_completed : Int
   bytes_moved : Int64
-} derive(Show)
+}
+pub impl Show for RebalanceProgress
 
 pub struct SaveDistributedOptions {
   segment_opts : SegmentOptions
@@ -147,7 +154,8 @@ pub fn SaveDistributedOptions::default(String, CrushMap) -> Self
 pub(all) struct SegmentEntry {
   name : String
   target_key : String
-} derive(Show)
+}
+pub impl Show for SegmentEntry
 
 pub struct SegmentOptions {
   base_name : String

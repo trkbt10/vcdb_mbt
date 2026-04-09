@@ -22,7 +22,7 @@ test "bruteforce/search" {
   // Search for [1, 0, 0] - should find id=1 as best match
   let results = bf_search(state, store, [1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
   inspect(results[0].score, content="1")
 }
 
@@ -46,7 +46,7 @@ test "bruteforce/search_with_filter" {
   }
   let results = bf_search(state, store, [1.0, 0.0], 10, Some(filter))
   inspect(results.length(), content="1")
-  inspect(results[0].id.to_int64(), content="2")
+  inspect(results[0].id, content="Int64Id(2)")
 }
 
 ///|
@@ -76,7 +76,7 @@ test "hnsw/basic" {
   // Search for [1, 0, 0]
   let results = hnsw_search(state, store, [1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -106,7 +106,7 @@ test "ivf/basic" {
   // Search for [1, 0, 0]
   let results = ivf_search(state, store, [1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -135,7 +135,7 @@ test "hnsw/serialization" {
   // Search should still work
   let results = hnsw_search(state2, store, [1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -164,7 +164,7 @@ test "ivf/serialization" {
   // Search should still work
   let results = ivf_search(state2, store, [1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -222,7 +222,7 @@ test "hnsw/remove" {
   // Search should not find id1 anymore
   let results2 = hnsw_search(state, store, [1.0, 0.0, 0.0], 10, None)
   // Note: hnsw_remove marks as deleted, search still works but skips deleted
-  let has_id1 = results2.iter().any(fn(h) { h.id.to_int64() == 1L })
+  let has_id1 = results2.iter().any(fn(h) { h.id == @types.Int64Id(1L) })
   inspect(has_id1, content="false")
 }
 
@@ -244,7 +244,7 @@ test "ivf/remove" {
   ivf_remove(state, id1)
   // Search should not return id1
   let results = ivf_search(state, store, [1.0, 0.0, 0.0], 10, None)
-  let has_id1 = results.iter().any(fn(h) { h.id.to_int64() == 1L })
+  let has_id1 = results.iter().any(fn(h) { h.id == @types.Int64Id(1L) })
   inspect(has_id1, content="false")
 }
 
@@ -265,7 +265,7 @@ test "bruteforce/find" {
   // Find single best match
   let result = bf_find(state, store, [1.0, 0.0], None)
   match result {
-    Some(hit) => inspect(hit.id.to_int64(), content="1")
+    Some(hit) => inspect(hit.id, content="Int64Id(1)")
     None => inspect(false, content="true")
   }
 }
@@ -290,7 +290,7 @@ test "hnsw/find" {
   // Find single best match
   let result = hnsw_find(state, store, [1.0, 0.0], None)
   match result {
-    Some(hit) => inspect(hit.id.to_int64(), content="1")
+    Some(hit) => inspect(hit.id, content="Int64Id(1)")
     None => inspect(false, content="true")
   }
 }
@@ -315,7 +315,7 @@ test "ivf/find" {
   // Find single best match
   let result = ivf_find(state, store, [1.0, 0.0], None)
   match result {
-    Some(hit) => inspect(hit.id.to_int64(), content="1")
+    Some(hit) => inspect(hit.id, content="Int64Id(1)")
     None => inspect(false, content="true")
   }
 }
@@ -337,7 +337,7 @@ test "hnsw/compact_rebuild" {
   hnsw_add(state, store, id3)
   // Verify search works
   let results1 = hnsw_search(state, store, [1.0, 0.0, 0.0], 1, None)
-  inspect(results1[0].id.to_int64(), content="1")
+  inspect(results1[0].id, content="Int64Id(1)")
   // Remove id1
   hnsw_remove(state, id1, store)
   // Tombstone stats
@@ -349,7 +349,7 @@ test "hnsw/compact_rebuild" {
   inspect(removed, content="1")
   // Search on rebuilt state - id1 should be completely gone
   let results2 = hnsw_search(new_state, store, [1.0, 0.0, 0.0], 10, None)
-  let has_id1 = results2.iter().any(fn(h) { h.id.to_int64() == 1L })
+  let has_id1 = results2.iter().any(fn(h) { h.id == @types.Int64Id(1L) })
   inspect(has_id1, content="false")
 }
 
@@ -373,7 +373,7 @@ test "hnsw/rebuild" {
   // Search should work
   let results = hnsw_search(state, store, [1.0, 0.0, 0.0], 2, None)
   inspect(results.length(), content="2")
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
 }
 
 ///|
@@ -498,7 +498,7 @@ test "bruteforce/l2_metric" {
   let results = bf_search(state, store, [1.0, 0.0], 2, None)
   inspect(results.length(), content="2")
   // id=1 should be best (distance 0)
-  inspect(results[0].id.to_int64(), content="1")
+  inspect(results[0].id, content="Int64Id(1)")
   inspect(results[0].score, content="0")
 }
 
@@ -577,10 +577,10 @@ test "ivf/recall_vs_bruteforce" {
   }
   let ivf_results = ivf_search(ivf_state, store, [1.0, 0.05, 0.0, 0.0], 5, None)
   // Calculate recall: how many IVF results match BF results
-  let bf_ids : Array[Int64] = bf_results.map(fn(h) { h.id.to_int64() })
+  let bf_ids : Array[@types.VectorId] = bf_results.map(fn(h) { h.id })
   let mut matches = 0
   for ivf_hit in ivf_results {
-    let ivf_id = ivf_hit.id.to_int64()
+    let ivf_id = ivf_hit.id
     if bf_ids.iter().any(fn(id) { id == ivf_id }) {
       matches = matches + 1
     }
@@ -687,7 +687,7 @@ test "hnsw/compact_preserves_tombstones" {
   // Search should not return ID 2
   let results = hnsw_search(new_state, store, [2.0, 0.0], 3, None)
   for r in results {
-    inspect(r.id.to_int64() != 2L, content="true")
+    inspect(r.id != @types.Int64Id(2L), content="true")
   }
 }
 
@@ -713,7 +713,7 @@ fn add_to_hnsw(
 fn assert_found(results : Array[@types.SearchHit], id : Int) -> Unit raise {
   let mut found = false
   for r in results {
-    if r.id.to_int64() == id.to_int64() {
+    if r.id == @types.VectorId::from_int(id) {
       found = true
     }
   }
@@ -725,7 +725,7 @@ fn assert_found(results : Array[@types.SearchHit], id : Int) -> Unit raise {
 fn assert_not_found(results : Array[@types.SearchHit], id : Int) -> Unit raise {
   let mut found = false
   for r in results {
-    if r.id.to_int64() == id.to_int64() {
+    if r.id == @types.VectorId::from_int(id) {
       found = true
     }
   }
@@ -907,4 +907,141 @@ test "hnsw/fallback_ep_must_not_pick_inserting_node" {
   // ID 10 must also be reachable
   let r2 = hnsw_search(state, store, [0.5, 0.5], 5, None)
   assert_found(r2, 10)
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Bytes16Id (UUID/128-bit) ANN tests
+// ══════════════════════════════════════════════════════════════
+
+///|
+fn make_uuid_id(seed : Int) -> @types.VectorId {
+  let b = (seed & 0xFF).to_byte()
+  @types.Bytes16Id(@types.Bytes16::{
+    b0: b,
+    b1: b'\xAA',
+    b2: b'\xBB',
+    b3: b'\xCC',
+    b4: b'\xDD',
+    b5: b'\xEE',
+    b6: b'\x41',
+    b7: b'\xD4',
+    b8: b'\xA7',
+    b9: b'\x16',
+    b10: b'\x44',
+    b11: b'\x66',
+    b12: b'\x55',
+    b13: b'\x44',
+    b14: b'\x00',
+    b15: b,
+  })
+}
+
+///|
+/// Bruteforce search with Bytes16Id
+test "bruteforce/bytes16id_search" {
+  let store = @store.CoreStore::new(3, @types.Dot, capacity=10)
+  let state = BruteforceState::new(@types.Dot)
+  let id1 = make_uuid_id(1)
+  let id2 = make_uuid_id(2)
+  let _ = store.add_or_update(
+    id1,
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  let _ = store.add_or_update(
+    id2,
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  let results = bf_search(state, store, [1.0, 0.0, 0.0], 1, None)
+  inspect(results.length(), content="1")
+  inspect(results[0].id == id1, content="true")
+}
+
+///|
+/// HNSW add/search with Bytes16Id
+test "hnsw/bytes16id_add_search" {
+  let store = @store.CoreStore::new(2, @types.Cosine, capacity=10)
+  let params = @types.HNSWParams::default()
+  let state = HNSWState::new(params, @types.Cosine, 10)
+  let id1 = make_uuid_id(10)
+  let id2 = make_uuid_id(20)
+  let _ = store.add_or_update(
+    id1,
+    [1.0, 0.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  hnsw_add(state, store, id1)
+  let _ = store.add_or_update(
+    id2,
+    [0.0, 1.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  hnsw_add(state, store, id2)
+  let results = hnsw_search(state, store, [1.0, 0.0], 1, None)
+  inspect(results.length(), content="1")
+  inspect(results[0].id == id1, content="true")
+}
+
+///|
+/// IVF add/search with Bytes16Id
+test "ivf/bytes16id_add_search" {
+  let store = @store.CoreStore::new(3, @types.Cosine, capacity=10)
+  let params : @types.IVFParams = { nlist: 2, nprobe: 2 }
+  let state = IVFState::new(params, @types.Cosine, 3)
+  let id1 = make_uuid_id(1)
+  let id2 = make_uuid_id(2)
+  let id3 = make_uuid_id(3)
+  let _ = store.add_or_update(
+    id1,
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  ivf_add(state, store, id1)
+  let _ = store.add_or_update(
+    id2,
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  ivf_add(state, store, id2)
+  let _ = store.add_or_update(
+    id3,
+    [0.0, 0.0, 1.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  ivf_add(state, store, id3)
+  let results = ivf_search(state, store, [1.0, 0.0, 0.0], 1, None)
+  inspect(results.length(), content="1")
+  inspect(results[0].id == id1, content="true")
+}
+
+///|
+/// Mixed Int64Id + Bytes16Id in same bruteforce search
+test "bruteforce/mixed_int64_bytes16" {
+  let store = @store.CoreStore::new(3, @types.Dot, capacity=10)
+  let state = BruteforceState::new(@types.Dot)
+  let int_id = @types.VectorId::from_int(1)
+  let uuid_id = make_uuid_id(42)
+  let _ = store.add_or_update(
+    int_id,
+    [1.0, 0.0, 0.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  let _ = store.add_or_update(
+    uuid_id,
+    [0.0, 1.0, 0.0],
+    @types.empty_attrs(),
+    upsert=false,
+  )
+  let results = bf_search(state, store, [1.0, 0.0, 0.0], 2, None)
+  inspect(results.length(), content="2")
+  inspect(results[0].id == int_id, content="true")
 }

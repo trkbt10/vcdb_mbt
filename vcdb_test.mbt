@@ -41,7 +41,7 @@ test "api/bruteforce_basic" {
     // Search
     let results = db.search([1.0, 0.0, 0.0], 2, None)
     inspect(results.length(), content="2")
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     // Has/Get
     inspect(db.has(@types.VectorId::from_int(1)), content="true")
     inspect(db.has(@types.VectorId::from_int(99)), content="false")
@@ -83,7 +83,7 @@ test "api/hnsw_search" {
     let results = db.search([1.0, 0.0, 0.0], 2, None)
     inspect(results.length(), content="2")
     // First result should be id=1 (dot product = 1.0)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
   })
 }
 
@@ -178,9 +178,9 @@ test "api/l2_metric" {
     )
     // Search from origin - closest should be id=1
     let results = db.search([0.0, 0.0], 3, None)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     inspect(results[0].score, content="0") // L2 distance = 0
-    inspect(results[1].id.to_int64(), content="2")
+    inspect(results[1].id, content="Int64Id(2)")
     inspect(results[1].score, content="-1") // L2 distance = -1
   })
 }
@@ -231,7 +231,7 @@ test "api/search_filter" {
     }
     let results = db.search_with_filter([1.0, 0.0], 10, Some(filter))
     inspect(results.length(), content="1")
-    inspect(results[0].id.to_int64(), content="2")
+    inspect(results[0].id, content="Int64Id(2)")
   })
 }
 
@@ -326,7 +326,7 @@ test "api/serialization_roundtrip" {
     inspect(record is None, content="false")
     // Verify search still works
     let results = db2.search([1.0, 0.0, 0.0], 1, None)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     // Verify attrs preserved
     let a = record.unwrap().attrs
     match a.get("tag") {
@@ -358,7 +358,7 @@ test "api/hnsw_serialization" {
     let db2 = @vcdb.PersistentDB::deserialize(bytes)
     // Search should work
     let results = db2.search([1.0, 0.0, 0.0], 1, None)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
   })
 }
 
@@ -403,10 +403,10 @@ test "api/recall_validation" {
     inspect(bf_results.length(), content="5")
     inspect(hnsw_results.length() > 0, content="true")
     // HNSW top result should be in bruteforce top-5 (approximate NN)
-    let hnsw_top_id = hnsw_results[0].id.to_int64()
+    let hnsw_top_id = hnsw_results[0].id
     let mut found_in_bf = false
     for r in bf_results {
-      if r.id.to_int64() == hnsw_top_id {
+      if r.id == hnsw_top_id {
         found_in_bf = true
         break
       }
@@ -450,7 +450,7 @@ test "api/find" {
     // Find best match
     let result = db.find([1.0, 0.0], None)
     inspect(result is None, content="false")
-    inspect(result.unwrap().id.to_int64(), content="1")
+    inspect(result.unwrap().id, content="Int64Id(1)")
     // Find on empty should return None
     let empty_db = @vcdb.PersistentDB::in_memory_bruteforce(2)
     let empty_result = empty_db.find([1.0, 0.0], None)
@@ -486,7 +486,10 @@ test "api/large_dataset" {
     // All top results should be from cluster 0 (ids 0-49)
     let mut cluster0_count = 0
     for hit in results {
-      let id = hit.id.to_int64()
+      let id = match hit.id {
+        Int64Id(v) => v
+        _ => abort("")
+      }
       if id >= 0L && id < 50L {
         cluster0_count = cluster0_count + 1
       }
@@ -574,7 +577,10 @@ test "api/ivf_clustered" {
     // All should be from cluster A (ids 0-29)
     let mut cluster_a_count = 0
     for hit in results_a {
-      let id = hit.id.to_int64()
+      let id = match hit.id {
+        Int64Id(v) => v
+        _ => abort("")
+      }
       if id >= 0L && id < 30L {
         cluster_a_count = cluster_a_count + 1
       }
@@ -758,11 +764,17 @@ test "api/metrics_comparison" {
     let l2_results = db_l2.search([1.0, 0.0, 0.0], 3, None)
     // Cosine: id=1 and id=2 should have same score (normalized)
     // Note: With cosine, [1,0,0] and [2,0,0] become the same after normalization
-    inspect(cosine_results[0].id.to_int64() <= 2L, content="true")
+    inspect(
+      match cosine_results[0].id {
+        Int64Id(v) => v <= 2L
+        _ => false
+      },
+      content="true",
+    )
     // Dot: id=2 should score highest (2.0 > 1.0)
-    inspect(dot_results[0].id.to_int64(), content="2")
+    inspect(dot_results[0].id, content="Int64Id(2)")
     // L2: id=1 should be closest (distance = 0)
-    inspect(l2_results[0].id.to_int64(), content="1")
+    inspect(l2_results[0].id, content="Int64Id(1)")
     inspect(l2_results[0].score, content="0")
   })
 }
@@ -941,7 +953,10 @@ test "api/hnsw_remove_search" {
     // With 25% tombstones, expect good recall (at least 10 out of 15)
     inspect(results.length() >= 10, content="true")
     for hit in results {
-      let id = hit.id.to_int64()
+      let id = match hit.id {
+        Int64Id(v) => v
+        _ => abort("")
+      }
       // No tombstoned IDs should be returned
       inspect(id > 5L, content="true")
     }
@@ -975,7 +990,7 @@ test "api/high_dimensional" {
     let results = db.search(query, 5, None)
     inspect(results.length(), content="5")
     // ID 1 should be best match (same pattern)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
   })
 }
 

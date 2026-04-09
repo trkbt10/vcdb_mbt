@@ -58,13 +58,13 @@ test "spec/metric/dot_exact" {
     )
     let results = db.search([1.0, 2.0, 3.0], 4, None)
     // Expected order: v4 (6.0) > v3 (3.0) > v2 (2.0) > v1 (1.0)
-    inspect(results[0].id.to_int64(), content="4")
+    inspect(results[0].id, content="Int64Id(4)")
     inspect(results[0].score, content="6")
-    inspect(results[1].id.to_int64(), content="3")
+    inspect(results[1].id, content="Int64Id(3)")
     inspect(results[1].score, content="3")
-    inspect(results[2].id.to_int64(), content="2")
+    inspect(results[2].id, content="Int64Id(2)")
     inspect(results[2].score, content="2")
-    inspect(results[3].id.to_int64(), content="1")
+    inspect(results[3].id, content="Int64Id(1)")
     inspect(results[3].score, content="1")
   })
 }
@@ -109,13 +109,13 @@ test "spec/metric/l2_exact" {
     )
     let results = db.search([0.0, 0.0], 4, None)
     // Expected order by -L2^2: v1 (0) > v2 (-1) > v3 (-4) > v4 (-25)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     inspect(results[0].score, content="0")
-    inspect(results[1].id.to_int64(), content="2")
+    inspect(results[1].id, content="Int64Id(2)")
     inspect(results[1].score, content="-1")
-    inspect(results[2].id.to_int64(), content="3")
+    inspect(results[2].id, content="Int64Id(3)")
     inspect(results[2].score, content="-4")
-    inspect(results[3].id.to_int64(), content="4")
+    inspect(results[3].id, content="Int64Id(4)")
     inspect(results[3].score, content="-25")
   })
 }
@@ -182,9 +182,9 @@ test "spec/metric/cosine_orthogonal" {
     )
     let results = db.search([1.0, 0.0], 2, None)
     // v1 should be perfect match (cos=1), v2 orthogonal (cos=0)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     inspect(results[0].score, content="1")
-    inspect(results[1].id.to_int64(), content="2")
+    inspect(results[1].id, content="Int64Id(2)")
     inspect(results[1].score, content="0")
   })
 }
@@ -212,9 +212,9 @@ test "spec/metric/cosine_opposite" {
       0L,
     )
     let results = db.search([1.0, 0.0], 2, None)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     inspect(results[0].score, content="1")
-    inspect(results[1].id.to_int64(), content="2")
+    inspect(results[1].id, content="Int64Id(2)")
     inspect(results[1].score, content="-1")
   })
 }
@@ -249,7 +249,7 @@ test "spec/search/k1_best_match" {
     )
     let results = db.search([1.0, 0.0, 0.0], 1, None)
     inspect(results.length(), content="1")
-    inspect(results[0].id.to_int64(), content="2")
+    inspect(results[0].id, content="Int64Id(2)")
   })
 }
 
@@ -300,7 +300,13 @@ test "spec/search/filter_reduces" {
     inspect(results.length(), content="5")
     // All results should be even IDs
     for hit in results {
-      inspect(hit.id.to_int64() % 2L, content="0")
+      inspect(
+        match hit.id {
+          Int64Id(v) => v % 2L
+          _ => abort("")
+        },
+        content="0",
+      )
     }
   })
 }
@@ -347,11 +353,11 @@ test "spec/search/sorted_descending" {
     )
     let results = db.search([1.0], 5, None)
     // Should be sorted by dot product: 5, 4, 3, 2, 1
-    inspect(results[0].id.to_int64(), content="5")
-    inspect(results[1].id.to_int64(), content="4")
-    inspect(results[2].id.to_int64(), content="3")
-    inspect(results[3].id.to_int64(), content="2")
-    inspect(results[4].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(5)")
+    inspect(results[1].id, content="Int64Id(4)")
+    inspect(results[2].id, content="Int64Id(3)")
+    inspect(results[3].id, content="Int64Id(2)")
+    inspect(results[4].id, content="Int64Id(1)")
   })
 }
 
@@ -399,10 +405,10 @@ test "spec/recall/hnsw_top1_in_top3" {
     for query in queries {
       let bf_results = bf_db.search(query, 3, None)
       let hnsw_result = hnsw_db.search(query, 1, None)
-      let hnsw_top1 = hnsw_result[0].id.to_int64()
+      let hnsw_top1 = hnsw_result[0].id
       // Check if HNSW top-1 is in BF top-3
       for bf_hit in bf_results {
-        if bf_hit.id.to_int64() == hnsw_top1 {
+        if bf_hit.id == hnsw_top1 {
           matches = matches + 1
           break
         }
@@ -445,13 +451,13 @@ test "spec/recall/ivf_trained_recall" {
     let bf_results = bf_db.search([1.0, 0.0, 0.0, 0.0], 10, None)
     let ivf_results = ivf_db.search([1.0, 0.0, 0.0, 0.0], 10, None)
     // IVF should find at least 8/10 of the same results
-    let bf_ids : Array[Int64] = bf_results
+    let bf_ids : Array[@types.VectorId] = bf_results
       .iter()
-      .map(fn(h) { h.id.to_int64() })
+      .map(fn(h) { h.id })
       .collect()
     let mut overlap = 0
     for hit in ivf_results {
-      if bf_ids.contains(hit.id.to_int64()) {
+      if bf_ids.contains(hit.id) {
         overlap = overlap + 1
       }
     }
@@ -502,9 +508,9 @@ test "spec/recall/exact_match_all_strategies" {
     let bf_result = bf_db.find(query, None)
     let hnsw_result = hnsw_db.find(query, None)
     let ivf_result = ivf_db.find(query, None)
-    inspect(bf_result.unwrap().id.to_int64(), content="7")
-    inspect(hnsw_result.unwrap().id.to_int64(), content="7")
-    inspect(ivf_result.unwrap().id.to_int64(), content="7")
+    inspect(bf_result.unwrap().id, content="Int64Id(7)")
+    inspect(hnsw_result.unwrap().id, content="Int64Id(7)")
+    inspect(ivf_result.unwrap().id, content="Int64Id(7)")
   })
 }
 
@@ -557,7 +563,7 @@ test "spec/crud/upsert_search_correctness" {
     )
     // Initial search: [1,0] should find id=1
     let r1 = db.find([1.0, 0.0], None)
-    inspect(r1.unwrap().id.to_int64(), content="1")
+    inspect(r1.unwrap().id, content="Int64Id(1)")
     // Upsert id=1 to point in different direction
     db.upsert(
       [(@types.VectorId::from_int(1), [0.0, 1.0], @types.empty_attrs())],
@@ -596,10 +602,10 @@ test "spec/crud/remove_excludes_from_search" {
     // Search should not return id=5
     let results = db.search([1.0, 0.0], 5, None)
     for hit in results {
-      inspect(hit.id.to_int64() != 5L, content="true")
+      inspect(hit.id != @types.Int64Id(5L), content="true")
     }
     // Best match should now be id=4 (dot = 4)
-    inspect(results[0].id.to_int64(), content="4")
+    inspect(results[0].id, content="Int64Id(4)")
   })
 }
 
@@ -630,7 +636,7 @@ test "spec/edge/zero_vector_l2" {
       0L,
     )
     let results = db.search([0.0, 0.0, 0.0], 2, None)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     inspect(results[0].score, content="0") // Distance 0
   })
 }
@@ -664,9 +670,9 @@ test "spec/edge/small_differences" {
     )
     let results = db.search([1.0], 3, None)
     // Should be ordered by score descending: 3 > 2 > 1
-    inspect(results[0].id.to_int64(), content="3")
-    inspect(results[1].id.to_int64(), content="2")
-    inspect(results[2].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(3)")
+    inspect(results[1].id, content="Int64Id(2)")
+    inspect(results[2].id, content="Int64Id(1)")
   })
 }
 
@@ -691,7 +697,7 @@ test "spec/edge/sparse_high_dim" {
     query[5] = 1.0
     let results = db.search(query, 1, None)
     // Should find id=5 (exact match)
-    inspect(results[0].id.to_int64(), content="5")
+    inspect(results[0].id, content="Int64Id(5)")
     inspect(results[0].score, content="1") // Cosine = 1
   })
 }
@@ -726,13 +732,13 @@ test "spec/edge/duplicate_vectors" {
     inspect(results[1].score, content="1")
     inspect(results[2].score, content="1")
     // All three IDs should be present
-    let ids : Array[Int64] = results
+    let ids : Array[@types.VectorId] = results
       .iter()
-      .map(fn(h) { h.id.to_int64() })
+      .map(fn(h) { h.id })
       .collect()
-    inspect(ids.contains(1L), content="true")
-    inspect(ids.contains(2L), content="true")
-    inspect(ids.contains(3L), content="true")
+    inspect(ids.contains(@types.Int64Id(1L)), content="true")
+    inspect(ids.contains(@types.Int64Id(2L)), content="true")
+    inspect(ids.contains(@types.Int64Id(3L)), content="true")
   })
 }
 
@@ -797,7 +803,7 @@ test "spec/serialization/search_preserved" {
     // Results should be identical
     inspect(after.length(), content="5")
     for i in 0..<5 {
-      inspect(after[i].id.to_int64() == before[i].id.to_int64(), content="true")
+      inspect(after[i].id == before[i].id, content="true")
       inspect(
         (after[i].score - before[i].score).abs() < 0.0000000001,
         content="true",
@@ -868,7 +874,7 @@ test "spec/serialization/hnsw_graph_preserved" {
     let mut top5_match = 0
     for i in 0..<5 {
       for j in 0..<5 {
-        if after[i].id.to_int64() == before[j].id.to_int64() {
+        if after[i].id == before[j].id {
           top5_match = top5_match + 1
           break
         }
@@ -916,7 +922,10 @@ test "spec/filter/and_logic" {
     inspect(results.length(), content="3")
     // Check all results satisfy filter
     for hit in results {
-      let id = hit.id.to_int64()
+      let id = match hit.id {
+        Int64Id(v) => v
+        _ => abort("")
+      }
       inspect(id >= 5L && id % 2L == 0L, content="true")
     }
   })
@@ -1016,7 +1025,10 @@ test "spec/stress/interleaved_operations" {
     // Search should not include removed IDs
     let results = db.search([15.0, 0.0], 25, None)
     for hit in results {
-      let id = hit.id.to_int64()
+      let id = match hit.id {
+        Int64Id(v) => v
+        _ => abort("")
+      }
       inspect(id != 5L && id != 10L && id != 15L, content="true")
     }
   })
@@ -1071,13 +1083,13 @@ test "spec/stress/large_dataset_recall" {
     let bf_results = bf_db.search(query, 10, None)
     let hnsw_results = hnsw_db.search(query, 10, None)
     // HNSW should achieve at least 70% recall
-    let bf_ids : Array[Int64] = bf_results
+    let bf_ids : Array[@types.VectorId] = bf_results
       .iter()
-      .map(fn(h) { h.id.to_int64() })
+      .map(fn(h) { h.id })
       .collect()
     let mut overlap = 0
     for hit in hnsw_results {
-      if bf_ids.contains(hit.id.to_int64()) {
+      if bf_ids.contains(hit.id) {
         overlap = overlap + 1
       }
     }
@@ -1106,7 +1118,7 @@ test "spec/hnsw/tombstone_exclusion" {
     let _ = db.remove(@types.VectorId::from_int(10), 0L)
     // Search should return id=9 as best (not 10)
     let results = db.search([10.0, 0.0], 1, None)
-    inspect(results[0].id.to_int64(), content="9")
+    inspect(results[0].id, content="Int64Id(9)")
   })
 }
 
@@ -1122,7 +1134,7 @@ test "spec/hnsw/readd_after_tombstone" {
     let _ = db.add(id, [0.0, 10.0], @types.empty_attrs(), 0L)
     // Search for [0, 10] should find id=1
     let results = db.search([0.0, 10.0], 1, None)
-    inspect(results[0].id.to_int64(), content="1")
+    inspect(results[0].id, content="Int64Id(1)")
     // Search for [1, 0] should NOT find id=1 as best
     let _ = db.add(
       @types.VectorId::from_int(2),
@@ -1131,7 +1143,7 @@ test "spec/hnsw/readd_after_tombstone" {
       0L,
     )
     let results2 = db.search([1.0, 0.0], 1, None)
-    inspect(results2[0].id.to_int64(), content="2")
+    inspect(results2[0].id, content="Int64Id(2)")
   })
 }
 
@@ -1156,7 +1168,7 @@ test "spec/ivf/untrained_search" {
     let results = db.search([10.0, 0.0, 0.0], 3, None)
     inspect(results.length(), content="3")
     // Should still find best matches (linear scan fallback)
-    inspect(results[0].id.to_int64(), content="10")
+    inspect(results[0].id, content="Int64Id(10)")
   })
 }
 
@@ -1181,7 +1193,10 @@ test "spec/ivf/training_clusters" {
     let results = db.search([0.0, 0.0, 1.0, 0.0], 5, None)
     let mut cluster2_count = 0
     for hit in results {
-      let id = hit.id.to_int64()
+      let id = match hit.id {
+        Int64Id(v) => v
+        _ => abort("")
+      }
       if id >= 20L && id < 30L {
         cluster2_count = cluster2_count + 1
       }

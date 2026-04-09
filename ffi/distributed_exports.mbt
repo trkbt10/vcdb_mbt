@@ -32,7 +32,11 @@ pub fn distributed_merge_search(
         None => None
       }
     })
-    let error_opt : String? = if error.length() > 0 { Some(error) } else { None }
+    let error_opt : String? = if error.length() > 0 {
+      Some(error)
+    } else {
+      None
+    }
     { shard_id, hits, error: error_opt }
   })
   let merged = @distributed.merge_search(inputs, top_k)
@@ -69,7 +73,11 @@ pub fn distributed_merge_scroll(
         None => None
       }
     })
-    let error_opt : String? = if error.length() > 0 { Some(error) } else { None }
+    let error_opt : String? = if error.length() > 0 {
+      Some(error)
+    } else {
+      None
+    }
     { shard_id, entries, error: error_opt }
   })
   let merged = @distributed.merge_scroll(inputs, limit)
@@ -92,7 +100,11 @@ pub fn distributed_merge_count(
 ) -> (Int, Array[Int], Array[(Int, String)]) {
   let inputs : Array[@distributed.ShardCountResult] = shard_results.map(fn(sr) {
     let (shard_id, count, error) = sr
-    let error_opt : String? = if error.length() > 0 { Some(error) } else { None }
+    let error_opt : String? = if error.length() > 0 {
+      Some(error)
+    } else {
+      None
+    }
     { shard_id, count, error: error_opt }
   })
   let merged = @distributed.merge_count(inputs)

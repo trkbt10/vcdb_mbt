@@ -72,8 +72,10 @@ pub fn SegmentWriter::append(
   let offset = self.size
   let w = @binary.BinaryWriter::new()
 
-  // Write ID (8 bytes)
-  w.push_u64(id.to_int64().reinterpret_as_uint64())
+  // Write ID (wire format: length-prefixed bytes)
+  let id_wire = id.to_wire_bytes()
+  w.push_u32(id_wire.length().reinterpret_as_uint())
+  w.push_bytes(id_wire)
 
   // Encode attrs as JSON
   let attrs_bytes = @codec.encode_attrs_json(Some(attrs))
@@ -151,7 +153,11 @@ pub fn SegmentReader::read_at(
   let r = @binary.BinaryReader::new(self.data)
   r.skip(offset)
   // Read ID
-  let id = @types.Int64Id(r.read_u64().reinterpret_as_int64())
+  let id_wire_len = r.read_u32().reinterpret_as_int()
+  let id = match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
+    Some(v) => v
+    None => @types.Int64Id(0L)
+  }
   // Read lengths
   let attrs_len = r.read_u32().reinterpret_as_int()
   let vector_len = r.read_u32().reinterpret_as_int()
@@ -184,7 +190,11 @@ pub fn SegmentReader::collect(
   r.skip(@codec.header_size) // Skip header
   while r.remaining() >= 16 {
     // Read ID
-    let id = @types.Int64Id(r.read_u64().reinterpret_as_int64())
+    let id_wire_len = r.read_u32().reinterpret_as_int()
+    let id = match @types.VectorId::from_wire_bytes(r.read_bytes(id_wire_len)) {
+      Some(v) => v
+      None => @types.Int64Id(0L)
+    }
     // Read lengths
     let attrs_len = r.read_u32().reinterpret_as_int()
     let vector_len = r.read_u32().reinterpret_as_int()

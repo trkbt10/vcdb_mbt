@@ -195,7 +195,7 @@ test "filter/get_candidates_must" {
   match candidates {
     Some(ids) => {
       inspect(ids.length(), content="1")
-      inspect(ids[0].to_int64(), content="1")
+      inspect(ids[0], content="Int64Id(1)")
     }
     None => inspect(false, content="true")
   }
