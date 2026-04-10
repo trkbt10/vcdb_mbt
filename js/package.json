@@ -68,6 +68,9 @@
     "./seed": {
       "types": "./dist/seed.d.ts",
       "import": "./dist/seed.js"
+    },
+    "./wasm": {
+      "import": "./dist/wasm/lib.js"
     }
   },
   "sideEffects": false,

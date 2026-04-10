@@ -29,14 +29,14 @@ const DEFAULT_LIB_PATH = "../wasm/lib.js";
  * Idempotent — subsequent calls are no-ops.
  */
 export async function loadModule(
-  moduleOrPath?: string | Record<string, unknown>,
+  moduleOrPath?: string | Record<string, unknown> | object,
 ): Promise<void> {
   if (module) return;
   if (typeof moduleOrPath === "object" && moduleOrPath !== null) {
     module = moduleOrPath as unknown as WasmModule;
     return;
   }
-  const path = moduleOrPath ?? DEFAULT_LIB_PATH;
+  const path = (moduleOrPath as string | undefined) ?? DEFAULT_LIB_PATH;
   const mod = await import(path);
   module = mod as unknown as WasmModule;
 }
