@@ -69,7 +69,7 @@ test "bench/crush_primary" (b : @bench.T) {
   let id = @types.VectorId::from_int(999)
   b.bench(fn() {
     match crush_primary(id, map) {
-      Some(s) => b.keep(s.length())
+      Some(s) => b.keep(s.to_string().length())
       None => b.keep(0)
     }
   })
@@ -101,7 +101,7 @@ test "bench/crush_plan_rebalance_no_change" (b : @bench.T) {
   for i in 0..<8 {
     let primary = match crush_primary(@types.VectorId::from_int(i), crush) {
       Some(p) => p
-      None => "node1"
+      None => TargetKey::new("node1")
     }
     segments.push({
       name: "db.pg" + i.to_string() + ".part0",
@@ -138,7 +138,7 @@ test "bench/crush_plan_rebalance_with_change" (b : @bench.T) {
   for i in 0..<8 {
     let primary = match crush_primary(@types.VectorId::from_int(i), old_crush) {
       Some(p) => p
-      None => "node1"
+      None => TargetKey::new("node1")
     }
     segments.push({
       name: "db.pg" + i.to_string() + ".part0",
@@ -179,7 +179,7 @@ test "bench/crush_update_manifest" (b : @bench.T) {
   for i in 0..<4 {
     segments.push({
       name: "db.pg" + i.to_string() + ".part0",
-      target_key: "node1",
+      target_key: TargetKey::new("node1"),
     })
   }
   let manifest : PlacementManifest = {
@@ -190,8 +190,16 @@ test "bench/crush_update_manifest" (b : @bench.T) {
     commit_ts: 1000L,
   }
   let plan : Array[MovePlan] = [
-    { name: "db.pg1.part0", from: "node1", to: "node2" },
-    { name: "db.pg3.part0", from: "node1", to: "node2" },
+    {
+      name: "db.pg1.part0",
+      from: TargetKey::new("node1"),
+      to: TargetKey::new("node2"),
+    },
+    {
+      name: "db.pg3.part0",
+      from: TargetKey::new("node1"),
+      to: TargetKey::new("node2"),
+    },
   ]
   b.bench(fn() {
     let updated = update_manifest_after_rebalance(

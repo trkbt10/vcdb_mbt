@@ -413,6 +413,113 @@ await test("Int64Id(0x80000000): correctly encoded in upper bytes", () => {
   assert.equal(wire[5], 0x00);
 });
 
+// ── crush_placement_groups with replicas ─────────────────────
+
+console.log("\n=== CRUSH placement with replicas ===");
+
+await test("crush_placement_groups returns multiple shards when replicas > 1", () => {
+  const wire = int64ToWireBytes(42n);
+  const shards = wasm.crush_placement_groups(wire, 8, 3);
+  assert.equal(shards.length, 3, `expected 3 replicas, got ${shards.length}`);
+  // All shard indices should be in [0, 8)
+  for (const s of shards) {
+    assert.ok(s >= 0 && s < 8, `shard ${s} should be in [0, 8)`);
+  }
+  // All shard indices should be distinct
+  const unique = new Set(shards);
+  assert.equal(unique.size, 3, "all replica shards should be distinct");
+});
+
+await test("crush_placement_groups is deterministic", () => {
+  const wire = int64ToWireBytes(100n);
+  const a = wasm.crush_placement_groups(wire, 8, 3);
+  const b = wasm.crush_placement_groups(wire, 8, 3);
+  assert.deepEqual(a, b);
+});
+
+await test("crush_placement_groups with replicas=1 returns single shard", () => {
+  const wire = int64ToWireBytes(42n);
+  const shards = wasm.crush_placement_groups(wire, 8, 1);
+  assert.equal(shards.length, 1);
+});
+
+// ── Replicated upsert grouping ───────────────────────────────
+
+console.log("\n=== Replicated upsert grouping ===");
+
+await test("distributed_group_upsert_replicated fans out to multiple shards", () => {
+  const points = [];
+  for (let i = 0; i < 10; i++) {
+    points.push({ _0: int64ToWireBytes(BigInt(i)), _1: [1.0, 0.0], _2: "{}" });
+  }
+  const groups = wasm.distributed_group_upsert_replicated(points, 4, 3);
+  // Count total point placements — with 3 replicas, each of the 10 points
+  // should appear 3 times across shard groups (total = 30)
+  let totalPlacements = 0;
+  for (const g of groups) {
+    totalPlacements += g._1.length;
+  }
+  assert.equal(totalPlacements, 30,
+    `10 points × 3 replicas = 30 placements, got ${totalPlacements}`);
+});
+
+await test("distributed_group_upsert with replicas=1 places each point once", () => {
+  const points = [];
+  for (let i = 0; i < 10; i++) {
+    points.push({ _0: int64ToWireBytes(BigInt(i)), _1: [1.0, 0.0], _2: "{}" });
+  }
+  const groups = wasm.distributed_group_upsert(points, 4);
+  let totalPlacements = 0;
+  for (const g of groups) {
+    totalPlacements += g._1.length;
+  }
+  assert.equal(totalPlacements, 10,
+    `10 points × 1 replica = 10 placements, got ${totalPlacements}`);
+});
+
+// ── Rebalance plan ───────────────────────────────────────────
+
+console.log("\n=== Rebalance plan ===");
+
+await test("distributed_rebalance_plan detects movement on pg_count change", () => {
+  const ids = [];
+  for (let i = 0; i < 50; i++) {
+    ids.push(int64ToWireBytes(BigInt(i)));
+  }
+  const plan = wasm.distributed_rebalance_plan(ids, 4, 1, 8, 1);
+  // Changing pg_count from 4 to 8 should move some vectors
+  assert.ok(plan.length > 0,
+    `rebalance plan should have actions, got ${plan.length}`);
+  // Each action should have add_to or remove_from
+  for (const action of plan) {
+    const addLen = action._1.length;
+    const removeLen = action._2.length;
+    assert.ok(addLen > 0 || removeLen > 0,
+      "each action should have additions or removals");
+  }
+});
+
+await test("distributed_rebalance_plan: no change when config identical", () => {
+  const ids = [];
+  for (let i = 0; i < 20; i++) {
+    ids.push(int64ToWireBytes(BigInt(i)));
+  }
+  const plan = wasm.distributed_rebalance_plan(ids, 4, 1, 4, 1);
+  assert.equal(plan.length, 0, "identical config should produce no actions");
+});
+
+await test("distributed_rebalance_summary: increasing replicas adds targets", () => {
+  const ids = [];
+  for (let i = 0; i < 20; i++) {
+    ids.push(int64ToWireBytes(BigInt(i)));
+  }
+  const summary = wasm.distributed_rebalance_summary(ids, 8, 1, 8, 3);
+  // Going from 1 to 3 replicas: each of 20 vectors needs 2 additional shards
+  assert.equal(summary._0, 20, `all 20 vectors affected, got ${summary._0}`);
+  assert.equal(summary._1, 40, `40 additions (20 × 2), got ${summary._1}`);
+  assert.equal(summary._2, 0, `0 removals, got ${summary._2}`);
+});
+
 // ── Summary ───────────────────────────────────────────────────
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);

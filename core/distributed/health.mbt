@@ -1,24 +1,24 @@
 ///|
-/// Shard health tracking for distributed vector database.
+/// Target health tracking for distributed vector database.
 ///
-/// Tracks the health state of each shard and supports state transitions:
+/// Tracks the health state of each target node and supports state transitions:
 ///   Healthy → Degraded (on first failure)
 ///   Degraded → Failed (consecutive failures ≥ threshold)
 ///   Failed → Healthy (on success report)
 ///   Degraded → Healthy (on success report)
 ///
 /// Platform adapters call report_success / report_failure after each
-/// shard RPC. The router uses the tracker to exclude failed shards
+/// target RPC. The router uses the tracker to exclude failed targets
 /// from fan-out operations.
 
 ///|
-/// Shard health status.
+/// Target health status.
 pub(all) enum ShardStatus {
-  /// Shard is responding normally.
+  /// Target is responding normally.
   Healthy
-  /// Shard has experienced failures but is below the failure threshold.
+  /// Target has experienced failures but is below the failure threshold.
   Degraded
-  /// Shard has exceeded the failure threshold and is considered unavailable.
+  /// Target has exceeded the failure threshold and is considered unavailable.
   Failed
 } derive(Eq)
 
@@ -32,9 +32,9 @@ pub impl Show for ShardStatus with output(self, logger) {
 }
 
 ///|
-/// Health information for a single shard.
+/// Health information for a single target node.
 pub(all) struct ShardHealth {
-  shard_id : Int
+  target_key : @placement.TargetKey
   status : ShardStatus
   /// Timestamp of the last successful response (nanoseconds since epoch).
   last_success_ts : Int64
@@ -47,26 +47,26 @@ pub(all) struct ShardHealth {
 }
 
 ///|
-/// Tracks health state for all shards in a distributed deployment.
+/// Tracks health state for all targets in a distributed deployment.
 ///
 /// - `failure_threshold`: consecutive failures required to transition to Failed
-/// - Transitions are immediate on success (any failed/degraded shard recovers)
+/// - Transitions are immediate on success (any failed/degraded target recovers)
 pub(all) struct ShardHealthTracker {
-  shards : Map[Int, ShardHealth]
-  /// Number of consecutive failures before a shard is marked Failed.
+  targets : Map[@placement.TargetKey, ShardHealth]
+  /// Number of consecutive failures before a target is marked Failed.
   failure_threshold : Int
 }
 
 ///|
-/// Create a new tracker with all shards initially Healthy.
+/// Create a new tracker with the given target keys, all initially Healthy.
 pub fn ShardHealthTracker::new(
-  shard_count : Int,
+  target_keys : Array[@placement.TargetKey],
   failure_threshold? : Int = 3,
 ) -> ShardHealthTracker {
-  let shards : Map[Int, ShardHealth] = {}
-  for i in 0..<shard_count {
-    shards[i] = {
-      shard_id: i,
+  let targets : Map[@placement.TargetKey, ShardHealth] = {}
+  for key in target_keys {
+    targets[key] = {
+      target_key: key,
       status: Healthy,
       last_success_ts: 0L,
       last_failure_ts: 0L,
@@ -74,20 +74,20 @@ pub fn ShardHealthTracker::new(
       last_error: None,
     }
   }
-  { shards, failure_threshold }
+  { targets, failure_threshold }
 }
 
 ///|
-/// Report a successful response from a shard.
+/// Report a successful response from a target.
 /// Resets failure count and transitions to Healthy regardless of previous state.
 pub fn ShardHealthTracker::report_success(
   self : ShardHealthTracker,
-  shard_id : Int,
+  target_key : @placement.TargetKey,
   ts : Int64,
 ) -> Unit {
-  match self.shards.get(shard_id) {
+  match self.targets.get(target_key) {
     Some(health) =>
-      self.shards[shard_id] = {
+      self.targets[target_key] = {
         ..health,
         status: Healthy,
         last_success_ts: ts,
@@ -99,18 +99,18 @@ pub fn ShardHealthTracker::report_success(
 }
 
 ///|
-/// Report a failure from a shard.
+/// Report a failure from a target.
 /// Increments consecutive failure count and transitions:
 ///   Healthy → Degraded (first failure)
 ///   Degraded → Failed (at threshold)
 ///   Failed stays Failed (but updates error/timestamp)
 pub fn ShardHealthTracker::report_failure(
   self : ShardHealthTracker,
-  shard_id : Int,
+  target_key : @placement.TargetKey,
   ts : Int64,
   error : String,
 ) -> Unit {
-  match self.shards.get(shard_id) {
+  match self.targets.get(target_key) {
     Some(health) => {
       let new_failures = health.consecutive_failures + 1
       let new_status = if new_failures >= self.failure_threshold {
@@ -118,7 +118,7 @@ pub fn ShardHealthTracker::report_failure(
       } else {
         Degraded
       }
-      self.shards[shard_id] = {
+      self.targets[target_key] = {
         ..health,
         status: new_status,
         last_failure_ts: ts,
@@ -131,36 +131,36 @@ pub fn ShardHealthTracker::report_failure(
 }
 
 ///|
-/// Get the current status of a specific shard.
+/// Get the current status of a specific target.
 pub fn ShardHealthTracker::get_status(
   self : ShardHealthTracker,
-  shard_id : Int,
+  target_key : @placement.TargetKey,
 ) -> ShardStatus {
-  match self.shards.get(shard_id) {
+  match self.targets.get(target_key) {
     Some(health) => health.status
-    None => Failed // Unknown shard is treated as Failed
+    None => Failed // Unknown target is treated as Failed
   }
 }
 
 ///|
-/// Get the full health record for a specific shard.
+/// Get the full health record for a specific target.
 pub fn ShardHealthTracker::get_health(
   self : ShardHealthTracker,
-  shard_id : Int,
+  target_key : @placement.TargetKey,
 ) -> ShardHealth? {
-  self.shards.get(shard_id)
+  self.targets.get(target_key)
 }
 
 ///|
-/// Return shard IDs that are not Failed (Healthy or Degraded).
-/// These are the shards available for fan-out operations.
-pub fn ShardHealthTracker::healthy_shards(
+/// Return target keys that are not Failed (Healthy or Degraded).
+/// These are the targets available for fan-out operations.
+pub fn ShardHealthTracker::healthy_targets(
   self : ShardHealthTracker,
-) -> Array[Int] {
-  let result : Array[Int] = []
-  for shard_id in self.shards.keys() {
-    match self.shards.get(shard_id) {
-      Some(health) => if health.status != Failed { result.push(shard_id) }
+) -> Array[@placement.TargetKey] {
+  let result : Array[@placement.TargetKey] = []
+  for key in self.targets.keys() {
+    match self.targets.get(key) {
+      Some(health) => if health.status != Failed { result.push(key) }
       None => ()
     }
   }
@@ -169,14 +169,14 @@ pub fn ShardHealthTracker::healthy_shards(
 }
 
 ///|
-/// Return shard IDs that are Failed.
-pub fn ShardHealthTracker::failed_shards(
+/// Return target keys that are Failed.
+pub fn ShardHealthTracker::failed_targets(
   self : ShardHealthTracker,
-) -> Array[Int] {
-  let result : Array[Int] = []
-  for shard_id in self.shards.keys() {
-    match self.shards.get(shard_id) {
-      Some(health) => if health.status == Failed { result.push(shard_id) }
+) -> Array[@placement.TargetKey] {
+  let result : Array[@placement.TargetKey] = []
+  for key in self.targets.keys() {
+    match self.targets.get(key) {
+      Some(health) => if health.status == Failed { result.push(key) }
       None => ()
     }
   }
@@ -185,15 +185,15 @@ pub fn ShardHealthTracker::failed_shards(
 }
 
 ///|
-/// Return health information for all shards, sorted by shard_id.
+/// Return health information for all targets, sorted by target_key.
 pub fn ShardHealthTracker::all_health(
   self : ShardHealthTracker,
 ) -> Array[ShardHealth] {
   let result : Array[ShardHealth] = []
-  let keys = self.shards.keys().collect()
+  let keys = self.targets.keys().collect()
   keys.sort()
-  for shard_id in keys {
-    match self.shards.get(shard_id) {
+  for key in keys {
+    match self.targets.get(key) {
       Some(health) => result.push(health)
       None => ()
     }
@@ -202,7 +202,7 @@ pub fn ShardHealthTracker::all_health(
 }
 
 ///|
-/// Total number of tracked shards.
-pub fn ShardHealthTracker::shard_count(self : ShardHealthTracker) -> Int {
-  self.shards.length()
+/// Total number of tracked targets.
+pub fn ShardHealthTracker::target_count(self : ShardHealthTracker) -> Int {
+  self.targets.length()
 }

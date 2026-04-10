@@ -17,50 +17,72 @@ pub fn ShardError::to_string(self : ShardError) -> String {
 }
 
 ///|
-/// DistributedDB — scatter-gather across multiple shards.
+/// DistributedDB — scatter-gather across target nodes with replication.
 ///
-/// Integrates the distributed primitives (router, merge, health, partition)
-/// into a single coordinated type. Platform adapters provide a ShardTransport
-/// implementation; DistributedDB handles:
+/// ## Architecture
 ///
-///   - CRUSH-based routing (which shard owns which vector)
-///   - Fan-out to healthy shards for search/scroll/count
-///   - Result merging across shards
-///   - Health tracking (success/failure per shard)
-///   - Partition detection and recovery planning
+/// - PG (placement group): logical data partition.
+/// - Target: physical storage node (identified by target_key: String).
+/// - CRUSH maps each PG to N target nodes (replicas).
+/// - Each target holds data for exactly the PGs assigned to it.
+/// - Reads query one healthy target per PG.
+/// - Writes go to all targets for each PG's replicas.
 ///
-/// When shard_count=1, DistributedDB degrades to a passthrough — all
-/// operations go to shard 0 with no merge overhead.
+/// ## Quorum semantics
+///
+/// N = replicas per PG (from CrushMap)
+/// W = write quorum (replicas that must acknowledge per point)
+/// R = read quorum (targets needed per PG for a successful read)
+/// W + R > N → strong consistency
 
 ///|
 pub struct DistributedDB[T] {
-  shard_count : Int
   crush_map : @placement.CrushMap
+  quorum : QuorumConfig
   transport : T
   health : ShardHealthTracker
   partition_state : PartitionState
 }
 
 ///|
+/// Create a DistributedDB.
+///
+/// `pg_count`: number of placement groups (logical data partitions).
+/// `targets`: physical storage nodes. Each target is identified by a key string.
+/// `replicas`: how many targets hold each PG's data.
+/// `write_quorum`: how many targets must acknowledge a write per point (default: replicas).
+/// `read_quorum`: not used for fan-out reads (1 target per PG is always sufficient).
 pub fn[T] DistributedDB::new(
-  shard_count : Int,
+  pg_count : Int,
+  targets : Array[@placement.CrushTarget],
   transport : T,
+  replicas? : Int = 1,
+  write_quorum? : Int = 0,
   failure_threshold? : Int = 3,
 ) -> DistributedDB[T] {
+  let effective_replicas = if replicas > targets.length() {
+    targets.length()
+  } else if replicas < 1 {
+    1
+  } else {
+    replicas
+  }
+  let w = if write_quorum > 0 { write_quorum } else { effective_replicas }
+  let target_keys = targets.map(fn(t) { t.key })
   {
-    shard_count,
-    crush_map: @placement.CrushMap::new(shard_count, 1, []),
+    crush_map: @placement.CrushMap::new(pg_count, effective_replicas, targets),
+    quorum: QuorumConfig::new(effective_replicas, w, 1),
     transport,
-    health: ShardHealthTracker::new(shard_count, failure_threshold~),
-    partition_state: PartitionState::new(shard_count),
+    health: ShardHealthTracker::new(target_keys, failure_threshold~),
+    partition_state: PartitionState::new(target_keys),
   }
 }
 
 ///|
-/// Helper: execute a shard operation with error handling and health tracking.
-async fn[T, R] DistributedDB::exec_shard(
+/// Helper: execute a target operation with error handling and health tracking.
+async fn[T, R] DistributedDB::exec_target(
   self : DistributedDB[T],
-  shard_id : Int,
+  target_key : @placement.TargetKey,
   timestamp_ns : Int64,
   op : ((R) -> Unit, (String) -> Unit) -> Unit,
 ) -> R? {
@@ -69,36 +91,42 @@ async fn[T, R] DistributedDB::exec_shard(
   })
   match result {
     Ok(value) => {
-      self.health.report_success(shard_id, timestamp_ns)
+      self.health.report_success(target_key, timestamp_ns)
       Some(value)
     }
     Err(msg) => {
       let err_str = msg.to_string()
-      self.health.report_failure(shard_id, timestamp_ns, err_str)
-      self.partition_state.detect_partition(shard_id, timestamp_ns)
+      self.health.report_failure(target_key, timestamp_ns, err_str)
+      self.partition_state.detect_partition(target_key, timestamp_ns)
       None
     }
   }
 }
 
-// ── Write operations (async, routed) ────────────────────────────
+// ── Write operations (async, routed, quorum-aware) ─────────────
 
 ///|
-/// Upsert points across shards.
-/// Groups points by CRUSH placement, fans out to each shard.
+/// Upsert points across targets with replication.
+///
+/// Each point is written to all its replica targets. Raises ShardError
+/// if any point fails to reach W replicas.
 pub async fn[T : ShardTransport] DistributedDB::upsert(
   self : DistributedDB[T],
   points : Array[TransportPoint],
   timestamp_ns : Int64,
-) -> Unit {
-  let groups = group_by_shard(
+) -> Unit raise ShardError {
+  let groups = group_by_target(
     points.map(fn(p) { (p.id, p.vector, p.attrs) }),
     self.crush_map,
   )
-  for shard_id in groups.keys() {
-    match groups.get(shard_id) {
-      Some(shard_points) => {
-        let tp = shard_points.map(fn(p) {
+  // Track which targets succeeded
+  let target_ok : Map[@placement.TargetKey, Bool] = {}
+  let mut last_error = ""
+  // Fan out to targets
+  for target_key in groups.keys() {
+    match groups.get(target_key) {
+      Some(target_points) => {
+        let tp = target_points.map(fn(p) {
           let (id, vector, attrs) = p
           TransportPoint::{ id, vector, attrs }
         })
@@ -107,7 +135,7 @@ pub async fn[T : ShardTransport] DistributedDB::upsert(
           reject,
         ) {
           self.transport.shard_upsert(
-            shard_id,
+            target_key,
             tp,
             timestamp_ns,
             fn() { resolve(()) },
@@ -115,39 +143,74 @@ pub async fn[T : ShardTransport] DistributedDB::upsert(
           )
         })
         match result {
-          Ok(_) => self.health.report_success(shard_id, timestamp_ns)
+          Ok(_) => {
+            self.health.report_success(target_key, timestamp_ns)
+            target_ok.set(target_key, true)
+          }
           Err(msg) => {
-            self.health.report_failure(shard_id, timestamp_ns, msg.to_string())
-            self.partition_state.detect_partition(shard_id, timestamp_ns)
+            last_error = msg.to_string()
+            self.health.report_failure(target_key, timestamp_ns, last_error)
+            self.partition_state.detect_partition(target_key, timestamp_ns)
           }
         }
       }
       None => ()
     }
   }
+  // Verify per-point write quorum
+  for point in points {
+    let point_targets = targets_for_id(point.id, self.crush_map)
+    let mut point_acks = 0
+    for t in point_targets {
+      if target_ok.contains(t) {
+        point_acks = point_acks + 1
+      }
+    }
+    if point_acks < self.quorum.w {
+      raise ShardFailed(
+        "Write quorum not met for point " +
+        point.id.to_string() +
+        ": " +
+        point_acks.to_string() +
+        "/" +
+        self.quorum.w.to_string() +
+        " replicas acknowledged. Last error: " +
+        last_error,
+      )
+    }
+  }
 }
 
 ///|
-/// Remove a vector from the owning shard.
+/// Remove a vector from all replica targets.
 pub async fn[T : ShardTransport] DistributedDB::remove(
   self : DistributedDB[T],
   id : @types.VectorId,
   timestamp_ns : Int64,
 ) -> Bool {
-  let shard_id = shard_for_id(id, self.crush_map)
-  match
-    self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-      self.transport.shard_remove(shard_id, id, timestamp_ns, resolve, reject)
-    }) {
-    Some(removed) => removed
-    None => false
+  let replica_targets = targets_for_id(id, self.crush_map)
+  let mut any_removed = false
+  for target_key in replica_targets {
+    match
+      self.exec_target(target_key, timestamp_ns, fn(resolve, reject) {
+        self.transport.shard_remove(
+          target_key, id, timestamp_ns, resolve, reject,
+        )
+      }) {
+      Some(removed) => if removed { any_removed = true }
+      None => ()
+    }
   }
+  any_removed
 }
 
-// ── Read operations (async, fan-out + merge) ────────────────────
+// ── Read operations (async, one target per PG) ─────────────────
 
 ///|
-/// Search across all healthy shards, merge results.
+/// Search across targets, one per PG.
+///
+/// select_read_targets picks one healthy target per PG, so each PG's
+/// data is queried exactly once. No dedup division needed.
 pub async fn[T : ShardTransport] DistributedDB::search(
   self : DistributedDB[T],
   query : Array[Double],
@@ -155,21 +218,21 @@ pub async fn[T : ShardTransport] DistributedDB::search(
   filter_json? : String = "",
   timestamp_ns? : Int64 = 0L,
 ) -> MergedSearchResult {
-  let shards = healthy_shards_for_fanout(self.crush_map, self.health)
+  let targets = select_read_targets(self.crush_map, self.health)
   let shard_results : Array[ShardSearchResult] = []
-  for shard_id in shards {
+  for target_key in targets {
     match
-      self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
+      self.exec_target(target_key, timestamp_ns, fn(resolve, reject) {
         self.transport.shard_search(
-          shard_id, query, top_k, filter_json, resolve, reject,
+          target_key, query, top_k, filter_json, resolve, reject,
         )
       }) {
-      Some(hits) => shard_results.push({ shard_id, hits, error: None })
+      Some(hits) => shard_results.push({ target_key, hits, error: None })
       None =>
         shard_results.push({
-          shard_id,
+          target_key,
           hits: [],
-          error: Some("shard unreachable"),
+          error: Some("target unreachable"),
         })
     }
   }
@@ -177,41 +240,51 @@ pub async fn[T : ShardTransport] DistributedDB::search(
 }
 
 ///|
-/// Get a vector from the owning shard.
+/// Get a vector from any target that holds it.
+///
+/// Tries each replica target. Returns as soon as one positively confirms
+/// the record exists. Returns None only after all replicas are exhausted.
 pub async fn[T : ShardTransport] DistributedDB::get(
   self : DistributedDB[T],
   id : @types.VectorId,
   timestamp_ns? : Int64 = 0L,
 ) -> @types.VectorRecord? {
-  let shard_id = shard_for_id(id, self.crush_map)
-  match
-    self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-      self.transport.shard_get(shard_id, id, resolve, reject)
-    }) {
-    Some(record) => record
-    None => None
+  let replica_targets = targets_for_id(id, self.crush_map)
+  for target_key in replica_targets {
+    match
+      self.exec_target(target_key, timestamp_ns, fn(resolve, reject) {
+        self.transport.shard_get(target_key, id, resolve, reject)
+      }) {
+      Some(Some(record)) => return Some(record)
+      Some(None) => continue // Target responded but doesn't have it
+      None => continue // Target failed
+    }
   }
+  None
 }
 
 ///|
-/// Check if a vector exists on the owning shard.
+/// Check if a vector exists on any replica target.
 pub async fn[T : ShardTransport] DistributedDB::has(
   self : DistributedDB[T],
   id : @types.VectorId,
   timestamp_ns? : Int64 = 0L,
 ) -> Bool {
-  let shard_id = shard_for_id(id, self.crush_map)
-  match
-    self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-      self.transport.shard_has(shard_id, id, resolve, reject)
-    }) {
-    Some(found) => found
-    None => false
+  let replica_targets = targets_for_id(id, self.crush_map)
+  for target_key in replica_targets {
+    match
+      self.exec_target(target_key, timestamp_ns, fn(resolve, reject) {
+        self.transport.shard_has(target_key, id, resolve, reject)
+      }) {
+      Some(found) => if found { return true }
+      None => continue
+    }
   }
+  false
 }
 
 ///|
-/// Scroll across all healthy shards, merge results.
+/// Scroll across targets, one per PG.
 pub async fn[T : ShardTransport] DistributedDB::scroll_filtered(
   self : DistributedDB[T],
   filter_json? : String = "",
@@ -219,21 +292,21 @@ pub async fn[T : ShardTransport] DistributedDB::scroll_filtered(
   limit? : Int = 10,
   timestamp_ns? : Int64 = 0L,
 ) -> MergedScrollResult {
-  let shards = healthy_shards_for_fanout(self.crush_map, self.health)
+  let targets = select_read_targets(self.crush_map, self.health)
   let shard_results : Array[ShardScrollResult] = []
-  for shard_id in shards {
+  for target_key in targets {
     match
-      self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
+      self.exec_target(target_key, timestamp_ns, fn(resolve, reject) {
         self.transport.shard_scroll(
-          shard_id, filter_json, offset, limit, resolve, reject,
+          target_key, filter_json, offset, limit, resolve, reject,
         )
       }) {
-      Some(entries) => shard_results.push({ shard_id, entries, error: None })
+      Some(entries) => shard_results.push({ target_key, entries, error: None })
       None =>
         shard_results.push({
-          shard_id,
+          target_key,
           entries: [],
-          error: Some("shard unreachable"),
+          error: Some("target unreachable"),
         })
     }
   }
@@ -241,25 +314,28 @@ pub async fn[T : ShardTransport] DistributedDB::scroll_filtered(
 }
 
 ///|
-/// Count across all healthy shards, merge results.
+/// Count across targets, one per PG.
+///
+/// Since each PG is queried exactly once, the sum of counts is the
+/// true unique count. No division needed.
 pub async fn[T : ShardTransport] DistributedDB::count_filtered(
   self : DistributedDB[T],
   filter_json? : String = "",
   timestamp_ns? : Int64 = 0L,
 ) -> MergedCountResult {
-  let shards = healthy_shards_for_fanout(self.crush_map, self.health)
+  let targets = select_read_targets(self.crush_map, self.health)
   let shard_results : Array[ShardCountResult] = []
-  for shard_id in shards {
+  for target_key in targets {
     match
-      self.exec_shard(shard_id, timestamp_ns, fn(resolve, reject) {
-        self.transport.shard_count(shard_id, filter_json, resolve, reject)
+      self.exec_target(target_key, timestamp_ns, fn(resolve, reject) {
+        self.transport.shard_count(target_key, filter_json, resolve, reject)
       }) {
-      Some(count) => shard_results.push({ shard_id, count, error: None })
+      Some(count) => shard_results.push({ target_key, count, error: None })
       None =>
         shard_results.push({
-          shard_id,
+          target_key,
           count: 0,
-          error: Some("shard unreachable"),
+          error: Some("target unreachable"),
         })
     }
   }
@@ -276,34 +352,53 @@ pub fn[T] DistributedDB::all_health(
 }
 
 ///|
-pub fn[T] DistributedDB::failed_shards(self : DistributedDB[T]) -> Array[Int] {
-  self.health.failed_shards()
+pub fn[T] DistributedDB::failed_targets(
+  self : DistributedDB[T],
+) -> Array[@placement.TargetKey] {
+  self.health.failed_targets()
 }
 
 ///|
-pub fn[T] DistributedDB::partitioned_shards(
+pub fn[T] DistributedDB::partitioned_targets(
   self : DistributedDB[T],
-) -> Array[(Int, Int64)] {
-  self.partition_state.partitioned_shards()
+) -> Array[(@placement.TargetKey, Int64)] {
+  self.partition_state.partitioned_targets()
 }
 
 ///|
 pub fn[T] DistributedDB::resolve_partition(
   self : DistributedDB[T],
-  shard_id : Int,
+  target_key : @placement.TargetKey,
 ) -> Unit {
-  self.partition_state.resolve_partition(shard_id)
+  self.partition_state.resolve_partition(target_key)
 }
 
 ///|
-pub fn[T] DistributedDB::shard_count(self : DistributedDB[T]) -> Int {
-  self.shard_count
+pub fn[T] DistributedDB::target_count(self : DistributedDB[T]) -> Int {
+  self.crush_map.targets.length()
 }
 
 ///|
-pub fn[T] DistributedDB::shard_for(
+pub fn[T] DistributedDB::pg_count(self : DistributedDB[T]) -> Int {
+  self.crush_map.pgs
+}
+
+///|
+pub fn[T] DistributedDB::replicas(self : DistributedDB[T]) -> Int {
+  self.crush_map.replicas
+}
+
+///|
+/// Get all target keys that hold a vector ID.
+pub fn[T] DistributedDB::targets_for(
   self : DistributedDB[T],
   id : @types.VectorId,
-) -> Int {
-  shard_for_id(id, self.crush_map)
+) -> Array[@placement.TargetKey] {
+  targets_for_id(id, self.crush_map)
+}
+
+///|
+/// Get the quorum configuration.
+pub fn[T] DistributedDB::quorum_config(self : DistributedDB[T]) -> QuorumConfig {
+  self.quorum
 }

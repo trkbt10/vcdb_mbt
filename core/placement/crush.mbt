@@ -3,9 +3,33 @@
 /// Provides deterministic distributed placement for vector data.
 
 ///|
+/// Opaque identifier for a physical storage target (node/device/bucket).
+///
+/// Wraps String to prevent accidental mixing with other string values
+/// (shard names, collection names, file paths, etc.).
+pub(all) struct TargetKey {
+  value : String
+} derive(Eq, Compare, Hash)
+
+///|
+pub impl Show for TargetKey with output(self, logger) {
+  logger.write_string(self.value)
+}
+
+///|
+pub fn TargetKey::new(value : String) -> TargetKey {
+  { value, }
+}
+
+///|
+pub fn TargetKey::to_string(self : TargetKey) -> String {
+  self.value
+}
+
+///|
 /// Storage target (device/bucket)
 pub struct CrushTarget {
-  key : String // Logical storage key
+  key : TargetKey // Logical storage key
   weight : Double // Device weight (default 1.0)
   zone : String? // Failure domain (optional)
 }
@@ -24,13 +48,19 @@ pub impl Show for CrushTarget with output(self, logger) {
 ///|
 /// Create a simple target with default weight
 pub fn CrushTarget::new(key : String) -> CrushTarget {
+  { key: TargetKey::new(key), weight: 1.0, zone: None }
+}
+
+///|
+/// Create a target from a TargetKey with default weight
+pub fn CrushTarget::from_key(key : TargetKey) -> CrushTarget {
   { key, weight: 1.0, zone: None }
 }
 
 ///|
 /// Create a target with weight
 pub fn CrushTarget::with_weight(key : String, weight : Double) -> CrushTarget {
-  { key, weight, zone: None }
+  { key: TargetKey::new(key), weight, zone: None }
 }
 
 ///|
@@ -40,7 +70,7 @@ pub fn CrushTarget::with_zone(
   weight : Double,
   zone : String,
 ) -> CrushTarget {
-  { key, weight, zone: Some(zone) }
+  { key: TargetKey::new(key), weight, zone: Some(zone) }
 }
 
 ///|
@@ -76,7 +106,7 @@ pub fn CrushMap::new(
 /// Placement result
 pub struct LocateResult {
   pg : Int // Placement group number
-  primaries : Array[String] // Ordered list of target keys
+  primaries : Array[TargetKey] // Ordered list of target keys
 }
 
 ///|
@@ -121,9 +151,10 @@ fn find_unused_index(start : Int, used : Map[Int, Bool], total : Int) -> Int {
 }
 
 ///|
-/// Choose primary targets for a placement group
-/// Uses FNV-like constant for stable seed generation
-fn choose_primaries(pg : Int, replicas : Int, total : Int) -> Array[Int] {
+/// Choose primary targets for a placement group.
+/// Uses FNV-like constant for stable seed generation.
+/// Returns `min(replicas, total)` distinct indices in [0, total).
+pub fn choose_primaries(pg : Int, replicas : Int, total : Int) -> Array[Int] {
   if total == 0 {
     return []
   }
@@ -183,7 +214,7 @@ pub fn crush_locate(id : @types.VectorId, map : CrushMap) -> LocateResult {
     return { pg, primaries: [] }
   }
   let indices = choose_primaries(pg, map.replicas, map.targets.length())
-  let primaries : Array[String] = []
+  let primaries : Array[TargetKey] = []
   for idx in indices {
     primaries.push(map.targets[idx].key)
   }
@@ -191,18 +222,36 @@ pub fn crush_locate(id : @types.VectorId, map : CrushMap) -> LocateResult {
 }
 
 ///|
+/// Map a placement group to its target keys.
+///
+/// Given a PG number, returns the ordered list of target keys that
+/// hold replicas for this PG. This is the PG→target mapping without
+/// the ID→PG hashing step.
+pub fn crush_locate_pg(pg : Int, map : CrushMap) -> Array[TargetKey] {
+  if map.targets.is_empty() {
+    return []
+  }
+  let indices = choose_primaries(pg, map.replicas, map.targets.length())
+  indices.map(fn(idx) { map.targets[idx].key })
+}
+
+///|
 /// Locate placement using just ID and CRUSH map
 /// Convenience function that returns the primary target key
-pub fn crush_primary(id : @types.VectorId, map : CrushMap) -> String? {
+pub fn crush_primary(id : @types.VectorId, map : CrushMap) -> TargetKey? {
   let result = crush_locate(id, map)
-  first_string_opt(result.primaries)
+  if result.primaries.is_empty() {
+    None
+  } else {
+    Some(result.primaries[0])
+  }
 }
 
 ///|
 /// Segment manifest entry
 pub(all) struct SegmentEntry {
   name : String // Segment name (e.g., "db.pg0.part0")
-  target_key : String // Storage target key
+  target_key : TargetKey // Storage target key
 }
 
 ///|
@@ -243,8 +292,8 @@ pub impl Show for PlacementManifest with output(self, logger) {
 /// Move plan for rebalancing
 pub(all) struct MovePlan {
   name : String // Segment name
-  from : String // Source target key
-  to : String // Destination target key
+  from : TargetKey // Source target key
+  to : TargetKey // Destination target key
 }
 
 ///|
@@ -302,11 +351,10 @@ fn parse_pg_from_name(name : String) -> Int {
 /// Compute primary target for a placement group under a CRUSH map
 /// Uses choose_primaries for consistency with crush_locate
 /// Returns None if no targets available
-fn target_for_pg(pg : Int, map : CrushMap) -> String? {
+fn target_for_pg(pg : Int, map : CrushMap) -> TargetKey? {
   if map.targets.is_empty() {
     return None
   }
-  // Use choose_primaries for consistent placement with crush_locate
   let primaries = choose_primaries(pg, 1, map.targets.length())
   if primaries.is_empty() {
     return Some(map.targets[0].key)
@@ -347,7 +395,7 @@ pub fn plan_rebalance(
 /// Execute rebalance plan using any Storage implementation
 pub fn[S : @storage.Storage] apply_rebalance(
   plan : Array[MovePlan],
-  storages : Map[String, S],
+  storages : Map[TargetKey, S],
 ) -> Unit raise @storage.IOError {
   for mv in plan {
     let from_storage = require_storage_with_prefix(
@@ -375,7 +423,7 @@ pub fn[S : @storage.Storage] apply_rebalance(
 /// Backward compatibility alias
 pub fn apply_rebalance_memory(
   plan : Array[MovePlan],
-  storages : Map[String, @storage.MemoryStorage],
+  storages : Map[TargetKey, @storage.MemoryStorage],
 ) -> Unit raise @storage.IOError {
   apply_rebalance(plan, storages)
 }
@@ -389,8 +437,8 @@ pub fn update_manifest_after_rebalance(
   new_epoch : Int,
   new_ts : Int64,
 ) -> PlacementManifest {
-  // Create move lookup
-  let move_map : Map[String, String] = {}
+  // Create move lookup: segment name → new target key
+  let move_map : Map[String, TargetKey] = {}
   for mv in plan {
     move_map.set(mv.name, mv.to)
   }

@@ -9,29 +9,33 @@ import {
 }
 
 // Values
-pub fn[S : @storage.Storage] apply_rebalance(Array[MovePlan], Map[String, S]) -> Unit raise @storage.IOError
+pub fn[S : @storage.Storage] apply_rebalance(Array[MovePlan], Map[TargetKey, S]) -> Unit raise @storage.IOError
 
-pub fn apply_rebalance_memory(Array[MovePlan], Map[String, @storage.MemoryStorage]) -> Unit raise @storage.IOError
+pub fn apply_rebalance_memory(Array[MovePlan], Map[TargetKey, @storage.MemoryStorage]) -> Unit raise @storage.IOError
 
-pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(AsyncRebalanceState, Map[String, S]) -> PlacementManifest raise @storage.AsyncIOError
+pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(AsyncRebalanceState, Map[TargetKey, S]) -> PlacementManifest raise @storage.AsyncIOError
 
 pub async fn[S : @storage.AsyncStorage] async_load_segmented(String, S) -> @store.CoreStore
 
 pub async fn[S : @storage.AsyncStorage] async_save_segmented(@store.CoreStore, String, Int, S) -> Unit
 
+pub fn choose_primaries(Int, Int, Int) -> Array[Int]
+
 pub fn crush_locate(@types.VectorId, CrushMap) -> LocateResult
 
-pub fn crush_primary(@types.VectorId, CrushMap) -> String?
+pub fn crush_locate_pg(Int, CrushMap) -> Array[TargetKey]
+
+pub fn crush_primary(@types.VectorId, CrushMap) -> TargetKey?
 
 pub fn[S : @storage.Storage] load_segmented(String, S) -> @store.CoreStore raise @storage.IOError
 
-pub fn[S : @storage.Storage] load_store_distributed(String, Map[String, S], S) -> @store.CoreStore raise @storage.IOError
+pub fn[S : @storage.Storage] load_store_distributed(String, Map[TargetKey, S], S) -> @store.CoreStore raise @storage.IOError
 
-pub fn[S : @storage.Storage] load_store_distributed_full(String, Map[String, S], S) -> LoadDistributedResult raise @storage.IOError
+pub fn[S : @storage.Storage] load_store_distributed_full(String, Map[TargetKey, S], S) -> LoadDistributedResult raise @storage.IOError
 
 pub fn plan_rebalance(PlacementManifest, CrushMap) -> Array[MovePlan]
 
-pub fn[S : @storage.Storage] read_segments_from_manifest(PlacementManifest, Map[String, S]) -> Array[(@types.VectorId, Array[Double], @types.Attrs)] raise @storage.IOError
+pub fn[S : @storage.Storage] read_segments_from_manifest(PlacementManifest, Map[TargetKey, S]) -> Array[(@types.VectorId, Array[Double], @types.Attrs)] raise @storage.IOError
 
 pub fn reconstruct_from_index(Bytes, Bytes, Map[String, Bytes]) -> LoadDistributedResult?
 
@@ -39,13 +43,13 @@ pub fn reconstruct_from_segments(Bytes, Map[String, Bytes]) -> LoadDistributedRe
 
 pub fn[S : @storage.Storage] save_segmented(@store.CoreStore, String, Int, S) -> Unit raise @storage.IOError
 
-pub fn[S : @storage.Storage] save_store_distributed(@store.CoreStore, SegmentOptions, Map[String, S], S) -> PlacementManifest raise @storage.IOError
+pub fn[S : @storage.Storage] save_store_distributed(@store.CoreStore, SegmentOptions, Map[TargetKey, S], S) -> PlacementManifest raise @storage.IOError
 
-pub fn[S : @storage.Storage] save_store_distributed_with_ann(@store.CoreStore, SegmentOptions, Map[String, S], S, @types.Strategy, Bytes?) -> PlacementManifest raise @storage.IOError
+pub fn[S : @storage.Storage] save_store_distributed_with_ann(@store.CoreStore, SegmentOptions, Map[TargetKey, S], S, @types.Strategy, Bytes?) -> PlacementManifest raise @storage.IOError
 
 pub fn update_manifest_after_rebalance(PlacementManifest, Array[MovePlan], CrushMap, Int, Int64) -> PlacementManifest
 
-pub fn[S : @storage.Storage] write_segments_from_store(@store.CoreStore, SegmentOptions, Map[String, S]) -> SegmentResult raise @storage.IOError
+pub fn[S : @storage.Storage] write_segments_from_store(@store.CoreStore, SegmentOptions, Map[TargetKey, S]) -> SegmentResult raise @storage.IOError
 
 pub fn write_segments_in_memory(@store.CoreStore, SegmentOptions) -> MemorySegmentResult
 
@@ -77,10 +81,11 @@ pub fn CrushMap::new(Int, Int, Array[CrushTarget]) -> Self
 pub impl Show for CrushMap
 
 pub struct CrushTarget {
-  key : String
+  key : TargetKey
   weight : Double
   zone : String?
 }
+pub fn CrushTarget::from_key(TargetKey) -> Self
 pub fn CrushTarget::new(String) -> Self
 pub fn CrushTarget::with_weight(String, Double) -> Self
 pub fn CrushTarget::with_zone(String, Double, String) -> Self
@@ -94,13 +99,13 @@ pub struct LoadDistributedResult {
 
 pub struct LocateResult {
   pg : Int
-  primaries : Array[String]
+  primaries : Array[TargetKey]
 }
 pub impl Show for LocateResult
 
 pub(all) struct MemorySegment {
   name : String
-  target_key : String
+  target_key : TargetKey
   data : Bytes
 }
 
@@ -112,8 +117,8 @@ pub(all) struct MemorySegmentResult {
 
 pub(all) struct MovePlan {
   name : String
-  from : String
-  to : String
+  from : TargetKey
+  to : TargetKey
 }
 pub impl Show for MovePlan
 
@@ -153,7 +158,7 @@ pub fn SaveDistributedOptions::default(String, CrushMap) -> Self
 
 pub(all) struct SegmentEntry {
   name : String
-  target_key : String
+  target_key : TargetKey
 }
 pub impl Show for SegmentEntry
 
@@ -172,6 +177,13 @@ pub struct SegmentResult {
   dim : Int
   count : Int
 }
+
+pub(all) struct TargetKey {
+  value : String
+} derive(Compare, Eq, Hash)
+pub fn TargetKey::new(String) -> Self
+pub fn TargetKey::to_string(Self) -> String
+pub impl Show for TargetKey
 
 // Type aliases
 

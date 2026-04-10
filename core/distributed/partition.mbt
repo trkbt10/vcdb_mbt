@@ -1,9 +1,9 @@
 ///|
 /// Partition detection, tracking, and recovery.
 ///
-/// Handles network partitions between shards:
-///   - Detect when a shard becomes partitioned (no response)
-///   - Track partition duration per shard
+/// Handles network partitions between targets:
+///   - Detect when a target becomes partitioned (no response)
+///   - Track partition duration per target
 ///   - On recovery: merge divergent WALs using LWW (Last-Writer-Wins)
 ///   - Generate recovery plans from partition + replication state
 ///
@@ -13,11 +13,11 @@
 /// deterministically by vector ID (lower ID wins).
 
 ///|
-/// Partition status for a shard.
+/// Partition status for a target.
 pub(all) enum PartitionStatus {
-  /// Shard is reachable.
+  /// Target is reachable.
   Connected
-  /// Shard is unreachable since the given timestamp (nanoseconds).
+  /// Target is unreachable since the given timestamp (nanoseconds).
   Partitioned(Int64)
 } derive(Eq)
 
@@ -34,80 +34,82 @@ pub impl Show for PartitionStatus with output(self, logger) {
 }
 
 ///|
-/// Tracks partition state across all shards.
+/// Tracks partition state across all targets.
 pub(all) struct PartitionState {
-  statuses : Map[Int, PartitionStatus]
+  statuses : Map[@placement.TargetKey, PartitionStatus]
 }
 
 ///|
-/// Create a new partition state with all shards connected.
-pub fn PartitionState::new(shard_count : Int) -> PartitionState {
-  let statuses : Map[Int, PartitionStatus] = {}
-  for i in 0..<shard_count {
-    statuses[i] = Connected
+/// Create a new partition state with all targets connected.
+pub fn PartitionState::new(
+  target_keys : Array[@placement.TargetKey],
+) -> PartitionState {
+  let statuses : Map[@placement.TargetKey, PartitionStatus] = {}
+  for key in target_keys {
+    statuses[key] = Connected
   }
   { statuses, }
 }
 
 ///|
-/// Mark a shard as partitioned at the given timestamp.
+/// Mark a target as partitioned at the given timestamp.
 /// No-op if already partitioned (preserves original partition timestamp).
 pub fn PartitionState::detect_partition(
   self : PartitionState,
-  shard_id : Int,
+  target_key : @placement.TargetKey,
   ts : Int64,
 ) -> Unit {
-  match self.statuses.get(shard_id) {
-    Some(Connected) => self.statuses[shard_id] = Partitioned(ts)
+  match self.statuses.get(target_key) {
+    Some(Connected) => self.statuses[target_key] = Partitioned(ts)
     Some(Partitioned(_)) => () // Already partitioned, keep original ts
-    None => self.statuses[shard_id] = Partitioned(ts)
+    None => self.statuses[target_key] = Partitioned(ts)
   }
 }
 
 ///|
-/// Mark a shard as connected (partition resolved).
+/// Mark a target as connected (partition resolved).
 pub fn PartitionState::resolve_partition(
   self : PartitionState,
-  shard_id : Int,
+  target_key : @placement.TargetKey,
 ) -> Unit {
-  self.statuses[shard_id] = Connected
+  self.statuses[target_key] = Connected
 }
 
 ///|
-/// Get the partition status of a shard.
+/// Get the partition status of a target.
 pub fn PartitionState::get_status(
   self : PartitionState,
-  shard_id : Int,
+  target_key : @placement.TargetKey,
 ) -> PartitionStatus {
-  match self.statuses.get(shard_id) {
+  match self.statuses.get(target_key) {
     Some(s) => s
     None => Connected
   }
 }
 
 ///|
-/// Check if a shard is currently partitioned.
+/// Check if a target is currently partitioned.
 pub fn PartitionState::is_partitioned(
   self : PartitionState,
-  shard_id : Int,
+  target_key : @placement.TargetKey,
 ) -> Bool {
-  match self.statuses.get(shard_id) {
+  match self.statuses.get(target_key) {
     Some(Partitioned(_)) => true
     _ => false
   }
 }
 
 ///|
-/// List all currently partitioned shards with their partition timestamps.
-pub fn PartitionState::partitioned_shards(
+/// List all currently partitioned targets with their partition timestamps.
+pub fn PartitionState::partitioned_targets(
   self : PartitionState,
-) -> Array[(Int, Int64)] {
-  let result : Array[(Int, Int64)] = []
+) -> Array[(@placement.TargetKey, Int64)] {
+  let result : Array[(@placement.TargetKey, Int64)] = []
   let keys = self.statuses.keys().collect()
   keys.sort()
-  for shard_id in keys {
-    match self.statuses.get(shard_id) {
-      Some(Partitioned(ts)) => result.push((shard_id, ts))
+  for key in keys {
+    match self.statuses.get(key) {
+      Some(Partitioned(ts)) => result.push((key, ts))
       _ => ()
     }
   }
@@ -306,26 +308,19 @@ pub fn merge_divergent_wals(
 ///|
 /// Generate a recovery plan from partition and replication state.
 ///
-/// For each currently partitioned shard that has just been resolved,
-/// returns (shard_id, since_ts) indicating the shard needs WAL records
-/// from since_ts onwards to catch up.
-///
-/// The since_ts is taken from the replication state's last known
-/// position for that shard.
+/// For each recently resolved target, returns (target_key, since_ts)
+/// indicating the target needs WAL records from since_ts onwards to catch up.
 pub fn recovery_plan(
   partition_state : PartitionState,
   replication_state : ReplicationState,
-  recently_resolved : Array[Int],
-) -> Array[(Int, Int64)] {
-  let plan : Array[(Int, Int64)] = []
-  for shard_id in recently_resolved {
-    match partition_state.get_status(shard_id) {
+  recently_resolved : Array[@placement.TargetKey],
+) -> Array[(@placement.TargetKey, Int64)] {
+  let plan : Array[(@placement.TargetKey, Int64)] = []
+  for target_key in recently_resolved {
+    match partition_state.get_status(target_key) {
       Connected => {
-        // Shard was resolved — find its last known position
-        // Use the shard ID as a replica key convention: "shard-{id}"
-        let replica_key = "shard-" + shard_id.to_string()
-        let last_ts = replication_state.replica_position(replica_key)
-        plan.push((shard_id, last_ts))
+        let last_ts = replication_state.replica_position(target_key.to_string())
+        plan.push((target_key, last_ts))
       }
       Partitioned(_) => () // Still partitioned, skip
     }

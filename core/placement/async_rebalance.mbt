@@ -175,7 +175,7 @@ pub fn AsyncRebalanceState::remaining_moves(
 /// Returns the updated manifest on success.
 pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(
   state : AsyncRebalanceState,
-  storages : Map[String, S],
+  storages : Map[TargetKey, S],
 ) -> PlacementManifest raise @storage.AsyncIOError {
   if state.plan.is_empty() {
     state.phase = Complete
@@ -197,7 +197,7 @@ pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(
     let from_storage = match storages.get(mv.from) {
       Some(s) => s
       None => {
-        let msg = "Source storage not found: " + mv.from
+        let msg = "Source storage not found: " + mv.from.to_string()
         state.phase = Failed(msg)
         raise @storage.AsyncIOFailed(msg)
       }
@@ -205,7 +205,7 @@ pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(
     let to_storage = match storages.get(mv.to) {
       Some(s) => s
       None => {
-        let msg = "Destination storage not found: " + mv.to
+        let msg = "Destination storage not found: " + mv.to.to_string()
         state.phase = Failed(msg)
         raise @storage.AsyncIOFailed(msg)
       }
@@ -215,7 +215,10 @@ pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(
     let segment_path = mv.name + @codec.ext_segment
     let data = @storage.async_read(from_storage, segment_path, @storage.Data) catch {
       _ => {
-        let err = "Failed to read " + segment_path + " from " + mv.from
+        let err = "Failed to read " +
+          segment_path +
+          " from " +
+          mv.from.to_string()
         state.phase = Failed(err)
         raise @storage.AsyncIOFailed(err)
       }
@@ -224,7 +227,7 @@ pub async fn[S : @storage.AsyncStorage] async_apply_rebalance(
     // Write to destination (async)
     @storage.async_atomic_write(to_storage, segment_path, data, @storage.Data) catch {
       _ => {
-        let err = "Failed to write " + segment_path + " to " + mv.to
+        let err = "Failed to write " + segment_path + " to " + mv.to.to_string()
         state.phase = Failed(err)
         raise @storage.AsyncIOFailed(err)
       }

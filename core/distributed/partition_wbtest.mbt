@@ -1,49 +1,58 @@
 ///|
 /// Tests for partition detection and recovery.
 
+///|
+fn ptk(s : String) -> @placement.TargetKey {
+  @placement.TargetKey::new(s)
+}
+
 // ── PartitionState ─────────────────────────────────────────────
 
 ///|
 test "partition: initial state all connected" {
-  let state = PartitionState::new(4)
-  for i in 0..<4 {
-    assert_eq(state.get_status(i), Connected)
-    assert_eq(state.is_partitioned(i), false)
+  let keys = [ptk("a"), ptk("b"), ptk("c"), ptk("d")]
+  let state = PartitionState::new(keys)
+  for key in keys {
+    assert_eq(state.get_status(key), Connected)
+    assert_eq(state.is_partitioned(key), false)
   }
-  assert_eq(state.partitioned_shards().length(), 0)
+  assert_eq(state.partitioned_targets().length(), 0)
 }
 
 ///|
 test "partition: detect and resolve" {
-  let state = PartitionState::new(4)
-  state.detect_partition(2, 5000L)
-  assert_eq(state.get_status(2), Partitioned(5000L))
-  assert_eq(state.is_partitioned(2), true)
-  assert_eq(state.partitioned_shards(), [(2, 5000L)])
+  let keys = [ptk("a"), ptk("b"), ptk("c"), ptk("d")]
+  let state = PartitionState::new(keys)
+  state.detect_partition(ptk("c"), 5000L)
+  assert_eq(state.get_status(ptk("c")), Partitioned(5000L))
+  assert_eq(state.is_partitioned(ptk("c")), true)
+  assert_eq(state.partitioned_targets(), [(ptk("c"), 5000L)])
 
-  state.resolve_partition(2)
-  assert_eq(state.get_status(2), Connected)
-  assert_eq(state.is_partitioned(2), false)
+  state.resolve_partition(ptk("c"))
+  assert_eq(state.get_status(ptk("c")), Connected)
+  assert_eq(state.is_partitioned(ptk("c")), false)
 }
 
 ///|
 test "partition: detect preserves original timestamp" {
-  let state = PartitionState::new(4)
-  state.detect_partition(1, 1000L)
+  let keys = [ptk("a"), ptk("b"), ptk("c"), ptk("d")]
+  let state = PartitionState::new(keys)
+  state.detect_partition(ptk("b"), 1000L)
   // Second detection should not change the timestamp
-  state.detect_partition(1, 5000L)
-  assert_eq(state.get_status(1), Partitioned(1000L))
+  state.detect_partition(ptk("b"), 5000L)
+  assert_eq(state.get_status(ptk("b")), Partitioned(1000L))
 }
 
 ///|
-test "partition: multiple partitioned shards" {
-  let state = PartitionState::new(4)
-  state.detect_partition(0, 1000L)
-  state.detect_partition(3, 2000L)
-  let partitioned = state.partitioned_shards()
+test "partition: multiple partitioned targets" {
+  let keys = [ptk("a"), ptk("b"), ptk("c"), ptk("d")]
+  let state = PartitionState::new(keys)
+  state.detect_partition(ptk("a"), 1000L)
+  state.detect_partition(ptk("d"), 2000L)
+  let partitioned = state.partitioned_targets()
   assert_eq(partitioned.length(), 2)
-  assert_eq(partitioned[0], (0, 1000L))
-  assert_eq(partitioned[1], (3, 2000L))
+  assert_eq(partitioned[0], (ptk("a"), 1000L))
+  assert_eq(partitioned[1], (ptk("d"), 2000L))
 }
 
 // ── LWW conflict resolution ────────────────────────────────────
@@ -191,38 +200,46 @@ test "partition: merge divergent WALs with conflict" {
 // ── Recovery plan ─────────────────────────────────────────────
 
 ///|
-test "partition: recovery plan for resolved shards" {
-  let partition_state = PartitionState::new(4)
-  let replication_state = ReplicationState::new([
-    "shard-0", "shard-1", "shard-2", "shard-3",
-  ])
+test "partition: recovery plan for resolved targets" {
+  let target_keys = [ptk("t-0"), ptk("t-1"), ptk("t-2"), ptk("t-3")]
+  let partition_state = PartitionState::new(target_keys)
+  let replication_state = ReplicationState::new(["t-0", "t-1", "t-2", "t-3"])
   replication_state.primary_max_ts = 10000L
-  replication_state.update_replica_position("shard-1", 5000L)
-  replication_state.update_replica_position("shard-3", 3000L)
+  replication_state.update_replica_position("t-1", 5000L)
+  replication_state.update_replica_position("t-3", 3000L)
 
-  // Shards 1 and 3 were partitioned, now resolved
-  let plan = recovery_plan(partition_state, replication_state, [1, 3])
+  // Targets 1 and 3 were partitioned, now resolved
+  let plan = recovery_plan(partition_state, replication_state, [
+    ptk("t-1"),
+    ptk("t-3"),
+  ])
   assert_eq(plan.length(), 2)
-  assert_eq(plan[0], (1, 5000L))
-  assert_eq(plan[1], (3, 3000L))
+  assert_eq(plan[0], (ptk("t-1"), 5000L))
+  assert_eq(plan[1], (ptk("t-3"), 3000L))
 }
 
 ///|
-test "partition: recovery plan skips still-partitioned shards" {
-  let partition_state = PartitionState::new(4)
-  partition_state.detect_partition(2, 1000L)
+test "partition: recovery plan skips still-partitioned targets" {
+  let target_keys = [ptk("t-0"), ptk("t-1"), ptk("t-2"), ptk("t-3")]
+  let partition_state = PartitionState::new(target_keys)
+  partition_state.detect_partition(ptk("t-2"), 1000L)
 
-  let replication_state = ReplicationState::new(["shard-2"])
+  let replication_state = ReplicationState::new(["t-2"])
 
-  // Shard 2 is still partitioned
-  let plan = recovery_plan(partition_state, replication_state, [2])
+  // Target 2 is still partitioned
+  let plan = recovery_plan(partition_state, replication_state, [ptk("t-2")])
   assert_eq(plan.length(), 0) // Skipped because still partitioned
 }
 
 ///|
-test "partition: recovery plan with no resolved shards" {
-  let partition_state = PartitionState::new(4)
+test "partition: recovery plan with no resolved targets" {
+  let target_keys = [ptk("t-0"), ptk("t-1"), ptk("t-2"), ptk("t-3")]
+  let partition_state = PartitionState::new(target_keys)
   let replication_state = ReplicationState::new([])
-  let plan = recovery_plan(partition_state, replication_state, [])
+  let plan : Array[(@placement.TargetKey, Int64)] = recovery_plan(
+    partition_state,
+    replication_state,
+    [],
+  )
   assert_eq(plan.length(), 0)
 }

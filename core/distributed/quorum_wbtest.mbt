@@ -178,7 +178,7 @@ test "quorum: select_write_replicas with single target" {
   let replicas = select_write_replicas(make_vid(42), crush)
   // Can only have 1 replica with 1 target (replicas capped by target count)
   assert_eq(replicas.length(), 1)
-  assert_eq(replicas[0], "s0")
+  assert_eq(replicas[0], @placement.TargetKey::new("s0"))
 }
 
 ///|
@@ -189,11 +189,13 @@ test "quorum: select_read_replicas excludes failed targets" {
     @placement.CrushTarget::new("s2"),
   ])
   // Mark s1 as failed
-  let healthy = select_read_replicas(make_vid(42), crush, ["s1"])
+  let healthy = select_read_replicas(make_vid(42), crush, [
+    @placement.TargetKey::new("s1"),
+  ])
   // Should have 2 replicas (s0, s2) since s1 is excluded
   assert_eq(healthy.length(), 2)
   for key in healthy {
-    assert_true(key != "s1")
+    assert_true(key != @placement.TargetKey::new("s1"))
   }
 }
 
@@ -204,7 +206,11 @@ test "quorum: select_read_replicas with no failures returns all" {
     @placement.CrushTarget::new("s1"),
     @placement.CrushTarget::new("s2"),
   ])
-  let healthy = select_read_replicas(make_vid(42), crush, [])
+  let healthy : Array[@placement.TargetKey] = select_read_replicas(
+    make_vid(42),
+    crush,
+    [],
+  )
   assert_eq(healthy.length(), 3)
 }
 
@@ -215,6 +221,10 @@ test "quorum: select_read_replicas with all failures returns empty" {
     @placement.CrushTarget::new("s1"),
     @placement.CrushTarget::new("s2"),
   ])
-  let healthy = select_read_replicas(make_vid(42), crush, ["s0", "s1", "s2"])
+  let healthy = select_read_replicas(make_vid(42), crush, [
+    @placement.TargetKey::new("s0"),
+    @placement.TargetKey::new("s1"),
+    @placement.TargetKey::new("s2"),
+  ])
   assert_eq(healthy.length(), 0)
 }

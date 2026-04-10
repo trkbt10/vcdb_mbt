@@ -19,7 +19,8 @@ pub fn[S : @storage.Storage] save_segmented(
 ) -> Unit raise @storage.IOError {
   let crush = CrushMap::new(32, 1, [CrushTarget::new("local")])
   let opts = SegmentOptions::segmented(base_name, crush, segment_bytes)
-  let storages : Map[String, S] = { "local": storage }
+  let storages : Map[TargetKey, S] = {}
+  storages.set(TargetKey::new("local"), storage)
   let _ = save_store_distributed(store, opts, storages, storage)
 }
 
@@ -30,6 +31,7 @@ pub fn[S : @storage.Storage] load_segmented(
   base_name : String,
   storage : S,
 ) -> @store.CoreStore raise @storage.IOError {
-  let storages : Map[String, S] = { "local": storage }
+  let storages : Map[TargetKey, S] = {}
+  storages.set(TargetKey::new("local"), storage)
   load_store_distributed(base_name, storages, storage)
 }

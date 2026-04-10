@@ -60,6 +60,14 @@
     "./storage/do-kv": {
       "types": "./dist/storage/do-kv.d.ts",
       "import": "./dist/storage/do-kv.js"
+    },
+    "./storage/types": {
+      "types": "./dist/storage/types.d.ts",
+      "import": "./dist/storage/types.js"
+    },
+    "./seed": {
+      "types": "./dist/seed.d.ts",
+      "import": "./dist/seed.js"
     }
   },
   "sideEffects": false,

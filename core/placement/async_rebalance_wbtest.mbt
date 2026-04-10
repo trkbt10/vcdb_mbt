@@ -20,7 +20,7 @@ fn make_test_manifest(
 ) -> PlacementManifest {
   let entries : Array[SegmentEntry] = segments.map(fn(s) {
     let (name, target) = s
-    { name, target_key: target }
+    { name, target_key: TargetKey::new(target) }
   })
   { base: "db", segments: entries, crush, epoch: 1, commit_ts: 1000L }
 }
@@ -176,7 +176,7 @@ test "async_rebalance: plan computed on topology change" {
   let state = AsyncRebalanceState::new(manifest, new_crush, 2, 2000L)
   assert_eq(state.phase, Planning)
   assert_true(state.plan.length() > 0)
-  let moves_to_s1 = state.plan.any(fn(mv) { mv.to == "s1" })
+  let moves_to_s1 = state.plan.any(fn(mv) { mv.to == TargetKey::new("s1") })
   assert_true(moves_to_s1)
 }
 
@@ -188,8 +188,8 @@ test "async_rebalance: execute empty plan" {
     let crush = CrushMap::new(2, 1, [CrushTarget::new("s0")])
     let manifest = make_test_manifest([], crush)
     let state = AsyncRebalanceState::new(manifest, crush, 2, 2000L)
-    let storages : Map[String, @storage.MemoryStorage] = {}
-    storages["s0"] = @storage.MemoryStorage::new()
+    let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+    storages[TargetKey::new("s0")] = @storage.MemoryStorage::new()
     let new_manifest = async_apply_rebalance(state, storages)
     assert_eq(state.phase, Complete)
     assert_eq(new_manifest.epoch, 2)
@@ -228,9 +228,9 @@ test "async_rebalance: execute moves with progress" {
       )
     }
 
-    let storages : Map[String, @storage.MemoryStorage] = {}
-    storages["s0"] = s0
-    storages["s1"] = s1
+    let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+    storages[TargetKey::new("s0")] = s0
+    storages[TargetKey::new("s1")] = s1
 
     let new_manifest = async_apply_rebalance(state, storages)
 
@@ -259,9 +259,21 @@ test "async_rebalance: remaining_moves for resumability" {
     crush,
   )
   let moves = [
-    MovePlan::{ name: "db.pg0.part0", from: "s0", to: "s1" },
-    MovePlan::{ name: "db.pg1.part0", from: "s0", to: "s1" },
-    MovePlan::{ name: "db.pg2.part0", from: "s0", to: "s1" },
+    MovePlan::{
+      name: "db.pg0.part0",
+      from: TargetKey::new("s0"),
+      to: TargetKey::new("s1"),
+    },
+    MovePlan::{
+      name: "db.pg1.part0",
+      from: TargetKey::new("s0"),
+      to: TargetKey::new("s1"),
+    },
+    MovePlan::{
+      name: "db.pg2.part0",
+      from: TargetKey::new("s0"),
+      to: TargetKey::new("s1"),
+    },
   ]
   let state = AsyncRebalanceState::from_plan(moves, manifest, crush, 2, 2000L)
   assert_eq(state.plan.length(), 3)
@@ -286,7 +298,13 @@ test "async_rebalance: from_plan for crash recovery" {
   ])
   let manifest = make_test_manifest([("db.pg0.part0", "s0")], crush)
   // Simulate recovery: provide explicit remaining moves
-  let moves = [MovePlan::{ name: "db.pg2.part0", from: "s0", to: "s1" }]
+  let moves = [
+    MovePlan::{
+      name: "db.pg2.part0",
+      from: TargetKey::new("s0"),
+      to: TargetKey::new("s1"),
+    },
+  ]
   let state = AsyncRebalanceState::from_plan(moves, manifest, crush, 3, 3000L)
   assert_eq(state.plan.length(), 1)
   assert_eq(state.moves_completed, 0)
@@ -337,9 +355,9 @@ test "async_rebalance: manifest updated after rebalance" {
       )
     }
 
-    let storages : Map[String, @storage.MemoryStorage] = {}
-    storages["s0"] = s0
-    storages["s1"] = s1
+    let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+    storages[TargetKey::new("s0")] = s0
+    storages[TargetKey::new("s1")] = s1
 
     let new_manifest = async_apply_rebalance(state, storages)
 
@@ -384,15 +402,21 @@ test "async_rebalance: read failure sets Failed phase" {
     CrushTarget::new("s1"),
   ])
   let manifest = make_test_manifest([("db.pg0.part0", "s0")], crush)
-  let moves = [MovePlan::{ name: "db.pg0.part0", from: "s0", to: "s1" }]
+  let moves = [
+    MovePlan::{
+      name: "db.pg0.part0",
+      from: TargetKey::new("s0"),
+      to: TargetKey::new("s1"),
+    },
+  ]
   let state = AsyncRebalanceState::from_plan(moves, manifest, crush, 2, 2000L)
 
   // Source storage is empty — async_read will reject
   let s0 = @storage.MemoryStorage::new()
   let s1 = @storage.MemoryStorage::new()
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  storages["s0"] = s0
-  storages["s1"] = s1
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  storages[TargetKey::new("s0")] = s0
+  storages[TargetKey::new("s1")] = s1
 
   let did_fail = run_rebalance_expect_failure(async fn() raise @storage.AsyncIOError {
     let _ = async_apply_rebalance(state, storages)
@@ -418,15 +442,21 @@ test "async_rebalance: missing storage sets Failed phase" {
     CrushTarget::new("s1"),
   ])
   let manifest = make_test_manifest([("db.pg0.part0", "s0")], crush)
-  let moves = [MovePlan::{ name: "db.pg0.part0", from: "s0", to: "s1" }]
+  let moves = [
+    MovePlan::{
+      name: "db.pg0.part0",
+      from: TargetKey::new("s0"),
+      to: TargetKey::new("s1"),
+    },
+  ]
   let state = AsyncRebalanceState::from_plan(moves, manifest, crush, 2, 2000L)
 
   // Source has data, but destination storage is not in the map
   let s0 = @storage.MemoryStorage::new()
   let test_data = Bytes::make(50, b'\x42')
   s0.write("db.pg0.part0" + @codec.ext_segment, test_data)
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  storages["s0"] = s0
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  storages[TargetKey::new("s0")] = s0
   // s1 not provided → "Destination storage not found"
 
   let did_fail = run_rebalance_expect_failure(async fn() raise @storage.AsyncIOError {
@@ -454,8 +484,16 @@ test "async_rebalance: partial failure preserves progress" {
   )
   // Two moves: first will succeed, second will fail (no data for pg1)
   let moves = [
-    MovePlan::{ name: "db.pg0.part0", from: "s0", to: "s1" },
-    MovePlan::{ name: "db.pg1.part0", from: "s0", to: "s1" },
+    MovePlan::{
+      name: "db.pg0.part0",
+      from: TargetKey::new("s0"),
+      to: TargetKey::new("s1"),
+    },
+    MovePlan::{
+      name: "db.pg1.part0",
+      from: TargetKey::new("s0"),
+      to: TargetKey::new("s1"),
+    },
   ]
   let state = AsyncRebalanceState::from_plan(moves, manifest, crush, 2, 2000L)
 
@@ -464,9 +502,9 @@ test "async_rebalance: partial failure preserves progress" {
   // Only populate the first segment — second will fail on read
   let test_data = Bytes::make(50, b'\x42')
   s0.write("db.pg0.part0" + @codec.ext_segment, test_data)
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  storages["s0"] = s0
-  storages["s1"] = s1
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  storages[TargetKey::new("s0")] = s0
+  storages[TargetKey::new("s1")] = s1
 
   let did_fail = run_rebalance_expect_failure(async fn() raise @storage.AsyncIOError {
     let _ = async_apply_rebalance(state, storages)
@@ -492,7 +530,13 @@ test "async_rebalance: delete failure stays best-effort" {
       CrushTarget::new("s1"),
     ])
     let manifest = make_test_manifest([("db.pg0.part0", "s0")], crush)
-    let moves = [MovePlan::{ name: "db.pg0.part0", from: "s0", to: "s1" }]
+    let moves = [
+      MovePlan::{
+        name: "db.pg0.part0",
+        from: TargetKey::new("s0"),
+        to: TargetKey::new("s1"),
+      },
+    ]
     let state = AsyncRebalanceState::from_plan(moves, manifest, crush, 2, 2000L)
 
     let s0 = RebalanceTestStorage::new(fail_del=true)
@@ -500,9 +544,9 @@ test "async_rebalance: delete failure stays best-effort" {
     let segment_path = "db.pg0.part0" + @codec.ext_segment
     s0.write_data(segment_path, Bytes::make(32, b'\x42'))
 
-    let storages : Map[String, RebalanceTestStorage] = {}
-    storages["s0"] = s0
-    storages["s1"] = s1
+    let storages : Map[TargetKey, RebalanceTestStorage] = {}
+    storages[TargetKey::new("s0")] = s0
+    storages[TargetKey::new("s1")] = s1
 
     let new_manifest = async_apply_rebalance(state, storages)
     assert_eq(state.phase, Complete)
@@ -522,7 +566,13 @@ test "async_rebalance: exists failure stays best-effort" {
       CrushTarget::new("s1"),
     ])
     let manifest = make_test_manifest([("db.pg0.part0", "s0")], crush)
-    let moves = [MovePlan::{ name: "db.pg0.part0", from: "s0", to: "s1" }]
+    let moves = [
+      MovePlan::{
+        name: "db.pg0.part0",
+        from: TargetKey::new("s0"),
+        to: TargetKey::new("s1"),
+      },
+    ]
     let state = AsyncRebalanceState::from_plan(moves, manifest, crush, 2, 2000L)
 
     let s0 = RebalanceTestStorage::new(fail_exists=true)
@@ -530,9 +580,9 @@ test "async_rebalance: exists failure stays best-effort" {
     let segment_path = "db.pg0.part0" + @codec.ext_segment
     s0.write_data(segment_path, Bytes::make(16, b'\x24'))
 
-    let storages : Map[String, RebalanceTestStorage] = {}
-    storages["s0"] = s0
-    storages["s1"] = s1
+    let storages : Map[TargetKey, RebalanceTestStorage] = {}
+    storages[TargetKey::new("s0")] = s0
+    storages[TargetKey::new("s1")] = s1
 
     let _ = async_apply_rebalance(state, storages)
     assert_eq(state.phase, Complete)

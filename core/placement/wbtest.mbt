@@ -26,7 +26,7 @@ test "crush/primary" {
   let map = CrushMap::new(8, 1, targets)
   let primary = crush_primary(@types.VectorId::from_int(100), map)
   match primary {
-    Some(key) => inspect(key.length() > 0, content="true")
+    Some(key) => inspect(key.to_string().length() > 0, content="true")
     None => inspect(false, content="true")
   }
 }
@@ -53,9 +53,9 @@ test "crush/distribution" {
   for i in 1..<=100 {
     let result = crush_locate(@types.VectorId::from_int(i), map)
     if result.primaries.length() > 0 {
-      if result.primaries[0] == "node1" {
+      if result.primaries[0] == TargetKey::new("node1") {
         node1_count = node1_count + 1
-      } else if result.primaries[0] == "node2" {
+      } else if result.primaries[0] == TargetKey::new("node2") {
         node2_count = node2_count + 1
       }
     }
@@ -91,8 +91,14 @@ test "crush/plan_rebalance" {
   let manifest : PlacementManifest = {
     base: "db",
     segments: [
-      SegmentEntry::{ name: "db.pg0.part0", target_key: "node1" },
-      SegmentEntry::{ name: "db.pg1.part0", target_key: "node2" },
+      SegmentEntry::{
+        name: "db.pg0.part0",
+        target_key: TargetKey::new("node1"),
+      },
+      SegmentEntry::{
+        name: "db.pg1.part0",
+        target_key: TargetKey::new("node2"),
+      },
     ],
     crush: old_map,
     epoch: 1,
@@ -116,13 +122,22 @@ test "crush/update_manifest" {
   let map = CrushMap::new(2, 1, targets)
   let manifest : PlacementManifest = {
     base: "db",
-    segments: [SegmentEntry::{ name: "db.pg0.part0", target_key: "node1" }],
+    segments: [
+      SegmentEntry::{
+        name: "db.pg0.part0",
+        target_key: TargetKey::new("node1"),
+      },
+    ],
     crush: map,
     epoch: 1,
     commit_ts: 1000L,
   }
   let plan : Array[MovePlan] = [
-    MovePlan::{ name: "db.pg0.part0", from: "node1", to: "node2" },
+    MovePlan::{
+      name: "db.pg0.part0",
+      from: TargetKey::new("node1"),
+      to: TargetKey::new("node2"),
+    },
   ]
   let new_targets = [CrushTarget::new("node1"), CrushTarget::new("node2")]
   let new_map = CrushMap::new(2, 1, new_targets)
@@ -199,12 +214,16 @@ test "crush/apply_rebalance" {
     "db.pg0.part0.data",
     Bytes::from_array([b'h', b'e', b'l', b'l', b'o'][:]),
   )
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  storages.set("node1", storage1)
-  storages.set("node2", storage2)
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  storages.set(TargetKey::new("node1"), storage1)
+  storages.set(TargetKey::new("node2"), storage2)
   // Create move plan
   let plan : Array[MovePlan] = [
-    { name: "db.pg0.part0", from: "node1", to: "node2" },
+    {
+      name: "db.pg0.part0",
+      from: TargetKey::new("node1"),
+      to: TargetKey::new("node2"),
+    },
   ]
   // Apply rebalance
   apply_rebalance_memory(plan, storages) catch {
@@ -218,8 +237,14 @@ test "crush/apply_rebalance" {
 
 ///|
 test "crush/apply_rebalance_no_source" {
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  let plan : Array[MovePlan] = [{ name: "missing", from: "node1", to: "node2" }]
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  let plan : Array[MovePlan] = [
+    {
+      name: "missing",
+      from: TargetKey::new("node1"),
+      to: TargetKey::new("node2"),
+    },
+  ]
   let mut caught = false
   apply_rebalance_memory(plan, storages) catch {
     @storage.IOError::IoFailed(msg) => {
@@ -235,9 +260,11 @@ test "crush/apply_rebalance_no_source" {
 test "crush/apply_rebalance_no_dest" {
   let storage1 = @storage.MemoryStorage::new()
   storage1.write("test.data", Bytes::from_array([b'x'][:]))
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  storages.set("node1", storage1)
-  let plan : Array[MovePlan] = [{ name: "test", from: "node1", to: "node2" }]
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  storages.set(TargetKey::new("node1"), storage1)
+  let plan : Array[MovePlan] = [
+    { name: "test", from: TargetKey::new("node1"), to: TargetKey::new("node2") },
+  ]
   let mut caught = false
   apply_rebalance_memory(plan, storages) catch {
     @storage.IOError::IoFailed(msg) => {
@@ -255,7 +282,12 @@ test "crush/plan_rebalance_no_changes" {
   let map = CrushMap::new(4, 1, targets)
   let manifest : PlacementManifest = {
     base: "db",
-    segments: [SegmentEntry::{ name: "db.pg0.part0", target_key: "node1" }],
+    segments: [
+      SegmentEntry::{
+        name: "db.pg0.part0",
+        target_key: TargetKey::new("node1"),
+      },
+    ],
     crush: map,
     epoch: 1,
     commit_ts: 1000L,
@@ -347,7 +379,7 @@ test "crush/rebalance_empty_targets" {
   let targets = [CrushTarget::new("a"), CrushTarget::new("b")]
   let manifest : PlacementManifest = {
     base: "db",
-    segments: [{ name: "db.pg0.part0", target_key: "a" }],
+    segments: [{ name: "db.pg0.part0", target_key: TargetKey::new("a") }],
     crush: CrushMap::new(8, 1, targets),
     epoch: 1,
     commit_ts: 0L,
@@ -365,7 +397,9 @@ test "crush/parse_pg_last_marker" {
   let targets = [CrushTarget::new("a"), CrushTarget::new("b")]
   let manifest : PlacementManifest = {
     base: "archive.pg_backup",
-    segments: [{ name: "archive.pg_backup.pg12.part0", target_key: "a" }],
+    segments: [
+      { name: "archive.pg_backup.pg12.part0", target_key: TargetKey::new("a") },
+    ],
     crush: CrushMap::new(16, 1, targets),
     epoch: 1,
     commit_ts: 0L,
@@ -434,8 +468,8 @@ test "distributed/segment_part_rotation" {
   }
 
   let crush = CrushMap::new(2, 1, [CrushTarget::new("node1")])
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  storages.set("node1", @storage.MemoryStorage::new())
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  storages.set(TargetKey::new("node1"), @storage.MemoryStorage::new())
 
   // Use very small segment_bytes to force rotation
   let opts : SegmentOptions = {
@@ -450,7 +484,7 @@ test "distributed/segment_part_rotation" {
   }
   // Should have created multiple segment parts
   inspect(result.entries.length(), content="10")
-  let files = storages.get("node1").unwrap().list()
+  let files = storages.get(TargetKey::new("node1")).unwrap().list()
   // Should have more than 1 file due to rotation
   inspect(files.length() > 1, content="true")
 }
@@ -470,8 +504,8 @@ test "distributed/load_slow_path" {
   }
 
   let crush = CrushMap::new(4, 1, [CrushTarget::new("disk")])
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  storages.set("disk", @storage.MemoryStorage::new())
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  storages.set(TargetKey::new("disk"), @storage.MemoryStorage::new())
   let index_storage = @storage.MemoryStorage::new()
 
   let opts = SegmentOptions::default("slowpath", crush)
@@ -505,8 +539,8 @@ test "distributed/manifest_roundtrip" {
   let manifest : PlacementManifest = {
     base: "test_db",
     segments: [
-      { name: "test_db.pg0.part0", target_key: "node-a" },
-      { name: "test_db.pg1.part0", target_key: "node-b" },
+      { name: "test_db.pg0.part0", target_key: TargetKey::new("node-a") },
+      { name: "test_db.pg1.part0", target_key: TargetKey::new("node-b") },
     ],
     crush,
     epoch: 5,
@@ -540,8 +574,8 @@ test "distributed/save_options_default" {
 ///|
 test "distributed/empty_manifest_error" {
   let crush = CrushMap::new(4, 1, [CrushTarget::new("node")])
-  let storages : Map[String, @storage.MemoryStorage] = {}
-  storages.set("node", @storage.MemoryStorage::new())
+  let storages : Map[TargetKey, @storage.MemoryStorage] = {}
+  storages.set(TargetKey::new("node"), @storage.MemoryStorage::new())
   let index_storage = @storage.MemoryStorage::new()
 
   // Create empty manifest

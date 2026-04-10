@@ -4,13 +4,21 @@ package "trkbt10/vcdb/ffi"
 // Values
 pub fn crush_placement_group(Bytes, Int) -> Int
 
+pub fn crush_placement_groups(Bytes, Int, Int) -> Array[Int]
+
 pub fn distributed_group_upsert(Array[(Bytes, Array[Double], String)], Int) -> Array[(Int, Array[(Bytes, Array[Double], String)])]
+
+pub fn distributed_group_upsert_replicated(Array[(Bytes, Array[Double], String)], Int, Int) -> Array[(Int, Array[(Bytes, Array[Double], String)])]
 
 pub fn distributed_merge_count(Array[(Int, Int, String)]) -> (Int, Array[Int], Array[(Int, String)])
 
 pub fn distributed_merge_scroll(Array[(Int, Array[(Bytes, String)], String)], Int) -> (Array[(Bytes, String)], Array[Int], Array[(Int, String)])
 
 pub fn distributed_merge_search(Array[(Int, Array[(Bytes, Double, String)], String)], Int) -> (Array[(Bytes, Double, String)], Array[Int], Array[(Int, String)])
+
+pub fn distributed_rebalance_plan(Array[Bytes], Int, Int, Int, Int) -> Array[(Bytes, Array[Int], Array[Int])]
+
+pub fn distributed_rebalance_summary(Array[Bytes], Int, Int, Int, Int) -> (Int, Int, Int)
 
 pub fn vcdb_add(Int, Bytes, Array[Double]) -> Int
 

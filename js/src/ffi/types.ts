@@ -191,6 +191,8 @@ export interface PersistentFfi {
 export interface DistributedFfi {
   /** id_bytes: Uint8Array(16). Returns placement group in [0, pgCount). */
   crush_placement_group(idBytes: Uint8Array, pgCount: number): number;
+  /** id_bytes: Uint8Array(16). Returns array of shard indices [primary, ...replicas]. */
+  crush_placement_groups(idBytes: Uint8Array, pgCount: number, replicas: number): number[];
   /** shard hits: (idBytes: Uint8Array(16), score, payloadJson) */
   distributed_merge_search(
     shardResults: Array<Tuple3<number, Array<Tuple3<Uint8Array, number, string>>, string>>,
@@ -204,11 +206,33 @@ export interface DistributedFfi {
   distributed_merge_count(
     shardResults: Array<Tuple3<number, number, string>>,
   ): Tuple3<number, number[], Array<Tuple2<number, string>>>;
-  /** points: (idBytes: Uint8Array(16), vector, payloadJson) */
+  /** points: (idBytes: Uint8Array(16), vector, payloadJson). Single replica. */
   distributed_group_upsert(
     points: Array<Tuple3<Uint8Array, number[], string>>,
     pgCount: number,
   ): Array<Tuple2<number, Array<Tuple3<Uint8Array, number[], string>>>>;
+  /** points: (idBytes: Uint8Array(16), vector, payloadJson). With replication. */
+  distributed_group_upsert_replicated(
+    points: Array<Tuple3<Uint8Array, number[], string>>,
+    pgCount: number,
+    replicas: number,
+  ): Array<Tuple2<number, Array<Tuple3<Uint8Array, number[], string>>>>;
+  /** Compute rebalance plan. Returns: Array of (idBytes, addToShards, removeFromShards) */
+  distributed_rebalance_plan(
+    ids: Array<Uint8Array>,
+    oldPgCount: number,
+    oldReplicas: number,
+    newPgCount: number,
+    newReplicas: number,
+  ): Array<Tuple3<Uint8Array, number[], number[]>>;
+  /** Rebalance summary. Returns: (affectedVectors, totalAdditions, totalRemovals) */
+  distributed_rebalance_summary(
+    ids: Array<Uint8Array>,
+    oldPgCount: number,
+    oldReplicas: number,
+    newPgCount: number,
+    newReplicas: number,
+  ): Tuple3<number, number, number>;
 }
 
 /* ── Composite FFI types ────────────────────────────────────── */

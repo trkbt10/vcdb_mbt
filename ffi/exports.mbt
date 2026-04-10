@@ -257,17 +257,53 @@ fn parse_json_to_attrs(json : String) -> @types.Attrs {
 // ── CRUSH placement ──────────────────────────────────────────
 
 ///|
+/// Build a CrushMap with numbered targets for FFI use.
+///
+/// At the FFI boundary each shard IS a target, so we create
+/// pg_count targets named "0", "1", …, "pg_count-1".
+/// This gives crush_locate real targets to map PGs onto,
+/// which is required for replicas > 1 to produce multiple
+/// primaries and for rebalance plans to detect movement.
+fn ffi_crush_map(pg_count : Int, replicas : Int) -> @placement.CrushMap {
+  let targets : Array[@placement.CrushTarget] = []
+  for i in 0..<pg_count {
+    targets.push(@placement.CrushTarget::new(i.to_string()))
+  }
+  @placement.CrushMap::new(pg_count, replicas, targets)
+}
+
+///|
 /// Compute placement group for a vector ID.
 /// id_bytes must be exactly 16 bytes (wire format).
 /// Returns placement group in [0, pg_count), or -1 on error.
 pub fn crush_placement_group(id_bytes : Bytes, pg_count : Int) -> Int {
   match vid_decode(id_bytes) {
     Some(vid) => {
-      let map = @placement.CrushMap::new(pg_count, 1, [])
+      let map = ffi_crush_map(pg_count, 1)
       let result = @placement.crush_locate(vid, map)
       result.pg
     }
     None => -1
+  }
+}
+
+///|
+/// Compute all shard indices (primary + replicas) for a vector ID.
+/// id_bytes must be exactly 16 bytes (wire format).
+/// Returns array of shard indices — one per replica.
+/// Returns empty array on error.
+pub fn crush_placement_groups(
+  id_bytes : Bytes,
+  pg_count : Int,
+  replicas : Int,
+) -> Array[Int] {
+  match vid_decode(id_bytes) {
+    Some(vid) => {
+      let map = ffi_crush_map(pg_count, replicas)
+      let result = @placement.crush_locate(vid, map)
+      result.primaries.map(fn(k) { key_to_shard_id(k) })
+    }
+    None => []
   }
 }
 

@@ -1,33 +1,33 @@
 ///|
-/// Shard transport trait — abstracts communication with shard instances.
+/// Shard transport trait — abstracts communication with target nodes.
 ///
-/// Platform adapters implement this trait to provide shard-level operations:
-///   - Cloudflare: DO RPC calls
-///   - HTTP: fetch to shard endpoints
-///   - Local: direct PersistentDB method calls (testing, single-process)
+/// Platform adapters implement this trait to provide target-level operations:
+///   - Cloudflare: DO RPC calls (target_key = DO shard name)
+///   - HTTP: fetch to target endpoints (target_key = URL)
+///   - Local: direct PersistentDB method calls (target_key = instance name)
 ///
 /// All operations are async (continuation-passing style), matching
 /// the AsyncStorage pattern used throughout vcdb.
 ///
-/// Each method receives a shard index and operation parameters.
-/// The transport is responsible for routing to the correct shard instance.
+/// Each method receives a TargetKey identifying the physical node.
+/// The transport is responsible for routing to the correct node instance.
 
 ///|
 pub(open) trait ShardTransport {
-  /// Upsert points into a specific shard.
+  /// Upsert points into a specific target node.
   shard_upsert(
     Self,
-    Int,
+    @placement.TargetKey,
     Array[TransportPoint],
     Int64,
     () -> Unit,
     (String) -> Unit,
   ) -> Unit
 
-  /// Search a specific shard. Returns hits via resolve callback.
+  /// Search a specific target node. Returns hits via resolve callback.
   shard_search(
     Self,
-    Int,
+    @placement.TargetKey,
     Array[Double],
     Int,
     String,
@@ -35,32 +35,38 @@ pub(open) trait ShardTransport {
     (String) -> Unit,
   ) -> Unit
 
-  /// Get a vector from a specific shard.
+  /// Get a vector from a specific target node.
   shard_get(
     Self,
-    Int,
+    @placement.TargetKey,
     @types.VectorId,
     (@types.VectorRecord?) -> Unit,
     (String) -> Unit,
   ) -> Unit
 
-  /// Check if a vector exists on a specific shard.
-  shard_has(Self, Int, @types.VectorId, (Bool) -> Unit, (String) -> Unit) -> Unit
+  /// Check if a vector exists on a specific target node.
+  shard_has(
+    Self,
+    @placement.TargetKey,
+    @types.VectorId,
+    (Bool) -> Unit,
+    (String) -> Unit,
+  ) -> Unit
 
-  /// Remove a vector from a specific shard.
+  /// Remove a vector from a specific target node.
   shard_remove(
     Self,
-    Int,
+    @placement.TargetKey,
     @types.VectorId,
     Int64,
     (Bool) -> Unit,
     (String) -> Unit,
   ) -> Unit
 
-  /// Scroll entries from a specific shard.
+  /// Scroll entries from a specific target node.
   shard_scroll(
     Self,
-    Int,
+    @placement.TargetKey,
     String,
     Int64?,
     Int,
@@ -68,6 +74,12 @@ pub(open) trait ShardTransport {
     (String) -> Unit,
   ) -> Unit
 
-  /// Count filtered entries on a specific shard.
-  shard_count(Self, Int, String, (Int) -> Unit, (String) -> Unit) -> Unit
+  /// Count filtered entries on a specific target node.
+  shard_count(
+    Self,
+    @placement.TargetKey,
+    String,
+    (Int) -> Unit,
+    (String) -> Unit,
+  ) -> Unit
 }

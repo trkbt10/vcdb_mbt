@@ -200,14 +200,14 @@ fn bytes_equal(a : Bytes, b : Bytes) -> Bool {
 pub fn select_read_replicas(
   id : @types.VectorId,
   crush_map : @placement.CrushMap,
-  failed_keys : Array[String],
-) -> Array[String] {
+  failed_keys : Array[@placement.TargetKey],
+) -> Array[@placement.TargetKey] {
   let result = @placement.crush_locate(id, crush_map)
-  let failed_set : Map[String, Bool] = {}
+  let failed_set : Map[@placement.TargetKey, Bool] = {}
   for key in failed_keys {
     failed_set[key] = true
   }
-  let healthy : Array[String] = []
+  let healthy : Array[@placement.TargetKey] = []
   for key in result.primaries {
     if !failed_set.contains(key) {
       healthy.push(key)
@@ -224,7 +224,7 @@ pub fn select_read_replicas(
 pub fn select_write_replicas(
   id : @types.VectorId,
   crush_map : @placement.CrushMap,
-) -> Array[String] {
+) -> Array[@placement.TargetKey] {
   let result = @placement.crush_locate(id, crush_map)
   result.primaries
 }

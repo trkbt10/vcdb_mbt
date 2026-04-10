@@ -45,7 +45,7 @@ priv struct SegState {
   mut writer : @segment.SegmentWriter
   mut size : Int
   mut part : Int
-  target_key : String
+  target_key : TargetKey
 }
 
 // ── In-memory segment construction (SoT) ────────────────────
@@ -65,7 +65,7 @@ pub(all) struct MemorySegmentResult {
 ///|
 pub(all) struct MemorySegment {
   name : String
-  target_key : String
+  target_key : TargetKey
   data : Bytes
 }
 
@@ -94,7 +94,11 @@ pub fn write_segments_in_memory(
     let id = store.ids[i]
     let result = crush_locate(id, opts.crush)
     let pg = result.pg
-    let target_key = first_string_or(result.primaries, "local")
+    let target_key = if result.primaries.is_empty() {
+      TargetKey::new("local")
+    } else {
+      result.primaries[0]
+    }
 
     let seg = match writers.get(pg) {
       Some(s) => s
@@ -176,7 +180,7 @@ pub fn write_segments_in_memory(
 pub fn[S : @storage.Storage] write_segments_from_store(
   store : @store.CoreStore,
   opts : SegmentOptions,
-  storages : Map[String, S],
+  storages : Map[TargetKey, S],
 ) -> SegmentResult raise @storage.IOError {
   let mem = write_segments_in_memory(store, opts)
 
@@ -215,7 +219,7 @@ fn estimate_attrs_size(attrs : @types.Attrs) -> Int {
 /// Read vectors from distributed segments using manifest
 pub fn[S : @storage.Storage] read_segments_from_manifest(
   manifest : PlacementManifest,
-  storages : Map[String, S],
+  storages : Map[TargetKey, S],
 ) -> Array[(@types.VectorId, Array[Double], @types.Attrs)] raise @storage.IOError {
   let results : Array[(@types.VectorId, Array[Double], @types.Attrs)] = []
 
@@ -266,7 +270,7 @@ pub fn SaveDistributedOptions::default(
 pub fn[S : @storage.Storage] save_store_distributed(
   store : @store.CoreStore,
   opts : SegmentOptions,
-  storages : Map[String, S],
+  storages : Map[TargetKey, S],
   index_storage : S,
 ) -> PlacementManifest raise @storage.IOError {
   save_store_distributed_with_ann(
@@ -284,7 +288,7 @@ pub fn[S : @storage.Storage] save_store_distributed(
 pub fn[S : @storage.Storage] save_store_distributed_with_ann(
   store : @store.CoreStore,
   opts : SegmentOptions,
-  storages : Map[String, S],
+  storages : Map[TargetKey, S],
   index_storage : S,
   strategy : @types.Strategy,
   ann_bytes : Bytes?,
@@ -350,7 +354,7 @@ pub fn reconstruct_from_index(
     None => return None
   }
 
-  let seg_targets : Map[String, String] = {}
+  let seg_targets : Map[String, TargetKey] = {}
   for seg in manifest.segments {
     seg_targets.set(seg.name, seg.target_key)
   }
@@ -463,7 +467,7 @@ pub fn reconstruct_from_segments(
 /// Load CoreStore from distributed storage using index file
 pub fn[S : @storage.Storage] load_store_distributed(
   base_name : String,
-  storages : Map[String, S],
+  storages : Map[TargetKey, S],
   index_storage : S,
 ) -> @store.CoreStore raise @storage.IOError {
   let result = load_store_distributed_full(base_name, storages, index_storage)
@@ -474,7 +478,7 @@ pub fn[S : @storage.Storage] load_store_distributed(
 /// Load CoreStore with full metadata (including ANN bytes)
 pub fn[S : @storage.Storage] load_store_distributed_full(
   base_name : String,
-  storages : Map[String, S],
+  storages : Map[TargetKey, S],
   index_storage : S,
 ) -> LoadDistributedResult raise @storage.IOError {
   // Fast path: index file exists
@@ -494,7 +498,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
 
     // Fetch all segment data
     let segment_data : Map[String, Bytes] = {}
-    let seg_targets : Map[String, String] = {}
+    let seg_targets : Map[String, TargetKey] = {}
     for seg in manifest.segments {
       seg_targets.set(seg.name, seg.target_key)
     }
@@ -512,7 +516,7 @@ pub fn[S : @storage.Storage] load_store_distributed_full(
         Some(t) => t
         None =>
           // Fall back to first available storage
-          "local"
+          TargetKey::new("local")
       }
       let storage = require_storage(storages, target_key)
       let data = storage.read(seg_name + @codec.ext_segment, @storage.Data)
@@ -563,7 +567,7 @@ fn serialize_manifest(manifest : PlacementManifest) -> Bytes {
       "{\"name\":\"" +
       seg.name +
       "\",\"target_key\":\"" +
-      seg.target_key +
+      seg.target_key.to_string() +
       "\"}",
     )
   }
@@ -577,7 +581,11 @@ fn serialize_manifest(manifest : PlacementManifest) -> Bytes {
   let target_parts : Array[String] = []
   for t in manifest.crush.targets {
     target_parts.push(
-      "{\"key\":\"" + t.key + "\",\"weight\":" + t.weight.to_string() + "}",
+      "{\"key\":\"" +
+      t.key.to_string() +
+      "\",\"weight\":" +
+      t.weight.to_string() +
+      "}",
     )
   }
   let targets_str = target_parts
@@ -766,7 +774,9 @@ fn extract_segments(json : String) -> Array[SegmentEntry] {
 
     let obj_str = String::from_array(seg_chars[obj_start:pos - 1])
     let name = extract_string_field("{" + obj_str + "}", "name")
-    let target_key = extract_string_field("{" + obj_str + "}", "target_key")
+    let target_key = TargetKey::new(
+      extract_string_field("{" + obj_str + "}", "target_key"),
+    )
     if !name.is_empty() {
       segments.push({ name, target_key })
     }
