@@ -94,6 +94,10 @@ jobs:
           moon version --all
           moon update
 
+      - name: Install JS dependencies
+        working-directory: js
+        run: npm ci
+
       - name: Build
         working-directory: js
         run: npm run build
