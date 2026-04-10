@@ -91,6 +91,9 @@ jobs:
       - name: Run FFI contract test
         run: node js/test/contract.test.mjs
 
+      - name: Run exports verification test
+        run: node js/test/exports.test.mjs
+
       - name: Validate npm package
         working-directory: js
         run: npm pack --dry-run
