@@ -10,6 +10,11 @@ import type { VectorId, SearchHit, ScrollEntry } from "./types.js";
 import { getDistributedFfi, isModuleLoaded } from "./ffi/loader.js";
 import { int64ToWireBytes, wireBytesBigInt } from "./ffi/vector-id.js";
 
+/* ── DistributedDB re-export ────────────────────────────────────── */
+
+export { DistributedDB } from "./distributed-db.js";
+export type { ShardTransport, DistributedDBOptions } from "./distributed-db.js";
+
 function ensureLoaded(caller: string): void {
   if (!isModuleLoaded()) {
     throw new Error(`${caller}() requires loadModule() to have been called first.`);
