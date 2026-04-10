@@ -443,6 +443,24 @@ await test("crush_placement_groups with replicas=1 returns single shard", () => 
   assert.equal(shards.length, 1);
 });
 
+await test("placementGroup consistent with groupUpsert", () => {
+  // For each point, the shard from placementGroup should match
+  // the shard that groupUpsert assigns it to
+  const pgCount = 4;
+  for (let i = 0; i < 20; i++) {
+    const id = BigInt(i);
+    const wire = int64ToWireBytes(id);
+    const shard = wasm.crush_placement_group(wire, pgCount);
+    const groups = wasm.distributed_group_upsert(
+      [{ _0: wire, _1: [1.0, 0.0], _2: "{}" }],
+      pgCount,
+    );
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0]._0, shard,
+      `ID ${i}: placementGroup=${shard} but groupUpsert assigned to shard ${groups[0]._0}`);
+  }
+});
+
 // ── Replicated upsert grouping ───────────────────────────────
 
 console.log("\n=== Replicated upsert grouping ===");

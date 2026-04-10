@@ -273,15 +273,22 @@ fn ffi_crush_map(pg_count : Int, replicas : Int) -> @placement.CrushMap {
 }
 
 ///|
-/// Compute placement group for a vector ID.
+/// Compute the primary shard for a vector ID (single replica).
 /// id_bytes must be exactly 16 bytes (wire format).
-/// Returns placement group in [0, pg_count), or -1 on error.
+/// Returns shard index in [0, pg_count), or -1 on error.
+///
+/// This returns the TARGET index (shard), not the raw PG number.
+/// With ffi_crush_map, CRUSH maps PG→target via choose_primaries,
+/// and the target index IS the shard index used by groupUpsert et al.
 pub fn crush_placement_group(id_bytes : Bytes, pg_count : Int) -> Int {
   match vid_decode(id_bytes) {
     Some(vid) => {
       let map = ffi_crush_map(pg_count, 1)
       let result = @placement.crush_locate(vid, map)
-      result.pg
+      match result.primaries {
+        [primary, ..] => key_to_shard_id(primary)
+        _ => result.pg
+      }
     }
     None => -1
   }
