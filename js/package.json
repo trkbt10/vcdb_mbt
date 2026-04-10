@@ -61,6 +61,10 @@
       "types": "./dist/storage/do-kv.d.ts",
       "import": "./dist/storage/do-kv.js"
     },
+    "./storage/d1": {
+      "types": "./dist/storage/d1.d.ts",
+      "import": "./dist/storage/d1.js"
+    },
     "./storage/types": {
       "types": "./dist/storage/types.d.ts",
       "import": "./dist/storage/types.js"
