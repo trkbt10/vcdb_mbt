@@ -1,0 +1,65 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+}
+
+.vcdb-vscode-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.vcdb-vscode-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+  font-size: 13px;
+}
+
+.vcdb-vscode-header code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.vcdb-vscode-main {
+  flex: 1;
+  padding: 16px;
+  overflow: auto;
+}
+
+.vcdb-vscode-error {
+  color: var(--vscode-errorForeground, #f48771);
+}
+
+.vcdb-vscode-collection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.vcdb-vscode-collection-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+  border-radius: 4px;
+}
+
+.vcdb-vscode-collection-name {
+  font-weight: 600;
+}
+
+.vcdb-vscode-collection-meta {
+  opacity: 0.7;
+  font-size: 12px;
+}

@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["react", "react-dom", "node", "vscode"],
+    "paths": {
+      "@vcdb/api-client": ["../api-client/src/index.ts"],
+      "@vcdb/data-source": ["../data-source/src/index.ts"],
+      "@vcdb/data-source-vcdb": ["../data-source-vcdb/src/index.ts"],
+      "@vcdb/db-viewer": ["../db-viewer/src/index.ts"],
+      "@vcdb/ui-kit": ["../ui-kit/src/index.ts"],
+      "@vcdb/ui-kit/theme": ["../ui-kit/src/theme/index.ts"],
+      "@vcdb/ui-kit/toast": ["../ui-kit/src/toast/index.ts"],
+      "@vcdb/vcdb-features": ["../vcdb-features/src/index.ts"],
+      "@vcdb/vcdb-features/*": ["../vcdb-features/src/*"],
+      "@vcdb/webview-bridge": ["../webview-bridge/src/index.ts"],
+      "@vcdb/webview-bridge/protocol": ["../webview-bridge/src/protocol.ts"],
+      "@vcdb/webview-bridge/host": ["../webview-bridge/src/host.ts"],
+      "@vcdb/webview-bridge/client": ["../webview-bridge/src/client.ts"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist"]
+}

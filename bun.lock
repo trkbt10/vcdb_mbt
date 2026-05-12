@@ -113,6 +113,28 @@
         "vcdb": "workspace:*",
       },
     },
+    "packages/vscode-plugin": {
+      "name": "@vcdb/vscode-plugin",
+      "version": "0.0.1",
+      "dependencies": {
+        "@vcdb/api-client": "workspace:*",
+        "@vcdb/data-source": "workspace:*",
+        "@vcdb/data-source-vcdb": "workspace:*",
+        "@vcdb/db-viewer": "workspace:*",
+        "@vcdb/ui-kit": "workspace:*",
+        "@vcdb/vcdb-features": "workspace:*",
+        "@vcdb/webview-bridge": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "^20.11.0",
+        "@types/react": "^19.2.7",
+        "@types/react-dom": "^19.2.3",
+        "@types/vscode": "^1.84.0",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/web-dashboard": {
       "name": "@vcdb/web-dashboard",
       "version": "0.0.1",
@@ -322,6 +344,8 @@
 
     "@types/react-dom": ["@types/react-dom@19.2.3", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ=="],
 
+    "@types/vscode": ["@types/vscode@1.118.0", "", {}, "sha512-Ah6eTlqDcwIMELEVwQMO++rJAFBRz/oLluLD/vWdYrH1KuI9kfpaM+7pg0OvvascgcJy+ghLCERAYouM4QbzGw=="],
+
     "@vcdb/api-client": ["@vcdb/api-client@workspace:packages/api-client"],
 
     "@vcdb/data-source": ["@vcdb/data-source@workspace:packages/data-source"],
@@ -333,6 +357,8 @@
     "@vcdb/ui-kit": ["@vcdb/ui-kit@workspace:packages/ui-kit"],
 
     "@vcdb/vcdb-features": ["@vcdb/vcdb-features@workspace:packages/vcdb-features"],
+
+    "@vcdb/vscode-plugin": ["@vcdb/vscode-plugin@workspace:packages/vscode-plugin"],
 
     "@vcdb/web-dashboard": ["@vcdb/web-dashboard@workspace:packages/web-dashboard"],
 

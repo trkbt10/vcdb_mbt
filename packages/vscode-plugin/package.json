@@ -1,0 +1,66 @@
+{
+  "name": "@vcdb/vscode-plugin",
+  "displayName": "vcdb Explorer",
+  "description": "Browse and operate on vcdb collections directly from VS Code.",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "publisher": "vcdb",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:vcdb.openExplorer"
+  ],
+  "main": "./dist/extension.cjs",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vcdb.openExplorer",
+        "title": "vcdb: Open Explorer",
+        "category": "vcdb"
+      }
+    ],
+    "configuration": {
+      "title": "vcdb",
+      "properties": {
+        "vcdb.gatewayUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:6333",
+          "description": "Base URL of the running vcdb gateway."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build:assets": "mkdir -p dist && cp src/webview/styles.css dist/webview.css",
+    "build:extension": "bun build src/extension/index.ts --target=node --external=vscode --format=cjs --sourcemap=inline --outfile=dist/extension.cjs",
+    "build:webview": "bun build src/webview/index.tsx --target=browser --format=esm --sourcemap=inline --outfile=dist/webview.js",
+    "build": "bun run build:assets && bun run build:extension && bun run build:webview",
+    "watch:extension": "bun build src/extension/index.ts --target=node --external=vscode --format=cjs --sourcemap=inline --outfile=dist/extension.cjs --watch",
+    "watch:webview": "bun build src/webview/index.tsx --target=browser --format=esm --sourcemap=inline --outfile=dist/webview.js --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@vcdb/api-client": "workspace:*",
+    "@vcdb/data-source": "workspace:*",
+    "@vcdb/data-source-vcdb": "workspace:*",
+    "@vcdb/db-viewer": "workspace:*",
+    "@vcdb/ui-kit": "workspace:*",
+    "@vcdb/vcdb-features": "workspace:*",
+    "@vcdb/webview-bridge": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/vscode": "^1.84.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}
