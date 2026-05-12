@@ -1,5 +1,5 @@
 import { Button } from "@vcdb/ui-kit";
-import type { IndexConfig } from "vcdb/meta/index-types";
+import { getIndexCategory, getIndexSummary } from "../../index-editor";
 import type { WizardData } from "../types";
 import { WizardStepLayout } from "./WizardStepLayout";
 import styles from "./ReviewStep.module.css";
@@ -10,47 +10,6 @@ type ReviewStepProps = {
   onSubmit: () => void;
   loading?: boolean;
 };
-
-function getIndexSummary(config: IndexConfig): string {
-  switch (config.kind) {
-    case "bruteforce":
-      return `Bruteforce (${config.metric ?? "cosine"})`;
-    case "hnsw":
-      return `HNSW (${config.metric ?? "cosine"}, M=${config.M ?? 16})`;
-    case "ivf":
-      return `IVF (${config.metric ?? "cosine"}, nlist=${config.nlist ?? 64})`;
-    case "basic":
-      return "Basic (hash)";
-    case "bitmap":
-      return "Bitmap";
-    case "bptree":
-      return `B+ Tree (order=${config.order ?? "declared"})`;
-    case "lsm":
-      return `LSM (order=${config.order ?? "declared"})`;
-    case "combined":
-      return `Combined: ${config.vector.kind.toUpperCase()} + ${config.attribute.kind.toUpperCase()} (${config.execution ?? "auto"})`;
-    default:
-      return "Unknown";
-  }
-}
-
-function getIndexCategory(kind: IndexConfig["kind"]): string {
-  switch (kind) {
-    case "bruteforce":
-    case "hnsw":
-    case "ivf":
-      return "Vector";
-    case "basic":
-    case "bitmap":
-    case "bptree":
-    case "lsm":
-      return "Attribute";
-    case "combined":
-      return "Combined";
-    default:
-      return "Unknown";
-  }
-}
 
 export function ReviewStep({
   data,

@@ -2,6 +2,7 @@ import { useDatabase } from "../../context/DatabaseContext";
 import { Button } from "@vcdb/ui-kit";
 import { useAsyncFn } from "react-use";
 import { useToast } from "@vcdb/ui-kit/toast";
+import { StatsList } from "./StatsList";
 import styles from "./StatsPanel.module.css";
 
 export function StatsPanel() {
@@ -25,26 +26,7 @@ export function StatsPanel() {
   return (
     <div className={styles.panel}>
       <h3 className={styles.title}>Database Stats</h3>
-
-      <div className={styles.stats}>
-        <div className={styles.stat}>
-          <span className={styles.label}>Vectors</span>
-          <span className={styles.value}>{stats.size.toLocaleString()}</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.label}>Dimensions</span>
-          <span className={styles.value}>{stats.dim}</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.label}>Metric</span>
-          <span className={styles.value}>{stats.metric}</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.label}>Strategy</span>
-          <span className={styles.value}>{stats.strategy}</span>
-        </div>
-      </div>
-
+      <StatsList stats={stats} variant="compact" />
       <div className={styles.actions}>
         <Button size="sm" onClick={refresh}>
           Refresh

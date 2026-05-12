@@ -1,5 +1,6 @@
 import { Button, StatusBadge } from "@vcdb/ui-kit";
 import type { IndexEntry } from "../../context/DatabaseContext";
+import { getIndexTypeLabel } from "../../index-editor";
 import styles from "./IndexCard.module.css";
 
 type IndexCardProps = {
@@ -10,57 +11,8 @@ type IndexCardProps = {
   rebuilding?: boolean;
 };
 
-function getIndexTypeLabel(entry: IndexEntry): string {
-  const { def } = entry;
-  switch (def.kind) {
-    case "hnsw":
-      return "HNSW";
-    case "ivf":
-      return "IVF";
-    case "bruteforce":
-      return "Bruteforce";
-    case "combined":
-      return `${getVectorLabel(def.vector.kind)} + ${getAttrLabel(def.attribute.kind)}`;
-    case "bptree":
-    case "lsm":
-    case "bitmap":
-    case "basic":
-      return getAttrLabel(def.kind);
-    default:
-      return "Unknown";
-  }
-}
-
-function getVectorLabel(kind: string): string {
-  switch (kind) {
-    case "hnsw":
-      return "HNSW";
-    case "ivf":
-      return "IVF";
-    case "bruteforce":
-      return "Bruteforce";
-    default:
-      return kind;
-  }
-}
-
-function getAttrLabel(kind: string): string {
-  switch (kind) {
-    case "bptree":
-      return "B+Tree";
-    case "lsm":
-      return "LSM";
-    case "bitmap":
-      return "Bitmap";
-    case "basic":
-      return "Basic";
-    default:
-      return kind;
-  }
-}
-
 export function IndexCard({ entry, onEdit, onRebuild, onDelete, rebuilding }: IndexCardProps) {
-  const typeLabel = getIndexTypeLabel(entry);
+  const typeLabel = getIndexTypeLabel(entry.def);
   const isCombined = entry.def.kind === "combined";
 
   return (

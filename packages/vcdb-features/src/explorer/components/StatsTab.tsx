@@ -1,6 +1,7 @@
 import { useDatabase } from "../../context/DatabaseContext";
 import { Button } from "@vcdb/ui-kit";
 import { useToast } from "@vcdb/ui-kit/toast";
+import { StatsList } from "./StatsList";
 import styles from "./StatsTab.module.css";
 
 export function StatsTab() {
@@ -19,31 +20,15 @@ export function StatsTab() {
     <div className={styles.container}>
       <div className={styles.card}>
         <h3 className={styles.title}>Collection Statistics</h3>
-
-        <div className={styles.stats}>
-          <div className={styles.stat}>
-            <span className={styles.label}>Vectors</span>
-            <span className={styles.value}>{stats.size.toLocaleString()}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.label}>Dimensions</span>
-            <span className={styles.value}>{stats.dim}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.label}>Metric</span>
-            <span className={styles.value}>{stats.metric}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.label}>Strategy</span>
-            <span className={styles.value}>{stats.strategy}</span>
-          </div>
-        </div>
-
+        <StatsList stats={stats} variant="roomy" />
         <div className={styles.actions}>
-          <Button size="sm" onClick={() => {
-            refresh();
-            toast.success("Statistics refreshed");
-          }}>
+          <Button
+            size="sm"
+            onClick={() => {
+              refresh();
+              toast.success("Statistics refreshed");
+            }}
+          >
             Refresh
           </Button>
         </div>

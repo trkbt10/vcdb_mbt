@@ -3,7 +3,8 @@
  * Persistent key-value storage using the IndexedDB API with StorageKind routing.
  */
 import type { StorageAdapter, StorageKindType } from "./types.js";
-import { StorageKind, toUint8 } from "./types.js";
+import { toUint8 } from "./types.js";
+import { kindToPathPrefix } from "./_kinds.js";
 
 type IDBReq<T> = IDBRequest<T>;
 
@@ -42,19 +43,6 @@ function reqToPromise<T>(req: IDBReq<T>): Promise<T> {
   });
 }
 
-function kindToPrefix(kind: StorageKindType): string {
-  switch (kind) {
-    case StorageKind.Config:
-      return "config/";
-    case StorageKind.Index:
-      return "index/";
-    case StorageKind.Data:
-      return "data/";
-    default:
-      return "data/";
-  }
-}
-
 export interface IndexedDBStorageOptions {
   /** Database name (default: "vcdb") */
   dbName?: string;
@@ -76,7 +64,7 @@ export function createIndexedDBStorage(options?: IndexedDBStorageOptions): Stora
   }
 
   const makeKey = (path: string, kind: StorageKindType): string =>
-    kindToPrefix(kind) + path;
+    kindToPathPrefix(kind) + path;
 
   return {
     async read(path: string, kind: StorageKindType): Promise<Uint8Array | null> {
@@ -113,7 +101,7 @@ export function createIndexedDBStorage(options?: IndexedDBStorageOptions): Stora
 
     async list(kind: StorageKindType, prefix = ""): Promise<string[]> {
       const db = await getDB();
-      const kindPrefix = kindToPrefix(kind);
+      const kindPrefix = kindToPathPrefix(kind);
       const fullPrefix = kindPrefix + prefix;
       const store = tx(db, storeName, "readonly");
 

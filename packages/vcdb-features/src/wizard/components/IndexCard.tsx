@@ -1,5 +1,9 @@
-import type { IndexConfig } from "vcdb/meta/index-types";
 import type { IndexEntry } from "../types";
+import {
+  getIndexCategory,
+  getIndexDescription,
+  getIndexIcon,
+} from "../../index-editor";
 import styles from "./IndexCard.module.css";
 
 type IndexCardProps = {
@@ -8,65 +12,6 @@ type IndexCardProps = {
   onDelete: () => void;
   canDelete: boolean;
 };
-
-function getIndexIcon(kind: IndexConfig["kind"]): string {
-  switch (kind) {
-    case "bruteforce":
-    case "hnsw":
-    case "ivf":
-      return "🔍"; // Vector search
-    case "basic":
-    case "bitmap":
-    case "bptree":
-    case "lsm":
-      return "🏷️"; // Attribute filter
-    case "combined":
-      return "⚡"; // Combined
-    default:
-      return "📦";
-  }
-}
-
-function getIndexDescription(config: IndexConfig): string {
-  switch (config.kind) {
-    case "bruteforce":
-      return `Bruteforce vector search${config.metric ? ` (${config.metric})` : ""}`;
-    case "hnsw":
-      return `HNSW vector index${config.metric ? ` (${config.metric})` : ""}${config.M ? `, M=${config.M}` : ""}`;
-    case "ivf":
-      return `IVF vector index${config.metric ? ` (${config.metric})` : ""}${config.nlist ? `, nlist=${config.nlist}` : ""}`;
-    case "basic":
-      return "Basic attribute index (hash-based)";
-    case "bitmap":
-      return "Bitmap attribute index";
-    case "bptree":
-      return `B+ Tree attribute index${config.order ? ` (order=${config.order})` : ""}`;
-    case "lsm":
-      return `LSM Tree attribute index${config.order ? ` (order=${config.order})` : ""}`;
-    case "combined":
-      return `Combined: ${config.vector.kind.toUpperCase()} + ${config.attribute.kind.toUpperCase()}${config.execution ? ` (${config.execution})` : ""}`;
-    default:
-      return "Unknown index type";
-  }
-}
-
-function getKindCategory(kind: IndexConfig["kind"]): string {
-  switch (kind) {
-    case "bruteforce":
-    case "hnsw":
-    case "ivf":
-      return "vector";
-    case "basic":
-    case "bitmap":
-    case "bptree":
-    case "lsm":
-      return "attribute";
-    case "combined":
-      return "combined";
-    default:
-      return "unknown";
-  }
-}
 
 export function IndexCard({ entry, onEdit, onDelete, canDelete }: IndexCardProps) {
   const { name, config } = entry;
@@ -78,7 +23,9 @@ export function IndexCard({ entry, onEdit, onDelete, canDelete }: IndexCardProps
       <div className={styles.indexContent}>
         <div className={styles.indexHeader}>
           <span className={styles.indexName}>{name}</span>
-          <span className={styles.indexKind}>{getKindCategory(config.kind)}</span>
+          <span className={styles.indexKind}>
+            {getIndexCategory(config.kind).toLowerCase()}
+          </span>
         </div>
         <p className={styles.indexDescription}>{getIndexDescription(config)}</p>
       </div>

@@ -3,20 +3,8 @@
  * For Service Worker environments and offline-first scenarios.
  */
 import type { StorageAdapter, StorageKindType } from "./types.js";
-import { StorageKind, toUint8 } from "./types.js";
-
-function kindToPrefix(kind: StorageKindType): string {
-  switch (kind) {
-    case StorageKind.Config:
-      return "config/";
-    case StorageKind.Index:
-      return "index/";
-    case StorageKind.Data:
-      return "data/";
-    default:
-      return "data/";
-  }
-}
+import { toUint8 } from "./types.js";
+import { kindToPathPrefix } from "./_kinds.js";
 
 export interface CacheStorageOptions {
   /** Cache name for namespacing */
@@ -47,7 +35,7 @@ export function createCacheStorage(options: CacheStorageOptions): StorageAdapter
     if (path.includes("..") || path.includes("//")) {
       throw new Error(`Invalid path: ${path}`);
     }
-    return `${urlPrefix}/${cacheName}/${kindToPrefix(kind)}${path}`;
+    return `${urlPrefix}/${cacheName}/${kindToPathPrefix(kind)}${path}`;
   };
 
   return {
@@ -97,7 +85,7 @@ export function createCacheStorage(options: CacheStorageOptions): StorageAdapter
     async list(kind: StorageKindType, prefix = ""): Promise<string[]> {
       const cache = await getCache();
       const keys = await cache.keys();
-      const kindPrefix = kindToPrefix(kind);
+      const kindPrefix = kindToPathPrefix(kind);
       const baseUrl = `${urlPrefix}/${cacheName}/${kindPrefix}`;
       const fullPrefix = baseUrl + prefix;
 
