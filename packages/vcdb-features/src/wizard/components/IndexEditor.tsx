@@ -1,13 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  Button,
-  FormField,
-  Input,
-  Select,
-  Section,
-  OptionGrid,
-  Toggle,
-} from "@vcdb/ui-kit";
+import { Button, FormField, Input, Select, OptionGrid } from "@vcdb/ui-kit";
 import type {
   IndexConfig,
   VectorIndexConfig,
@@ -15,57 +7,19 @@ import type {
   CombinedExecutionStrategy,
 } from "vcdb/meta/index-types";
 import { INDEX_NAME_PATTERN } from "vcdb/config/types-public";
-import { VECTOR_STRATEGIES, ATTR_STRATEGIES, EXECUTION_OPTIONS } from "@/constants";
+import { VECTOR_STRATEGIES, ATTR_STRATEGIES, EXECUTION_OPTIONS } from "../../constants";
+import type { IndexEntry } from "../types";
+import { createDefaultVectorIndex, createDefaultAttrIndex } from "../hooks/useWizard";
 import { VectorParamsEditor } from "./VectorParamsEditor";
 import { AttrParamsEditor } from "./AttrParamsEditor";
-import { createDefaultField } from "./FieldDefsEditor";
 import styles from "./IndexEditor.module.css";
-
-export type IndexEditorEntry = {
-  name: string;
-  config: IndexConfig;
-};
 
 type IndexEditorProps = {
   onClose: () => void;
   onSave: (name: string, config: IndexConfig, originalName?: string) => void;
   existingNames: string[];
-  editingEntry: IndexEditorEntry | null;
+  editingEntry: IndexEntry | null;
 };
-
-// Factory functions
-export function createDefaultVectorIndex(): VectorIndexConfig {
-  return { kind: "hnsw", metric: "cosine", M: 16, efConstruction: 200, efSearch: 50 };
-}
-
-export function createDefaultAttrIndex(): AttributeIndexConfig {
-  return { kind: "bptree", fields: [createDefaultField()], order: "declared" };
-}
-
-function createDefaultVectorConfig(kind: VectorIndexConfig["kind"]): VectorIndexConfig {
-  switch (kind) {
-    case "bruteforce":
-      return { kind: "bruteforce", metric: "cosine" };
-    case "hnsw":
-      return { kind: "hnsw", metric: "cosine", M: 16, efConstruction: 200, efSearch: 50 };
-    case "ivf":
-      return { kind: "ivf", metric: "cosine", nlist: 64, nprobe: 8 };
-  }
-}
-
-function createDefaultAttrConfig(kind: AttributeIndexConfig["kind"]): AttributeIndexConfig {
-  const defaultFields = [{ path: "category", type: "string" as const, ops: ["eq" as const] }];
-  switch (kind) {
-    case "basic":
-      return { kind: "basic", fields: defaultFields };
-    case "bitmap":
-      return { kind: "bitmap", fields: defaultFields };
-    case "bptree":
-      return { kind: "bptree", fields: defaultFields, order: "declared" };
-    case "lsm":
-      return { kind: "lsm", fields: defaultFields, order: "declared" };
-  }
-}
 
 function buildFinalConfig(
   attrEnabled: boolean,
@@ -210,13 +164,14 @@ export function IndexEditor({
         </FormField>
 
         {/* Vector Index Strategy */}
-        <Section title="Vector Index Strategy">
+        <div className={styles.editorSection}>
+          <h4 className={styles.editorSectionTitle}>Vector Index Strategy</h4>
           <OptionGrid
             options={VECTOR_STRATEGIES}
             value={vectorConfig.kind}
             onChange={handleVectorKindChange}
           />
-        </Section>
+        </div>
 
         {/* Vector Parameters */}
         <VectorParamsEditor
@@ -226,23 +181,34 @@ export function IndexEditor({
         />
 
         {/* Attribute Filter Toggle */}
-        <Toggle
-          checked={attrEnabled}
-          onChange={setAttrEnabled}
-          label="Enable Attribute Filtering"
-          description="Add metadata filtering to vector search (creates Combined index)"
-        />
+        <div className={styles.editorSection}>
+          <label className={styles.toggleRow}>
+            <input
+              type="checkbox"
+              checked={attrEnabled}
+              onChange={(e) => setAttrEnabled(e.target.checked)}
+              className={styles.toggleCheckbox}
+            />
+            <div className={styles.toggleText}>
+              <span className={styles.toggleLabel}>Enable Attribute Filtering</span>
+              <span className={styles.toggleDesc}>
+                Add metadata filtering to vector search (creates Combined index)
+              </span>
+            </div>
+          </label>
+        </div>
 
         {/* Attribute Config (shown when enabled) */}
         {attrEnabled && (
           <>
-            <Section title="Attribute Index Strategy">
+            <div className={styles.editorSection}>
+              <h4 className={styles.editorSectionTitle}>Attribute Index Strategy</h4>
               <OptionGrid
                 options={ATTR_STRATEGIES}
                 value={attrConfig.kind}
                 onChange={handleAttrKindChange}
               />
-            </Section>
+            </div>
 
             <AttrParamsEditor
               kind={attrConfig.kind}
@@ -271,4 +237,30 @@ export function IndexEditor({
       </div>
     </div>
   );
+}
+
+// Helper functions
+function createDefaultVectorConfig(kind: VectorIndexConfig["kind"]): VectorIndexConfig {
+  switch (kind) {
+    case "bruteforce":
+      return { kind: "bruteforce", metric: "cosine" };
+    case "hnsw":
+      return { kind: "hnsw", metric: "cosine", M: 16, efConstruction: 200, efSearch: 50 };
+    case "ivf":
+      return { kind: "ivf", metric: "cosine", nlist: 64, nprobe: 8 };
+  }
+}
+
+function createDefaultAttrConfig(kind: AttributeIndexConfig["kind"]): AttributeIndexConfig {
+  const defaultFields = [{ path: "category", type: "string" as const, ops: ["eq" as const] }];
+  switch (kind) {
+    case "basic":
+      return { kind: "basic", fields: defaultFields };
+    case "bitmap":
+      return { kind: "bitmap", fields: defaultFields };
+    case "bptree":
+      return { kind: "bptree", fields: defaultFields, order: "declared" };
+    case "lsm":
+      return { kind: "lsm", fields: defaultFields, order: "declared" };
+  }
 }

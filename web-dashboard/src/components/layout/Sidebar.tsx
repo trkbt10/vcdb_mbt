@@ -1,4 +1,4 @@
-import { ConnectionManager, type DatabaseInfo } from "@/features/registry/components";
+import { ConnectionManager, type DatabaseInfo } from "@vcdb/vcdb-features";
 import styles from "./Sidebar.module.css";
 
 type SidebarProps = {

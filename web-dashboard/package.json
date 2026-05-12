@@ -16,10 +16,10 @@
     "@vcdb/data-source": "workspace:*",
     "@vcdb/db-viewer": "workspace:*",
     "@vcdb/ui-kit": "workspace:*",
+    "@vcdb/vcdb-features": "workspace:*",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "react-panel-layout": "^0.6.0",
-    "react-use": "^17.6.0"
+    "react-panel-layout": "^0.6.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",

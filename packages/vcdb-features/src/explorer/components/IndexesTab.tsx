@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAsyncFn } from "react-use";
 import { Button, Modal, Spinner, ConfirmDialog } from "@vcdb/ui-kit";
-import { useDatabase, type IndexEntry, type IndexConfig } from "@/contexts/DatabaseContext";
+import { useDatabase, type IndexEntry, type IndexConfig } from "../../context/DatabaseContext";
 import { useToast } from "@vcdb/ui-kit/toast";
-import { IndexEditor, type IndexEditorEntry } from "@/features/index-editor";
+import { IndexEditor, type IndexEditorEntry } from "../../index-editor";
 import { IndexCard } from "./IndexCard";
 import styles from "./IndexesTab.module.css";
 

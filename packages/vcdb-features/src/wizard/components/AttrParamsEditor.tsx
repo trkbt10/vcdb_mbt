@@ -1,7 +1,7 @@
 import { FormField, Select } from "@vcdb/ui-kit";
 import type { AttributeIndexConfig } from "vcdb/meta/index-types";
 import type { FieldDef, CompositeOrder } from "vcdb/types";
-import { ORDER_OPTIONS } from "@/constants";
+import { ORDER_OPTIONS } from "../../constants";
 import { FieldDefsEditor } from "./FieldDefsEditor";
 import styles from "./AttrParamsEditor.module.css";
 

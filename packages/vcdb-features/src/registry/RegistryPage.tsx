@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { useDatabase } from "@/contexts/DatabaseContext";
+import { useDatabase } from "../context/DatabaseContext";
 import { useToast } from "@vcdb/ui-kit/toast";
 import { ConnectionManager, type DatabaseInfo } from "./components";
 

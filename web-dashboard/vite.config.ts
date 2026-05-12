@@ -29,6 +29,7 @@ export default defineConfig({
       "@vcdb/ui-kit/theme": resolve(__dirname, "../packages/ui-kit/src/theme/index.ts"),
       "@vcdb/ui-kit/toast": resolve(__dirname, "../packages/ui-kit/src/toast/index.ts"),
       "@vcdb/ui-kit": resolve(__dirname, "../packages/ui-kit/src/index.ts"),
+      "@vcdb/vcdb-features": resolve(__dirname, "../packages/vcdb-features/src/index.ts"),
     },
   },
   css: {

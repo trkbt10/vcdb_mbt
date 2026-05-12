@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAsync } from "react-use";
 import { Button, Spinner, Section } from "@vcdb/ui-kit";
-import { useDatabase } from "@/contexts/DatabaseContext";
+import { useDatabase } from "../../context/DatabaseContext";
 import { useToast } from "@vcdb/ui-kit/toast";
 import {
   StorageEditor,
@@ -9,7 +9,7 @@ import {
   DEFAULT_CRUSH_CONFIG,
   type StorageConfig,
   type CrushConfig,
-} from "@/features/storage-editor";
+} from "../../storage-editor";
 import styles from "./StorageTab.module.css";
 
 export function StorageTab() {

@@ -5,6 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./explorer": "./src/explorer/index.ts",
     "./wizard": "./src/wizard/index.ts",
     "./index-editor": "./src/index-editor/index.ts",
     "./storage-editor": "./src/storage-editor/index.ts",
@@ -19,11 +22,14 @@
   "dependencies": {
     "@vcdb/api-client": "workspace:*",
     "@vcdb/data-source": "workspace:*",
-    "@vcdb/ui-kit": "workspace:*"
+    "@vcdb/db-viewer": "workspace:*",
+    "@vcdb/ui-kit": "workspace:*",
+    "react-use": "^17.6.0"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
+    "react-panel-layout": ">=0.6.0",
     "vcdb": "workspace:*"
   },
   "devDependencies": {
@@ -31,6 +37,7 @@
     "@types/react-dom": "^19.2.3",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-panel-layout": "^0.6.0",
     "typescript": "^5.9.3"
   }
 }

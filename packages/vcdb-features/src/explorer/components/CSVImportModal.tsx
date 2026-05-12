@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { Modal, Button, Select } from "@vcdb/ui-kit";
-import { useDatabase } from "@/contexts/DatabaseContext";
+import { useDatabase } from "../../context/DatabaseContext";
 import { useToast } from "@vcdb/ui-kit/toast";
 import { useAsyncFn } from "react-use";
 import styles from "./CSVImportModal.module.css";

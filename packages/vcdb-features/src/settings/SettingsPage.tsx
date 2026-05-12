@@ -1,5 +1,5 @@
 import { useTheme } from "@vcdb/ui-kit/theme";
-import { useDatabase } from "@/contexts/DatabaseContext";
+import { useDatabase } from "../context/DatabaseContext";
 import { Button, PageHeader, ArrowLeft } from "@vcdb/ui-kit";
 import styles from "./SettingsPage.module.css";
 

@@ -94,18 +94,22 @@
       "dependencies": {
         "@vcdb/api-client": "workspace:*",
         "@vcdb/data-source": "workspace:*",
+        "@vcdb/db-viewer": "workspace:*",
         "@vcdb/ui-kit": "workspace:*",
+        "react-use": "^17.6.0",
       },
       "devDependencies": {
         "@types/react": "^19.2.7",
         "@types/react-dom": "^19.2.3",
         "react": "^19.2.3",
         "react-dom": "^19.2.3",
+        "react-panel-layout": "^0.6.0",
         "typescript": "^5.9.3",
       },
       "peerDependencies": {
         "react": ">=18.0.0",
         "react-dom": ">=18.0.0",
+        "react-panel-layout": ">=0.6.0",
         "vcdb": "workspace:*",
       },
     },
@@ -124,11 +128,13 @@
       "version": "0.0.1",
       "dependencies": {
         "@vcdb/api-client": "workspace:*",
+        "@vcdb/data-source": "workspace:*",
+        "@vcdb/db-viewer": "workspace:*",
         "@vcdb/ui-kit": "workspace:*",
+        "@vcdb/vcdb-features": "workspace:*",
         "react": "^19.2.3",
         "react-dom": "^19.2.3",
         "react-panel-layout": "^0.6.0",
-        "react-use": "^17.6.0",
       },
       "devDependencies": {
         "@types/react": "^19.2.7",

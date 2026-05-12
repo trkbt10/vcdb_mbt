@@ -1,6 +1,6 @@
 import { FormField, Input, Select } from "@vcdb/ui-kit";
 import type { FieldDef } from "vcdb/types";
-import { TYPE_OPTIONS, OP_OPTIONS } from "@/constants";
+import { TYPE_OPTIONS, OP_OPTIONS } from "../../constants";
 import { createDefaultField } from "../hooks/useWizard";
 import styles from "./FieldDefsEditor.module.css";
 

@@ -1,1 +1,0 @@
-export { RegistryPage } from "./RegistryPage";

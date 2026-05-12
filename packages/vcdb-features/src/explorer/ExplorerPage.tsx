@@ -5,9 +5,9 @@ import {
   type PanelLayoutConfig,
   type LayerDefinition,
 } from "react-panel-layout";
-import { useDatabase } from "@/contexts/DatabaseContext";
+import { useDatabase } from "../context/DatabaseContext";
 import { useToast } from "@vcdb/ui-kit/toast";
-import { useKeyboard, SHORTCUTS } from "@/hooks";
+import { useKeyboard, SHORTCUTS } from "../hooks";
 import { Spinner, TabBar, Button, type TabItem } from "@vcdb/ui-kit";
 import { DataTable, type ScoredRecord } from "@vcdb/db-viewer";
 import { VECTOR_FIELD } from "@vcdb/data-source";
@@ -23,7 +23,7 @@ import {
   type FilterCondition,
 } from "./components";
 import { useVectorData } from "./hooks";
-import { DEFAULT_PORT } from "../../constants";
+import { DEFAULT_PORT } from "../constants";
 import styles from "./ExplorerPage.module.css";
 
 type DataRow = {

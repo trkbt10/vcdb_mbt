@@ -6,10 +6,12 @@ import {
 } from "react-panel-layout";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
-import { useDatabase } from "@/contexts/DatabaseContext";
 import { ToastContainer, useToast } from "@vcdb/ui-kit/toast";
-import type { DatabaseInfo } from "@/features/registry/components";
-import { ExplorerPage } from "@/features/explorer";
+import {
+  useDatabase,
+  ExplorerPage,
+  type DatabaseInfo,
+} from "@vcdb/vcdb-features";
 import styles from "./Shell.module.css";
 
 type ContentPanelProps = {

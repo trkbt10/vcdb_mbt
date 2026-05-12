@@ -5,7 +5,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { useCollectionApi } from "@/hooks/useCollectionApi";
+import { useCollectionApi } from "../hooks/useCollectionApi";
 import type {
   Attrs,
   BulkResult,

@@ -1,6 +1,6 @@
 import { useTheme } from "@vcdb/ui-kit/theme";
 import { Logo, Sun, Moon } from "@vcdb/ui-kit";
-import type { DatabaseInfo } from "@/features/registry/components";
+import type { DatabaseInfo } from "@vcdb/vcdb-features";
 import styles from "./Header.module.css";
 
 type HeaderProps = {

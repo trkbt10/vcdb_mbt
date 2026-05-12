@@ -1,5 +1,5 @@
 import { Button, StatusBadge } from "@vcdb/ui-kit";
-import type { IndexEntry } from "@/contexts/DatabaseContext";
+import type { IndexEntry } from "../../context/DatabaseContext";
 import styles from "./IndexCard.module.css";
 
 type IndexCardProps = {

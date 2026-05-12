@@ -1,4 +1,4 @@
-import { useDatabase } from "@/contexts/DatabaseContext";
+import { useDatabase } from "../../context/DatabaseContext";
 import { Button } from "@vcdb/ui-kit";
 import { useToast } from "@vcdb/ui-kit/toast";
 import styles from "./StatsTab.module.css";

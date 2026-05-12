@@ -5,10 +5,41 @@
     "paths": {
       "@vcdb/api-client": ["../api-client/src/index.ts"],
       "@vcdb/data-source": ["../data-source/src/index.ts"],
+      "@vcdb/db-viewer": ["../db-viewer/src/index.ts"],
       "@vcdb/ui-kit": ["../ui-kit/src/index.ts"],
-      "@vcdb/ui-kit/*": ["../ui-kit/src/*"],
+      "@vcdb/ui-kit/theme": ["../ui-kit/src/theme/index.ts"],
+      "@vcdb/ui-kit/toast": ["../ui-kit/src/toast/index.ts"],
       "vcdb/*": ["../sdk/src/*"]
     }
   },
-  "include": ["src"]
+  "include": [
+    "src/css-modules.d.ts",
+    "src/constants.ts",
+    "src/index.ts",
+    "src/context/index.ts",
+    "src/context/DatabaseContext.tsx",
+    "src/hooks/index.ts",
+    "src/hooks/useKeyboard.ts",
+    "src/hooks/useCollectionApi.ts",
+    "src/registry/index.ts",
+    "src/registry/types.ts",
+    "src/registry/hooks/useRegistry.tsx",
+    "src/registry/hooks/useRegistryApi.ts",
+    "src/registry/components/index.ts",
+    "src/registry/components/ConnectionItem.tsx",
+    "src/registry/components/ConnectionManager.tsx",
+    "src/registry/components/CreateDatabaseModal.tsx",
+    "src/explorer/index.ts",
+    "src/explorer/ExplorerPage.tsx",
+    "src/explorer/hooks/index.ts",
+    "src/explorer/hooks/useVectorData.ts",
+    "src/explorer/components/index.ts",
+    "src/explorer/components/AddRowModal.tsx",
+    "src/explorer/components/CSVImportModal.tsx",
+    "src/explorer/components/FilterDropdown.tsx",
+    "src/explorer/components/FilterEditor.tsx",
+    "src/explorer/components/InspectorPanel.tsx",
+    "src/explorer/components/QueryBar.tsx",
+    "src/explorer/components/StatsTab.tsx"
+  ]
 }
