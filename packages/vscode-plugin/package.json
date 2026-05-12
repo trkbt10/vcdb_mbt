@@ -37,12 +37,11 @@
     }
   },
   "scripts": {
-    "build:assets": "mkdir -p dist && cp src/webview/styles.css dist/webview.css",
-    "build:extension": "bun build src/extension/index.ts --target=node --external=vscode --format=cjs --sourcemap=inline --outfile=dist/extension.cjs",
-    "build:webview": "bun build src/webview/index.tsx --target=browser --format=esm --sourcemap=inline --outfile=dist/webview.js",
-    "build": "bun run build:assets && bun run build:extension && bun run build:webview",
+    "build:extension": "mkdir -p dist && bun build src/extension/index.ts --target=node --external=vscode --format=cjs --sourcemap=inline --outfile=dist/extension.cjs",
+    "build:webview": "mkdir -p dist && bun build src/webview/webview.tsx --target=browser --format=esm --sourcemap=inline --outdir=dist",
+    "build": "bun run build:extension && bun run build:webview",
     "watch:extension": "bun build src/extension/index.ts --target=node --external=vscode --format=cjs --sourcemap=inline --outfile=dist/extension.cjs --watch",
-    "watch:webview": "bun build src/webview/index.tsx --target=browser --format=esm --sourcemap=inline --outfile=dist/webview.js --watch",
+    "watch:webview": "bun build src/webview/webview.tsx --target=browser --format=esm --sourcemap=inline --outdir=dist --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

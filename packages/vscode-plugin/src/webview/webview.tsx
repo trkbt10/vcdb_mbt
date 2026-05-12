@@ -13,6 +13,9 @@ import {
   getVsCodeApi,
   type ExtensionToWebviewMessage,
 } from "./vscode-api.ts";
+// Global page CSS lives alongside the CSS-modules emitted by every
+// component — both ride out under dist/webview.css together.
+import "./styles.css";
 import { createVscodeWebviewTransport } from "./transport.ts";
 
 function CollectionPicker({
