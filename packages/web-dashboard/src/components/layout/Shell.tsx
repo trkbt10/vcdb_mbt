@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, type ReactNode } from "react";
 import {
   GridLayout,
   type PanelLayoutConfig,
@@ -7,20 +7,31 @@ import {
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { ToastContainer, useToast } from "@vcdb/ui-kit/toast";
-import {
-  useDatabase,
-  ExplorerPage,
-  type DatabaseInfo,
-} from "@vcdb/vcdb-features";
+import { useDatabase, type DatabaseInfo } from "@vcdb/vcdb-features";
 import styles from "./Shell.module.css";
 
-type ContentPanelProps = {
-  selectedDb: DatabaseInfo | null;
+export type ShellProps = {
+  /**
+   * Render the main content area. The host decides what page (explorer,
+   * wizard, settings, ...) to mount based on the current selection. Default
+   * renders a welcome panel when no database is selected; otherwise an
+   * unstyled hint to provide your own renderer.
+   */
+  renderContent?: (selectedDb: DatabaseInfo | null) => ReactNode;
 };
 
-function ContentPanelInner({ selectedDb }: ContentPanelProps): React.ReactNode {
+function defaultRenderContent(selectedDb: DatabaseInfo | null): ReactNode {
   if (selectedDb) {
-    return <ExplorerPage />;
+    return (
+      <div className={styles.welcome}>
+        <div className={styles.welcomeContent}>
+          <div className={styles.welcomeText}>
+            <h1>{selectedDb.name}</h1>
+            <p>Connected. Pass a `renderContent` prop to Shell to render a page here.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
   return (
     <div className={styles.welcome}>
@@ -34,7 +45,7 @@ function ContentPanelInner({ selectedDb }: ContentPanelProps): React.ReactNode {
   );
 }
 
-export function Shell() {
+export function Shell({ renderContent = defaultRenderContent }: ShellProps) {
   const { selectDatabase } = useDatabase();
   const { showToast } = useToast();
   const [selectedDb, setSelectedDb] = useState<DatabaseInfo | null>(null);
@@ -67,9 +78,7 @@ export function Shell() {
   );
 
   const contentPanel = (
-    <div className={styles.contentWrapper}>
-      <ContentPanelInner selectedDb={selectedDb} />
-    </div>
+    <div className={styles.contentWrapper}>{renderContent(selectedDb)}</div>
   );
 
   const gridLayers = useMemo<LayerDefinition[]>(

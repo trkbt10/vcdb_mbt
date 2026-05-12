@@ -15,7 +15,8 @@
       "@vcdb/webview-bridge": ["../webview-bridge/src/index.ts"],
       "@vcdb/webview-bridge/protocol": ["../webview-bridge/src/protocol.ts"],
       "@vcdb/webview-bridge/host": ["../webview-bridge/src/host.ts"],
-      "@vcdb/webview-bridge/client": ["../webview-bridge/src/client.ts"]
+      "@vcdb/webview-bridge/client": ["../webview-bridge/src/client.ts"],
+      "vcdb/*": ["../vcdb/src/*"]
     }
   },
   "include": ["src/**/*"],

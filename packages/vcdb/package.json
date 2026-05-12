@@ -75,6 +75,22 @@
     },
     "./wasm": {
       "import": "./dist/wasm/lib.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    },
+    "./types/public": {
+      "types": "./dist/types/public.d.ts",
+      "import": "./dist/types/public.js"
+    },
+    "./meta/index-types": {
+      "types": "./dist/meta/index-types.d.ts",
+      "import": "./dist/meta/index-types.js"
+    },
+    "./config/types-public": {
+      "types": "./dist/config/types-public.d.ts",
+      "import": "./dist/config/types-public.js"
     }
   },
   "sideEffects": false,
@@ -131,7 +147,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/trkbt10/vcdb_mbt.git",
-    "directory": "packages/sdk"
+    "directory": "packages/vcdb"
   },
   "files": [
     "dist",

@@ -48,11 +48,25 @@ body,
 }
 
 .vcdb-vscode-collection-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 10px;
   border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
   border-radius: 4px;
+}
+
+.vcdb-vscode-collection-button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.vcdb-vscode-collection-button:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.1));
 }
 
 .vcdb-vscode-collection-name {
@@ -62,4 +76,28 @@ body,
 .vcdb-vscode-collection-meta {
   opacity: 0.7;
   font-size: 12px;
+}
+
+.vcdb-vscode-subheader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+}
+
+.vcdb-vscode-subheader button {
+  font: inherit;
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.vcdb-vscode-explorer {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
 }

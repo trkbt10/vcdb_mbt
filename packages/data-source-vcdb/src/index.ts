@@ -4,23 +4,38 @@
 
 import {
   createGatewayClient,
-  type Attrs,
-  type CollectionInfo,
-  type PointRecord,
   type VectorRowInput,
 } from "@vcdb/api-client";
-import {
-  VECTOR_FIELD,
-  type CollectionDescriptor,
-  type CreateCollectionInput,
-  type DataRecord,
-  type DataSource,
-  type ListOptions,
-  type ListPage,
-  type RecordId,
-  type SearchQuery,
-  type SearchResult,
+import type {
+  CreateCollectionInput,
+  DataSource,
+  ListOptions,
+  ListPage,
+  RecordId,
+  SearchQuery,
+  SearchResult,
 } from "@vcdb/data-source";
+import { VECTOR_FIELD } from "@vcdb/data-source";
+import {
+  extractAttrs,
+  extractVector,
+  idToNumber,
+  infoToDescriptor,
+  pointToRecord,
+} from "./shape.ts";
+
+export {
+  attrsFromFields,
+  descriptorToStats,
+  extractAttrs,
+  extractVector,
+  idToNumber,
+  infoToDescriptor,
+  pointToRecord,
+  recordToPoint,
+  scoredRecordToHit,
+  toDataRecord,
+} from "./shape.ts";
 
 export type VcdbDataSourceOptions = {
   apiBase?: string;
@@ -37,13 +52,13 @@ export function createVcdbDataSource(options: VcdbDataSourceOptions = {}): DataS
     return {
       records: page.rows.map((row) => ({
         id: row.id,
-        fields: (row.attrs ?? {}) as DataRecord["fields"],
+        fields: (row.attrs ?? {}) as ListPage["records"][number]["fields"],
       })),
       total: page.total,
     };
   }
 
-  async function getRecord(collection: string, id: RecordId): Promise<DataRecord | null> {
+  async function getRecord(collection: string, id: RecordId) {
     const point = await client.getPoint(collection, idToNumber(id));
     return point ? pointToRecord(point) : null;
   }
@@ -58,27 +73,11 @@ export function createVcdbDataSource(options: VcdbDataSourceOptions = {}): DataS
         id: hit.id,
         score: hit.score,
         fields: {
-          ...((hit.attrs ?? {}) as DataRecord["fields"]),
+          ...((hit.attrs ?? {}) as Record<string, unknown> as Record<string, never>),
           ...(hit.vector ? { [VECTOR_FIELD]: hit.vector } : {}),
-        },
+        } as ListPage["records"][number]["fields"],
       })),
     };
-  }
-
-  async function upsertRecord(collection: string, record: DataRecord): Promise<void> {
-    await client.upsertPoint(collection, idToNumber(record.id), {
-      vector: extractVector(record),
-      attrs: extractAttrs(record),
-    });
-  }
-
-  async function upsertRecords(collection: string, records: DataRecord[]): Promise<void> {
-    const rows: VectorRowInput[] = records.map((record) => ({
-      id: idToNumber(record.id),
-      vector: extractVector(record),
-      attrs: extractAttrs(record),
-    }));
-    await client.bulkUpsert(collection, rows);
   }
 
   return {
@@ -88,8 +87,20 @@ export function createVcdbDataSource(options: VcdbDataSourceOptions = {}): DataS
     listRecords,
     getRecord,
     search,
-    upsertRecord,
-    upsertRecords,
+    upsertRecord: async (collection, record) => {
+      await client.upsertPoint(collection, idToNumber(record.id), {
+        vector: extractVector(record),
+        attrs: extractAttrs(record),
+      });
+    },
+    upsertRecords: async (collection, records) => {
+      const rows: VectorRowInput[] = records.map((record) => ({
+        id: idToNumber(record.id),
+        vector: extractVector(record),
+        attrs: extractAttrs(record),
+      }));
+      await client.bulkUpsert(collection, rows);
+    },
     deleteRecord: async (collection, id) => {
       await client.deletePoint(collection, idToNumber(id));
     },
@@ -101,57 +112,4 @@ export function createVcdbDataSource(options: VcdbDataSourceOptions = {}): DataS
       await client.deleteCollection(name);
     },
   };
-}
-
-function infoToDescriptor(info: CollectionInfo): CollectionDescriptor {
-  return {
-    name: info.name,
-    recordCount: info.vectors_count,
-    schema: {
-      fields: [{ name: VECTOR_FIELD, kind: "vector", vectorDim: info.dim }],
-    },
-  };
-}
-
-function pointToRecord(point: PointRecord): DataRecord {
-  return {
-    id: point.id,
-    fields: {
-      ...(point.attrs as DataRecord["fields"]),
-      [VECTOR_FIELD]: point.vector,
-    },
-  };
-}
-
-function idToNumber(id: RecordId): number {
-  if (typeof id === "number") return id;
-  const parsed = Number(id);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`vcdb requires numeric record ids; got ${JSON.stringify(id)}`);
-  }
-  return parsed;
-}
-
-function extractVector(record: DataRecord): number[] {
-  const value = record.fields[VECTOR_FIELD];
-  if (!Array.isArray(value) || !value.every((n) => typeof n === "number")) {
-    throw new Error(`DataRecord.fields["${VECTOR_FIELD}"] must be a number[] for vcdb`);
-  }
-  return value as number[];
-}
-
-function extractAttrs(record: DataRecord): Attrs {
-  const attrs: Attrs = {};
-  for (const [key, value] of Object.entries(record.fields)) {
-    if (key === VECTOR_FIELD) continue;
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      value === null
-    ) {
-      attrs[key] = value;
-    }
-  }
-  return attrs;
 }

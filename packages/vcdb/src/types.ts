@@ -39,3 +39,29 @@ export interface ScrollEntry {
   readonly id: VectorId;
   readonly payload: Record<string, unknown> | null;
 }
+
+// =============================================================================
+// Attribute / field shapes
+//
+// The dashboard wizard and any user-facing configuration UI need to describe
+// the attribute fields a collection indexes. Keeping these in the public
+// types module lets the SDK be self-describing.
+// =============================================================================
+
+/** Operations an attribute index can answer. */
+export type AttrOp = "eq" | "range" | "exists";
+
+/** Scalar attribute field type. */
+export type FieldType = "string" | "number" | "boolean";
+
+/** Definition of one attribute column inside an attribute index. */
+export interface FieldDef {
+  /** JSON-pointer-style path into the payload object. */
+  readonly path: string;
+  readonly type: FieldType;
+  /** Non-empty list of operations the index must support for this field. */
+  readonly ops: ReadonlyArray<AttrOp>;
+}
+
+/** Ordering for composite (multi-field) attribute indexes. */
+export type CompositeOrder = "declared" | "alpha";

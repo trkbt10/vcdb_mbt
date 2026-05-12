@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { DashboardConfig } from "../../../../server/types";
+import type { DashboardConfig } from "../types.ts";
 
 type UseServerConfigResult = {
   config: DashboardConfig | null;

@@ -22,6 +22,7 @@
   "dependencies": {
     "@vcdb/api-client": "workspace:*",
     "@vcdb/data-source": "workspace:*",
+    "@vcdb/data-source-vcdb": "workspace:*",
     "@vcdb/db-viewer": "workspace:*",
     "@vcdb/ui-kit": "workspace:*",
     "react-use": "^17.6.0"

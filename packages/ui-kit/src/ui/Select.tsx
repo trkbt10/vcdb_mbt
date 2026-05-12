@@ -1,16 +1,16 @@
 import { forwardRef, type SelectHTMLAttributes } from "react";
 import styles from "./Select.module.css";
 
-type SelectOption = {
-  value: string;
-  label: string;
-  disabled?: boolean;
+export type SelectOption = {
+  readonly value: string;
+  readonly label: string;
+  readonly disabled?: boolean;
 };
 
 type SelectVariant = "default" | "minimal";
 
 type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> & {
-  options: SelectOption[];
+  options: ReadonlyArray<SelectOption>;
   placeholder?: string;
   variant?: SelectVariant;
 };

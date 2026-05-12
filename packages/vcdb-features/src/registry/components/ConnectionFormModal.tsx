@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal, Input, Button } from "@vcdb/ui-kit";
 import type { DatabaseInfo } from "../types";
-import { DEFAULT_HOST, DEFAULT_PORT } from "../../../constants";
+import { DEFAULT_HOST, DEFAULT_PORT } from "../../constants";
 import styles from "./ConnectionFormModal.module.css";
 
 type ConnectionData = { name: string; host: string; port: number };
@@ -28,8 +28,8 @@ export function ConnectionFormModal({
   useEffect(() => {
     if (initialData) {
       setName(initialData.name);
-      setHost(initialData.host);
-      setPort(initialData.port);
+      setHost(initialData.host ?? DEFAULT_HOST);
+      setPort(initialData.port ?? DEFAULT_PORT);
     } else {
       setName("");
       setHost(DEFAULT_HOST);

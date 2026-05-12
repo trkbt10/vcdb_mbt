@@ -1,12 +1,18 @@
 import { useState, useCallback, useMemo } from "react";
 import type {
-  VectorIndexConfig,
-  AttributeIndexConfig,
   CombinedIndexConfig,
   IndexConfig,
 } from "vcdb/meta/index-types";
-import type { FieldDef } from "vcdb/types";
+import {
+  createDefaultAttrIndex,
+  createDefaultVectorIndex,
+} from "../../index-editor";
 import type { WizardData } from "../types";
+
+// Re-export factories so the wizard's own consumers keep their existing
+// import surface even though the SoT lives in @vcdb/vcdb-features/index-editor.
+export { createDefaultAttrIndex, createDefaultVectorIndex };
+export { createDefaultField } from "../../index-editor";
 
 // =============================================================================
 // Wizard Step Types
@@ -27,32 +33,10 @@ const STEP_LABELS: Record<WizardStep, string> = {
 // Default Config Factories
 // =============================================================================
 
-/** Create default HNSW vector index config */
-export function createDefaultVectorIndex(): VectorIndexConfig {
-  return {
-    kind: "hnsw",
-    metric: "cosine",
-    M: 16,
-    efConstruction: 200,
-    efSearch: 50,
-  };
-}
-
-/** Create default B+ Tree attribute index config with sample field */
-export function createDefaultAttrIndex(): AttributeIndexConfig {
-  return {
-    kind: "bptree",
-    fields: [{ path: "category", type: "string", ops: ["eq"] }],
-    order: "declared",
-  };
-}
-
-/** Create default field definition */
-export function createDefaultField(): FieldDef {
-  return { path: "", type: "string", ops: ["eq"] };
-}
-
-/** Create default combined index config */
+/**
+ * Combined index factory is wizard-specific (no consumer in index-editor),
+ * so it stays here and composes the shared factories.
+ */
 export function createDefaultCombinedIndex(): CombinedIndexConfig {
   return {
     kind: "combined",

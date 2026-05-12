@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Button } from "@vcdb/ui-kit";
 import type { IndexConfig } from "vcdb/meta/index-types";
 import type { WizardData, IndexEntry } from "../types";
-import { IndexEditor } from "./IndexEditor";
+import { IndexEditor } from "../../index-editor";
 import { IndexCard } from "./IndexCard";
 import { WizardStepLayout } from "./WizardStepLayout";
 import indexStyles from "./IndexesForm.module.css";

@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { Modal, Input, Button, Select } from "@vcdb/ui-kit";
-import type {
-  EmbeddingStrategy,
-  DatabaseEmbeddingConfig,
-} from "../../../../server/types";
+import type { EmbeddingStrategy, DatabaseEmbeddingConfig } from "../types";
 import styles from "./EmbeddingConfigModal.module.css";
 
 type EmbeddingConfigModalProps = {

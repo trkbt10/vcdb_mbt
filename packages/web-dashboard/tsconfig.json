@@ -13,7 +13,8 @@
       "@vcdb/ui-kit/theme": ["../ui-kit/src/theme/index.ts"],
       "@vcdb/ui-kit/toast": ["../ui-kit/src/toast/index.ts"],
       "@vcdb/vcdb-features": ["../vcdb-features/src/index.ts"],
-      "@vcdb/vcdb-features/*": ["../vcdb-features/src/*"]
+      "@vcdb/vcdb-features/*": ["../vcdb-features/src/*"],
+      "vcdb/*": ["../vcdb/src/*"]
     },
     "types": ["vite/client"]
   },

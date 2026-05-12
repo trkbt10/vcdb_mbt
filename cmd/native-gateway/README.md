@@ -19,4 +19,4 @@ moon run cmd/native-gateway -- points upsert demo --id 1 --vector 1,0,0
 
 - State lives in-process today via `MemoryStorage`.
 - Long-lived HTTP serving remains the responsibility of transport adapters such
-  as [`packages/sdk/src/server.ts`](/Users/terukichi/Workspaces/moonbit/vcdb/packages/sdk/src/server.ts).
+  as [`packages/vcdb/src/server.ts`](/Users/terukichi/Workspaces/moonbit/vcdb/packages/vcdb/src/server.ts).

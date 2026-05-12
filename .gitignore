@@ -13,3 +13,7 @@ packages/*/node_modules/
 packages/*/dist/
 packages/*/playwright-report/
 packages/*/test-results/
+
+# Dashboard runtime data
+packages/web-dashboard/.dashboard-data/
+packages/web-dashboard/.e2e-storage/
