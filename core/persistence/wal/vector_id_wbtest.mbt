@@ -55,9 +55,12 @@ test "bytes16/from_uuid_string_no_hyphens" {
 
 ///|
 test "bytes16/from_uuid_string_invalid" {
-  inspect(@types.Bytes16::from_uuid_string("not-a-uuid"), content="None")
-  inspect(@types.Bytes16::from_uuid_string(""), content="None")
-  inspect(
+  @debug.debug_inspect(
+    @types.Bytes16::from_uuid_string("not-a-uuid"),
+    content="None",
+  )
+  @debug.debug_inspect(@types.Bytes16::from_uuid_string(""), content="None")
+  @debug.debug_inspect(
     @types.Bytes16::from_uuid_string("550e8400-e29b-41d4-a716-44665544000g"),
     content="None",
   )
@@ -152,9 +155,9 @@ test "vector_id/int64id_as_map_key" {
   let b = @types.Int64Id(2L)
   m.set(a, 10)
   m.set(b, 20)
-  inspect(m.get(a), content="Some(10)")
-  inspect(m.get(b), content="Some(20)")
-  inspect(m.get(@types.Int64Id(3L)), content="None")
+  @debug.debug_inspect(m.get(a), content="Some(10)")
+  @debug.debug_inspect(m.get(b), content="Some(20)")
+  @debug.debug_inspect(m.get(@types.Int64Id(3L)), content="None")
 }
 
 ///|
@@ -181,8 +184,8 @@ test "vector_id/bytes16id_as_map_key" {
   })
   m.set(uuid, 100)
   m.set(zero, 200)
-  inspect(m.get(uuid), content="Some(100)")
-  inspect(m.get(zero), content="Some(200)")
+  @debug.debug_inspect(m.get(uuid), content="Some(100)")
+  @debug.debug_inspect(m.get(zero), content="Some(200)")
 }
 
 ///|
@@ -205,19 +208,19 @@ test "vector_id/compare_int64id_before_bytes16id" {
 test "wire/int64_basic_encoding" {
   let id = @types.Int64Id(0x0102030405060708L)
   let wire = id.to_wire_bytes()
-  assert_eq(wire.length(), 16)
+  @test.assert_eq(wire.length(), 16)
   // Upper 8 bytes: big-endian encoding of 0x0102030405060708
-  assert_eq(wire[0], b'\x01')
-  assert_eq(wire[1], b'\x02')
-  assert_eq(wire[2], b'\x03')
-  assert_eq(wire[3], b'\x04')
-  assert_eq(wire[4], b'\x05')
-  assert_eq(wire[5], b'\x06')
-  assert_eq(wire[6], b'\x07')
-  assert_eq(wire[7], b'\x08')
+  @test.assert_eq(wire[0], b'\x01')
+  @test.assert_eq(wire[1], b'\x02')
+  @test.assert_eq(wire[2], b'\x03')
+  @test.assert_eq(wire[3], b'\x04')
+  @test.assert_eq(wire[4], b'\x05')
+  @test.assert_eq(wire[5], b'\x06')
+  @test.assert_eq(wire[6], b'\x07')
+  @test.assert_eq(wire[7], b'\x08')
   // Lower 8 bytes: all zero
   for i in 8..<16 {
-    assert_eq(wire[i], b'\x00')
+    @test.assert_eq(wire[i], b'\x00')
   }
 }
 
@@ -227,9 +230,9 @@ test "wire/int64_zero_roundtrip" {
   let id = @types.Int64Id(0L)
   let wire = id.to_wire_bytes()
   for i in 0..<16 {
-    assert_eq(wire[i], b'\x00')
+    @test.assert_eq(wire[i], b'\x00')
   }
-  assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
+  @test.assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
 }
 
 ///|
@@ -237,7 +240,7 @@ test "wire/int64_zero_roundtrip" {
 test "wire/int64_max_positive_roundtrip" {
   let id = @types.Int64Id(9223372036854775807L) // Int64::max
   let wire = id.to_wire_bytes()
-  assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
+  @test.assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
 }
 
 ///|
@@ -246,12 +249,12 @@ test "wire/int64_minus_one_roundtrip" {
   let id = @types.Int64Id(-1L)
   let wire = id.to_wire_bytes()
   for i in 0..<8 {
-    assert_eq(wire[i], b'\xff')
+    @test.assert_eq(wire[i], b'\xff')
   }
   for i in 8..<16 {
-    assert_eq(wire[i], b'\x00')
+    @test.assert_eq(wire[i], b'\x00')
   }
-  assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
+  @test.assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
 }
 
 ///|
@@ -260,11 +263,11 @@ test "wire/int64_min_value_roundtrip" {
   let id = @types.Int64Id(-9223372036854775808L) // Int64::min
   let wire = id.to_wire_bytes()
   // 0x80_00_00_00_00_00_00_00
-  assert_eq(wire[0], b'\x80')
+  @test.assert_eq(wire[0], b'\x80')
   for i in 1..<8 {
-    assert_eq(wire[i], b'\x00')
+    @test.assert_eq(wire[i], b'\x00')
   }
-  assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
+  @test.assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
 }
 
 ///|
@@ -272,8 +275,8 @@ test "wire/int64_min_value_roundtrip" {
 test "wire/int64_one_roundtrip" {
   let id = @types.Int64Id(1L)
   let wire = id.to_wire_bytes()
-  assert_eq(wire[7], b'\x01')
-  assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
+  @test.assert_eq(wire[7], b'\x01')
+  @test.assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
 }
 
 ///|
@@ -282,24 +285,24 @@ test "wire/bytes16_basic_encoding" {
   let b = sample_uuid_for_types()
   let id = @types.Bytes16Id(b)
   let wire = id.to_wire_bytes()
-  assert_eq(wire.length(), 16)
+  @test.assert_eq(wire.length(), 16)
   // Verify each byte matches the Bytes16 struct
-  assert_eq(wire[0], b.b0)
-  assert_eq(wire[1], b.b1)
-  assert_eq(wire[2], b.b2)
-  assert_eq(wire[3], b.b3)
-  assert_eq(wire[4], b.b4)
-  assert_eq(wire[5], b.b5)
-  assert_eq(wire[6], b.b6)
-  assert_eq(wire[7], b.b7)
-  assert_eq(wire[8], b.b8)
-  assert_eq(wire[9], b.b9)
-  assert_eq(wire[10], b.b10)
-  assert_eq(wire[11], b.b11)
-  assert_eq(wire[12], b.b12)
-  assert_eq(wire[13], b.b13)
-  assert_eq(wire[14], b.b14)
-  assert_eq(wire[15], b.b15)
+  @test.assert_eq(wire[0], b.b0)
+  @test.assert_eq(wire[1], b.b1)
+  @test.assert_eq(wire[2], b.b2)
+  @test.assert_eq(wire[3], b.b3)
+  @test.assert_eq(wire[4], b.b4)
+  @test.assert_eq(wire[5], b.b5)
+  @test.assert_eq(wire[6], b.b6)
+  @test.assert_eq(wire[7], b.b7)
+  @test.assert_eq(wire[8], b.b8)
+  @test.assert_eq(wire[9], b.b9)
+  @test.assert_eq(wire[10], b.b10)
+  @test.assert_eq(wire[11], b.b11)
+  @test.assert_eq(wire[12], b.b12)
+  @test.assert_eq(wire[13], b.b13)
+  @test.assert_eq(wire[14], b.b14)
+  @test.assert_eq(wire[15], b.b15)
 }
 
 ///|
@@ -307,7 +310,7 @@ test "wire/bytes16_basic_encoding" {
 test "wire/bytes16_roundtrip" {
   let id = @types.Bytes16Id(sample_uuid_for_types())
   let wire = id.to_wire_bytes()
-  assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
+  @test.assert_eq(@types.VectorId::from_wire_bytes(wire), Some(id))
 }
 
 ///|
@@ -337,7 +340,7 @@ test "wire/bytes16_with_lower_nonzero_is_bytes16id" {
   let decoded = @types.VectorId::from_wire_bytes(wire)
   match decoded {
     Some(@types.Bytes16Id(_)) => () // correct
-    _ => fail("Expected Bytes16Id, got " + decoded.to_string())
+    _ => fail("Expected Bytes16Id, got " + Debug::to_repr(decoded).to_string())
   }
 }
 
@@ -371,17 +374,29 @@ test "wire/bytes16_all_zeros_decodes_as_int64id_zero" {
   // This is acceptable because Bytes16(all-zeros) is semantically
   // equivalent to "no ID" and should not be used in practice.
   let decoded = @types.VectorId::from_wire_bytes(wire)
-  assert_eq(decoded, Some(@types.Int64Id(0L)))
+  @test.assert_eq(decoded, Some(@types.Int64Id(0L)))
 }
 
 ///|
 /// Invalid wire bytes lengths
 test "wire/invalid_lengths" {
-  assert_eq(@types.VectorId::from_wire_bytes(b""), None)
-  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(1, b'\x00')), None)
-  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(8, b'\x00')), None)
-  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(15, b'\x00')), None)
-  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(17, b'\x00')), None)
+  @test.assert_eq(@types.VectorId::from_wire_bytes(b""), None)
+  @test.assert_eq(
+    @types.VectorId::from_wire_bytes(Bytes::make(1, b'\x00')),
+    None,
+  )
+  @test.assert_eq(
+    @types.VectorId::from_wire_bytes(Bytes::make(8, b'\x00')),
+    None,
+  )
+  @test.assert_eq(
+    @types.VectorId::from_wire_bytes(Bytes::make(15, b'\x00')),
+    None,
+  )
+  @test.assert_eq(
+    @types.VectorId::from_wire_bytes(Bytes::make(17, b'\x00')),
+    None,
+  )
 }
 
 // ── Wire format ↔ WAL format consistency ─────────────────────
@@ -408,7 +423,7 @@ test "wire_wal/int64_full_roundtrip" {
   let decoded_wal = decode_wal_record(r).unwrap()
   // Re-encode to wire
   let wire_out = decoded_wal.id.to_wire_bytes()
-  assert_eq(wire_in, wire_out)
+  @test.assert_eq(wire_in, wire_out)
 }
 
 ///|
@@ -427,7 +442,7 @@ test "wire_wal/bytes16_full_roundtrip" {
   let r = @binary.BinaryReader::new(encoded)
   let decoded_wal = decode_wal_record(r).unwrap()
   let wire_out = decoded_wal.id.to_wire_bytes()
-  assert_eq(wire_in, wire_out)
+  @test.assert_eq(wire_in, wire_out)
 }
 
 ///|
@@ -443,10 +458,10 @@ test "wire_wal/mixed_ids_segment_roundtrip" {
     WalRecord::upsert(uuid_id, [3.0, 4.0], @types.empty_attrs(), timestamp=2L),
   ])
   let records = decode_wal_records(segment)
-  assert_eq(records.length(), 2)
+  @test.assert_eq(records.length(), 2)
   // Verify wire bytes match after WAL round-trip
-  assert_eq(records[0].id.to_wire_bytes(), wire_int)
-  assert_eq(records[1].id.to_wire_bytes(), wire_uuid)
+  @test.assert_eq(records[0].id.to_wire_bytes(), wire_int)
+  @test.assert_eq(records[1].id.to_wire_bytes(), wire_uuid)
 }
 
 ///|
@@ -474,7 +489,7 @@ test "wire_wal/int64_boundary_values" {
     let r = @binary.BinaryReader::new(encoded)
     let decoded = decode_wal_record(r).unwrap()
     let wire_out = decoded.id.to_wire_bytes()
-    assert_eq(wire_in, wire_out)
+    @test.assert_eq(wire_in, wire_out)
   }
 }
 
@@ -490,8 +505,8 @@ test "wire_wal/bytes16_from_hi_lo_roundtrip" {
   match decoded {
     @types.Bytes16Id(b2) => {
       let (hi2, lo2) = b2.to_hi_lo()
-      assert_eq(hi, hi2)
-      assert_eq(lo, lo2)
+      @test.assert_eq(hi, hi2)
+      @test.assert_eq(lo, lo2)
     }
     _ => fail("expected Bytes16Id")
   }
@@ -509,6 +524,6 @@ test "wire_wal/uuid_strings_roundtrip" {
     let id = @types.VectorId::from_uuid_string(uuid).unwrap()
     let wire = id.to_wire_bytes()
     let decoded = @types.VectorId::from_wire_bytes(wire).unwrap()
-    assert_eq(decoded.to_display_string(), uuid)
+    @test.assert_eq(decoded.to_display_string(), uuid)
   }
 }

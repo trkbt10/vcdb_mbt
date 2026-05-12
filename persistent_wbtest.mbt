@@ -8,6 +8,9 @@
 // 5. Init from various storage states (empty, snapshot-only, WAL-only, both)
 
 ///|
+using @test {assert_eq}
+
+///|
 /// In-memory AsyncStorage that records operation order for verification.
 /// Each operation completes synchronously (resolve called immediately)
 /// to test the ordering logic without real async I/O.

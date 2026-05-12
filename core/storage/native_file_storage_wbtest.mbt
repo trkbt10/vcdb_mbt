@@ -1,4 +1,7 @@
 ///|
+using @test {assert_eq}
+
+///|
 fn test_join_path(base : String, child : String) -> String {
   @path.Path::join(base, child).to_string()
 }

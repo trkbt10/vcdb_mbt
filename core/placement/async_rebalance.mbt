@@ -21,7 +21,7 @@ pub(all) enum RebalancePhase {
   Complete
   /// Rebalance failed with error.
   Failed(String)
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub impl Show for RebalancePhase with output(self, logger) {

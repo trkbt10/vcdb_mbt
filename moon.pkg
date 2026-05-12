@@ -13,3 +13,7 @@ import {
   "trkbt10/vcdb/core/persistence/wal",
   "trkbt10/vcdb/core/distributed",
 }
+
+import {
+  "moonbitlang/core/test",
+} for "wbtest"

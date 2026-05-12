@@ -98,7 +98,7 @@ fn[T] await_promise(
   reject : (String) -> Unit,
 ) -> Unit {
   fn local_run() {
-    run_async(fn() {
+    run_async(async fn() noraise {
       try {
         let result = promise.wait()
         resolve(result)
@@ -118,7 +118,7 @@ fn await_promise_unit(
   reject : (String) -> Unit,
 ) -> Unit {
   fn local_run() {
-    run_async(fn() {
+    run_async(async fn() noraise {
       try {
         promise.wait()
         resolve()

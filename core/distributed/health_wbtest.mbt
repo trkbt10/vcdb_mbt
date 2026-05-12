@@ -21,16 +21,19 @@ fn target_key(i : Int) -> @placement.TargetKey {
 test "health: initial state all healthy" {
   let tracker = ShardHealthTracker::new(make_target_keys(4))
   for i in 0..<4 {
-    assert_eq(tracker.get_status(target_key(i)), Healthy)
+    @test.assert_eq(tracker.get_status(target_key(i)), Healthy)
   }
-  assert_eq(tracker.healthy_targets().length(), 4)
-  assert_eq(tracker.failed_targets().length(), 0)
+  @test.assert_eq(tracker.healthy_targets().length(), 4)
+  @test.assert_eq(tracker.failed_targets().length(), 0)
 }
 
 ///|
 test "health: unknown target treated as Failed" {
   let tracker = ShardHealthTracker::new(make_target_keys(2))
-  assert_eq(tracker.get_status(@placement.TargetKey::new("unknown")), Failed)
+  @test.assert_eq(
+    tracker.get_status(@placement.TargetKey::new("unknown")),
+    Failed,
+  )
 }
 
 // ── State transitions ──────────────────────────────────────────
@@ -42,10 +45,10 @@ test "health: single failure transitions to Degraded" {
     failure_threshold=3,
   )
   tracker.report_failure(target_key(1), 1000L, "timeout")
-  assert_eq(tracker.get_status(target_key(1)), Degraded)
+  @test.assert_eq(tracker.get_status(target_key(1)), Degraded)
   // Other targets unaffected
-  assert_eq(tracker.get_status(target_key(0)), Healthy)
-  assert_eq(tracker.get_status(target_key(2)), Healthy)
+  @test.assert_eq(tracker.get_status(target_key(0)), Healthy)
+  @test.assert_eq(tracker.get_status(target_key(2)), Healthy)
 }
 
 ///|
@@ -55,11 +58,11 @@ test "health: consecutive failures reach threshold → Failed" {
     failure_threshold=3,
   )
   tracker.report_failure(target_key(2), 1000L, "error 1")
-  assert_eq(tracker.get_status(target_key(2)), Degraded)
+  @test.assert_eq(tracker.get_status(target_key(2)), Degraded)
   tracker.report_failure(target_key(2), 2000L, "error 2")
-  assert_eq(tracker.get_status(target_key(2)), Degraded)
+  @test.assert_eq(tracker.get_status(target_key(2)), Degraded)
   tracker.report_failure(target_key(2), 3000L, "error 3")
-  assert_eq(tracker.get_status(target_key(2)), Failed)
+  @test.assert_eq(tracker.get_status(target_key(2)), Failed)
 }
 
 ///|
@@ -70,12 +73,12 @@ test "health: success after failure resets to Healthy" {
   )
   tracker.report_failure(target_key(1), 1000L, "err")
   tracker.report_failure(target_key(1), 2000L, "err")
-  assert_eq(tracker.get_status(target_key(1)), Degraded)
+  @test.assert_eq(tracker.get_status(target_key(1)), Degraded)
   tracker.report_success(target_key(1), 3000L)
-  assert_eq(tracker.get_status(target_key(1)), Healthy)
+  @test.assert_eq(tracker.get_status(target_key(1)), Healthy)
   // Failure count was reset
   match tracker.get_health(target_key(1)) {
-    Some(h) => assert_eq(h.consecutive_failures, 0)
+    Some(h) => @test.assert_eq(h.consecutive_failures, 0)
     None => assert_true(false)
   }
 }
@@ -88,9 +91,9 @@ test "health: success recovers Failed target" {
   )
   tracker.report_failure(target_key(0), 1000L, "err")
   tracker.report_failure(target_key(0), 2000L, "err")
-  assert_eq(tracker.get_status(target_key(0)), Failed)
+  @test.assert_eq(tracker.get_status(target_key(0)), Failed)
   tracker.report_success(target_key(0), 5000L)
-  assert_eq(tracker.get_status(target_key(0)), Healthy)
+  @test.assert_eq(tracker.get_status(target_key(0)), Healthy)
 }
 
 ///|
@@ -101,11 +104,11 @@ test "health: Failed stays Failed on more failures" {
   )
   tracker.report_failure(target_key(0), 1000L, "err 1")
   tracker.report_failure(target_key(0), 2000L, "err 2")
-  assert_eq(tracker.get_status(target_key(0)), Failed)
+  @test.assert_eq(tracker.get_status(target_key(0)), Failed)
   tracker.report_failure(target_key(0), 3000L, "err 3")
-  assert_eq(tracker.get_status(target_key(0)), Failed)
+  @test.assert_eq(tracker.get_status(target_key(0)), Failed)
   match tracker.get_health(target_key(0)) {
-    Some(h) => assert_eq(h.consecutive_failures, 3)
+    Some(h) => @test.assert_eq(h.consecutive_failures, 3)
     None => assert_true(false)
   }
 }
@@ -120,8 +123,8 @@ test "health: healthy_targets excludes Failed" {
   )
   tracker.report_failure(target_key(1), 1000L, "down")
   tracker.report_failure(target_key(3), 2000L, "down")
-  assert_eq(tracker.healthy_targets(), [target_key(0), target_key(2)])
-  assert_eq(tracker.failed_targets(), [target_key(1), target_key(3)])
+  @test.assert_eq(tracker.healthy_targets(), [target_key(0), target_key(2)])
+  @test.assert_eq(tracker.failed_targets(), [target_key(1), target_key(3)])
 }
 
 ///|
@@ -131,13 +134,13 @@ test "health: Degraded included in healthy_targets" {
     failure_threshold=3,
   )
   tracker.report_failure(target_key(1), 1000L, "slow")
-  assert_eq(tracker.get_status(target_key(1)), Degraded)
-  assert_eq(tracker.healthy_targets(), [
+  @test.assert_eq(tracker.get_status(target_key(1)), Degraded)
+  @test.assert_eq(tracker.healthy_targets(), [
     target_key(0),
     target_key(1),
     target_key(2),
   ])
-  assert_eq(tracker.failed_targets(), [])
+  @test.assert_eq(tracker.failed_targets(), [])
 }
 
 // ── all_health ─────────────────────────────────────────────────
@@ -147,11 +150,11 @@ test "health: all_health returns sorted by target_key" {
   let tracker = ShardHealthTracker::new(make_target_keys(3))
   tracker.report_failure(target_key(2), 1000L, "err")
   let all = tracker.all_health()
-  assert_eq(all.length(), 3)
-  assert_eq(all[0].target_key, target_key(0))
-  assert_eq(all[1].target_key, target_key(1))
-  assert_eq(all[2].target_key, target_key(2))
-  assert_eq(all[2].status, Degraded)
+  @test.assert_eq(all.length(), 3)
+  @test.assert_eq(all[0].target_key, target_key(0))
+  @test.assert_eq(all[1].target_key, target_key(1))
+  @test.assert_eq(all[2].target_key, target_key(2))
+  @test.assert_eq(all[2].status, Degraded)
 }
 
 // ── Health-aware routing ───────────────────────────────────────
@@ -185,7 +188,7 @@ test "health: last_error tracks most recent error" {
   tracker.report_failure(target_key(0), 1000L, "timeout")
   tracker.report_failure(target_key(0), 2000L, "connection refused")
   match tracker.get_health(target_key(0)) {
-    Some(h) => assert_eq(h.last_error, Some("connection refused"))
+    Some(h) => @test.assert_eq(h.last_error, Some("connection refused"))
     None => assert_true(false)
   }
 }
@@ -197,8 +200,8 @@ test "health: timestamps updated correctly" {
   tracker.report_failure(target_key(0), 6000L, "err")
   match tracker.get_health(target_key(0)) {
     Some(h) => {
-      assert_eq(h.last_success_ts, 5000L)
-      assert_eq(h.last_failure_ts, 6000L)
+      @test.assert_eq(h.last_success_ts, 5000L)
+      @test.assert_eq(h.last_failure_ts, 6000L)
     }
     None => assert_true(false)
   }

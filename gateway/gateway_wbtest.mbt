@@ -2,40 +2,43 @@
 /// Tests for JSON module
 test "json/parse_null" {
   let result = parse_json("null")
-  assert_eq(result, Some(Json::null()))
+  @test.assert_eq(result, Some(Json::null()))
 }
 
 ///|
 test "json/parse_bool" {
-  assert_eq(parse_json("true"), Some(true.to_json()))
-  assert_eq(parse_json("false"), Some(false.to_json()))
+  @test.assert_eq(parse_json("true"), Some(true.to_json()))
+  @test.assert_eq(parse_json("false"), Some(false.to_json()))
 }
 
 ///|
 test "json/parse_number" {
-  assert_eq(parse_json("42"), Some(42.0.to_json()))
-  assert_eq(parse_json("-123"), Some((-123.0).to_json()))
-  assert_eq(parse_json("3.14"), Some(3.14.to_json()))
-  assert_eq(parse_json("1e10"), Some(10000000000.0.to_json()))
+  @test.assert_eq(parse_json("42"), Some(42.0.to_json()))
+  @test.assert_eq(parse_json("-123"), Some((-123.0).to_json()))
+  @test.assert_eq(parse_json("3.14"), Some(3.14.to_json()))
+  @test.assert_eq(parse_json("1e10"), Some(10000000000.0.to_json()))
 }
 
 ///|
 test "json/parse_string" {
-  assert_eq(parse_json("\"hello\""), Some("hello".to_json()))
-  assert_eq(parse_json("\"hello\\nworld\""), Some("hello\nworld".to_json()))
-  assert_eq(parse_json("\"tab\\there\""), Some("tab\there".to_json()))
+  @test.assert_eq(parse_json("\"hello\""), Some("hello".to_json()))
+  @test.assert_eq(
+    parse_json("\"hello\\nworld\""),
+    Some("hello\nworld".to_json()),
+  )
+  @test.assert_eq(parse_json("\"tab\\there\""), Some("tab\there".to_json()))
 }
 
 ///|
 test "json/parse_array" {
   let result = parse_json("[1, 2, 3]")
-  assert_eq(
+  @test.assert_eq(
     result,
     Some(Json::array([1.0.to_json(), 2.0.to_json(), 3.0.to_json()])),
   )
 
   let empty = parse_json("[]")
-  assert_eq(empty, Some(Json::array([])))
+  @test.assert_eq(empty, Some(Json::array([])))
 }
 
 ///|
@@ -43,8 +46,8 @@ test "json/parse_object" {
   let result = parse_json("{\"name\": \"test\", \"value\": 42}")
   match result {
     Some(Object(obj)) => {
-      assert_eq(get_string(Json::object(obj), "name"), Some("test"))
-      assert_eq(get_number(Json::object(obj), "value"), Some(42.0))
+      @test.assert_eq(get_string(Json::object(obj), "name"), Some("test"))
+      @test.assert_eq(get_number(Json::object(obj), "value"), Some(42.0))
     }
     _ => assert_true(false)
   }
@@ -54,13 +57,13 @@ test "json/parse_object" {
 test "json/int64_id_string_and_safe_number" {
   match parse_json("{\"id\":\"9007199254740993\",\"small\":42}") {
     Some(obj) => {
-      assert_eq(get_int64_id(obj, "id"), Some(9007199254740993L))
-      assert_eq(get_int64_id(obj, "small"), Some(42L))
+      @test.assert_eq(get_int64_id(obj, "id"), Some(9007199254740993L))
+      @test.assert_eq(get_int64_id(obj, "small"), Some(42L))
     }
     None => assert_true(false)
   }
   match parse_json("{\"id\":9007199254740992}") {
-    Some(obj) => assert_eq(get_int64_id(obj, "id"), None)
+    Some(obj) => @test.assert_eq(get_int64_id(obj, "id"), None)
     None => assert_true(false)
   }
 }
@@ -76,7 +79,7 @@ test "json/parse_nested" {
         Some(meta) => {
           let count = meta.get("count")
           match count {
-            Some(Number(n, ..)) => assert_eq(n, 3.0)
+            Some(Number(n, ..)) => @test.assert_eq(n, 3.0)
             _ => assert_true(false)
           }
         }
@@ -105,7 +108,7 @@ test "json/vector_conversion" {
   let vec = [1.0, 2.0, 3.0]
   let json = vector_to_json(vec)
   let back = json_to_vector(json)
-  assert_eq(back, Some(vec))
+  @test.assert_eq(back, Some(vec))
 }
 
 ///|
@@ -121,9 +124,9 @@ test "json/attrs_conversion" {
 
   match back {
     Some(a) => {
-      assert_eq(a.get("name"), Some(@types.String("test")))
-      assert_eq(a.get("count"), Some(@types.Int(42L)))
-      assert_eq(a.get("active"), Some(@types.Bool(true)))
+      @test.assert_eq(a.get("name"), Some(@types.String("test")))
+      @test.assert_eq(a.get("count"), Some(@types.Int(42L)))
+      @test.assert_eq(a.get("active"), Some(@types.Bool(true)))
     }
     None => assert_true(false)
   }
@@ -138,12 +141,12 @@ test "json/get_helpers" {
     ("items", json_array([1.0.to_json(), 2.0.to_json()])),
   ])
 
-  assert_eq(get_string(obj, "name"), Some("test"))
-  assert_eq(get_number(obj, "count"), Some(42.0))
-  assert_eq(get_int(obj, "count"), Some(42))
-  assert_eq(get_bool(obj, "active"), Some(true))
+  @test.assert_eq(get_string(obj, "name"), Some("test"))
+  @test.assert_eq(get_number(obj, "count"), Some(42.0))
+  @test.assert_eq(get_int(obj, "count"), Some(42))
+  @test.assert_eq(get_bool(obj, "active"), Some(true))
   assert_true(get_array(obj, "items") is Some(_))
-  assert_eq(get_string(obj, "missing"), None)
+  @test.assert_eq(get_string(obj, "missing"), None)
 }
 
 ///|
@@ -152,7 +155,7 @@ test "json/escape_roundtrip" {
   let json : Json = special.to_json()
   let s = json.stringify()
   let parsed = parse_json(s)
-  assert_eq(parsed, Some("hello\nworld\ttab\"quote\\backslash".to_json()))
+  @test.assert_eq(parsed, Some("hello\nworld\ttab\"quote\\backslash".to_json()))
 }
 
 ///|
@@ -175,20 +178,20 @@ fn string_to_bytes(value : String) -> Bytes {
 ///|
 test "request/parse_request_path" {
   let segments = parse_request_path("/collections/test/points")
-  assert_eq(segments, ["collections", "test", "points"])
+  @test.assert_eq(segments, ["collections", "test", "points"])
 }
 
 ///|
 test "request/parse_request_path_empty" {
-  assert_eq(parse_request_path("/"), [])
-  assert_eq(parse_request_path(""), [])
+  @test.assert_eq(parse_request_path("/"), [])
+  @test.assert_eq(parse_request_path(""), [])
 }
 
 ///|
 test "request/split_request_target" {
   let (path, query) = split_request_target("/collections/test?limit=10")
-  assert_eq(path, "/collections/test")
-  assert_eq(query, "limit=10")
+  @test.assert_eq(path, "/collections/test")
+  @test.assert_eq(query, "limit=10")
 }
 
 ///|
@@ -201,11 +204,11 @@ test "wal/upsert_creates_wal" {
     let create = execute_path_request(
       manager, "POST", "/collections/test", "{\"dim\":3,\"strategy\":\"Bruteforce\"}",
     )
-    assert_eq(create.status, "ok")
+    @test.assert_eq(create.status, "ok")
     let upsert = execute_path_request(
       manager, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{}}]}",
     )
-    assert_eq(upsert.status, "ok")
+    @test.assert_eq(upsert.status, "ok")
     // WAL file should exist
     let wal_path = @storage.collection_wal_path("test")
     assert_true(storage.exists(wal_path))
@@ -229,14 +232,14 @@ test "wal/delete_persists_via_wal" {
     let del = execute_path_request(
       manager1, "DELETE", "/collections/test/points/1", "",
     )
-    assert_eq(del.status, "ok")
+    @test.assert_eq(del.status, "ok")
     // Reload — deletion should be replayed from WAL
     let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
       storage,
     )
     match manager2.get("test") {
       Ok(d) => {
-        assert_eq(d.size(), 1)
+        @test.assert_eq(d.size(), 1)
         assert_true(d.has(@types.VectorId::from_int(2)))
         assert_true(!d.has(@types.VectorId::from_int(1)))
       }
@@ -265,7 +268,7 @@ test "wal/checkpoint_snapshot_is_current" {
     )
     match manager2.get("test") {
       Ok(d) => {
-        assert_eq(d.size(), 1)
+        @test.assert_eq(d.size(), 1)
         assert_true(d.has(@types.VectorId::from_int(1)))
       }
       Err(_) => assert_true(false)
@@ -302,7 +305,7 @@ test "wal/reload_replays_wal" {
     match db {
       Ok(d) => {
         // Both points should exist: id=1 from snapshot, id=2 from WAL replay
-        assert_eq(d.size(), 2)
+        @test.assert_eq(d.size(), 2)
         assert_true(d.has(@types.VectorId::from_int(1)))
         assert_true(d.has(@types.VectorId::from_int(2)))
       }
@@ -329,7 +332,7 @@ test "wal/auto_checkpoint_on_threshold" {
     )
     // Data should be accessible
     match manager1.get("test") {
-      Ok(d) => assert_eq(d.size(), 3)
+      Ok(d) => @test.assert_eq(d.size(), 3)
       Err(_) => assert_true(false)
     }
     // Auto-checkpoint means data survives reload without explicit checkpoint
@@ -338,7 +341,7 @@ test "wal/auto_checkpoint_on_threshold" {
       checkpoint_threshold=3,
     )
     match manager2.get("test") {
-      Ok(d) => assert_eq(d.size(), 3)
+      Ok(d) => @test.assert_eq(d.size(), 3)
       Err(_) => assert_true(false)
     }
   })
@@ -359,10 +362,10 @@ test "wal/delete_collection_removes_wal" {
     )
     // Delete collection
     let del = execute_path_request(manager, "DELETE", "/collections/test", "")
-    assert_eq(del.status, "ok")
+    @test.assert_eq(del.status, "ok")
     // WAL file should be gone
     let wal_path = @storage.collection_wal_path("test")
-    assert_eq(storage.exists(wal_path), false)
+    @test.assert_eq(storage.exists(wal_path), false)
   })
 }
 
@@ -375,10 +378,10 @@ test "request/execute_path_request" {
     let create = execute_path_request(
       manager, "POST", "/collections/demo", "{\"dim\":3}",
     )
-    assert_eq(create.status, "ok")
+    @test.assert_eq(create.status, "ok")
 
     let list = execute_path_request(manager, "GET", "/collections?limit=10", "")
-    assert_eq(list.status, "ok")
+    @test.assert_eq(list.status, "ok")
   })
 }
 
@@ -391,8 +394,8 @@ test "request/create_collection_rejects_invalid_config" {
     let create = execute_path_request(
       manager, "POST", "/collections/demo", "{\"dim\":3,\"strategy\":\"bogus\"}",
     )
-    assert_eq(create.status, "error")
-    assert_eq(
+    @test.assert_eq(create.status, "error")
+    @test.assert_eq(
       create.error,
       Some("Invalid request body: unsupported strategy: bogus"),
     )
@@ -408,13 +411,13 @@ test "request/upsert_rejects_invalid_payload" {
     let create = execute_path_request(
       manager, "POST", "/collections/demo", "{\"dim\":3}",
     )
-    assert_eq(create.status, "ok")
+    @test.assert_eq(create.status, "ok")
 
     let upsert = execute_path_request(
       manager, "PUT", "/collections/demo/points", "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{\"nested\":{\"x\":1}}}]}",
     )
-    assert_eq(upsert.status, "error")
-    assert_eq(upsert.error, Some("Invalid request body"))
+    @test.assert_eq(upsert.status, "error")
+    @test.assert_eq(upsert.error, Some("Invalid request body"))
   })
 }
 
@@ -428,18 +431,18 @@ test "request/reload_preserves_metric_and_strategy" {
     let create = execute_path_request(
       manager1, "POST", "/collections/test", "{\"dim\":2,\"metric\":\"L2\",\"strategy\":\"Bruteforce\"}",
     )
-    assert_eq(create.status, "ok")
+    @test.assert_eq(create.status, "ok")
     let upsert = execute_path_request(
       manager1, "PUT", "/collections/test/points", "{\"points\":[{\"id\":1,\"vector\":[1,0],\"payload\":{}}]}",
     )
-    assert_eq(upsert.status, "ok")
+    @test.assert_eq(upsert.status, "ok")
 
     let manager2 : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
       storage,
     )
     match manager2.get("test") {
       Ok(db) => {
-        assert_eq(db.metric(), @types.L2)
+        @test.assert_eq(db.metric(), @types.L2)
         assert_true(db.strategy() is @types.Bruteforce)
       }
       Err(_) => assert_true(false)
@@ -462,8 +465,8 @@ test "request/invalid_persisted_config_surfaces_error" {
     let get_resp = execute_path_request(
       manager, "GET", "/collections/broken", "",
     )
-    assert_eq(get_resp.status, "error")
-    assert_eq(
+    @test.assert_eq(get_resp.status, "error")
+    @test.assert_eq(
       get_resp.error,
       Some(
         "Storage error: Invalid collection config for broken: dim is required",
@@ -471,8 +474,8 @@ test "request/invalid_persisted_config_surfaces_error" {
     )
 
     let list_resp = execute_path_request(manager, "GET", "/collections", "")
-    assert_eq(list_resp.status, "error")
-    assert_eq(
+    @test.assert_eq(list_resp.status, "error")
+    @test.assert_eq(
       list_resp.error,
       Some(
         "Storage error: Invalid collection config for broken: dim is required",
@@ -490,25 +493,25 @@ test "request/scroll_points" {
     let create = execute_path_request(
       manager, "POST", "/collections/demo", "{\"dim\":3,\"strategy\":\"Bruteforce\"}",
     )
-    assert_eq(create.status, "ok")
+    @test.assert_eq(create.status, "ok")
 
     let upsert = execute_path_request(
       manager, "PUT", "/collections/demo/points", "{\"points\":[{\"id\":1,\"vector\":[1,0,0],\"payload\":{\"label\":\"alpha\"}},{\"id\":2,\"vector\":[0,1,0],\"payload\":{\"label\":\"beta\"}}]}",
     )
-    assert_eq(upsert.status, "ok")
+    @test.assert_eq(upsert.status, "ok")
 
     let scroll = execute_path_request(
       manager, "POST", "/collections/demo/points/scroll", "{\"limit\":1,\"with_payload\":true}",
     )
-    assert_eq(scroll.status, "ok")
+    @test.assert_eq(scroll.status, "ok")
     match scroll.result {
       Some(Object(result)) => {
         match result.get("points") {
-          Some(Array(points)) => assert_eq(points.length(), 1)
+          Some(Array(points)) => @test.assert_eq(points.length(), 1)
           _ => assert_true(false)
         }
         match result.get("next_page_offset") {
-          Some(Number(offset, ..)) => assert_eq(offset, 1.0)
+          Some(Number(offset, ..)) => @test.assert_eq(offset, 1.0)
           _ => assert_true(false)
         }
       }
@@ -526,7 +529,7 @@ test "request/large_int64_id_string_roundtrip" {
     let create = execute_path_request(
       manager, "POST", "/collections/demo", "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
     )
-    assert_eq(create.status, "ok")
+    @test.assert_eq(create.status, "ok")
 
     let large_id = "9007199254740993"
     let upsert = execute_path_request(
@@ -537,7 +540,7 @@ test "request/large_int64_id_string_roundtrip" {
       large_id +
       "\",\"vector\":[1,0],\"payload\":{}}]}",
     )
-    assert_eq(upsert.status, "ok")
+    @test.assert_eq(upsert.status, "ok")
 
     let get_resp = execute_path_request(
       manager,
@@ -545,11 +548,11 @@ test "request/large_int64_id_string_roundtrip" {
       "/collections/demo/points/" + large_id,
       "",
     )
-    assert_eq(get_resp.status, "ok")
+    @test.assert_eq(get_resp.status, "ok")
     match get_resp.result {
       Some(Object(point)) =>
         match point.get("id") {
-          Some(String(id)) => assert_eq(id, large_id)
+          Some(String(id)) => @test.assert_eq(id, large_id)
           _ => assert_true(false)
         }
       _ => assert_true(false)
@@ -558,7 +561,7 @@ test "request/large_int64_id_string_roundtrip" {
     let search = execute_path_request(
       manager, "POST", "/collections/demo/points/search", "{\"vector\":[1,0],\"limit\":1}",
     )
-    assert_eq(search.status, "ok")
+    @test.assert_eq(search.status, "ok")
     match search.result {
       Some(Object(search_obj)) =>
         match search_obj.get("result") {
@@ -566,7 +569,7 @@ test "request/large_int64_id_string_roundtrip" {
             match hits[0] {
               Object(hit) =>
                 match hit.get("id") {
-                  Some(String(id)) => assert_eq(id, large_id)
+                  Some(String(id)) => @test.assert_eq(id, large_id)
                   _ => assert_true(false)
                 }
               _ => assert_true(false)
@@ -579,11 +582,11 @@ test "request/large_int64_id_string_roundtrip" {
     let scroll = execute_path_request(
       manager, "POST", "/collections/demo/points/scroll", "{\"limit\":1}",
     )
-    assert_eq(scroll.status, "ok")
+    @test.assert_eq(scroll.status, "ok")
     match scroll.result {
       Some(Object(scroll_obj)) =>
         match scroll_obj.get("next_page_offset") {
-          Some(String(offset)) => assert_eq(offset, large_id)
+          Some(String(offset)) => @test.assert_eq(offset, large_id)
           _ => assert_true(false)
         }
       _ => assert_true(false)
@@ -595,11 +598,11 @@ test "request/large_int64_id_string_roundtrip" {
       "/collections/demo/points/scroll",
       "{\"offset\":\"" + large_id + "\",\"limit\":1}",
     )
-    assert_eq(next_scroll.status, "ok")
+    @test.assert_eq(next_scroll.status, "ok")
     match next_scroll.result {
       Some(Object(scroll_obj)) =>
         match scroll_obj.get("points") {
-          Some(Array(points)) => assert_eq(points.length(), 0)
+          Some(Array(points)) => @test.assert_eq(points.length(), 0)
           _ => assert_true(false)
         }
       _ => assert_true(false)

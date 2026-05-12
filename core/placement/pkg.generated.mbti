@@ -2,6 +2,7 @@
 package "trkbt10/vcdb/core/placement"
 
 import {
+  "moonbitlang/core/debug",
   "trkbt10/vcdb/core/persistence/segment",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/store",
@@ -84,7 +85,7 @@ pub struct CrushTarget {
   key : TargetKey
   weight : Double
   zone : String?
-}
+} derive(@debug.Debug)
 pub fn CrushTarget::from_key(TargetKey) -> Self
 pub fn CrushTarget::new(String) -> Self
 pub fn CrushTarget::with_weight(String, Double) -> Self
@@ -137,7 +138,7 @@ pub(all) enum RebalancePhase {
   Updating
   Complete
   Failed(String)
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub impl Show for RebalancePhase
 
 pub(all) struct RebalanceProgress {
@@ -180,7 +181,7 @@ pub struct SegmentResult {
 
 pub(all) struct TargetKey {
   value : String
-} derive(Compare, Eq, Hash)
+} derive(Compare, Eq, Hash, @debug.Debug)
 pub fn TargetKey::new(String) -> Self
 pub fn TargetKey::to_string(Self) -> String
 pub impl Show for TargetKey

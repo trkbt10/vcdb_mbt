@@ -13,8 +13,8 @@ fn run_async_test(f : async () -> Unit) -> Unit {
 ///|
 test "http/parse_query" {
   let params = parse_query("key1=value1&key2=value2")
-  assert_eq(params.get("key1"), Some("value1"))
-  assert_eq(params.get("key2"), Some("value2"))
+  @test.assert_eq(params.get("key1"), Some("value1"))
+  @test.assert_eq(params.get("key2"), Some("value2"))
 }
 
 ///|
@@ -22,7 +22,7 @@ test "http/router_health" {
   run_async_test(async fn() {
     let router = Router::with_storage(@storage.MemoryStorage::new())
     let response = router.route(HttpRequest::new("GET", "/healthz"))
-    assert_eq(response.status, 200)
+    @test.assert_eq(response.status, 200)
   })
 }
 
@@ -34,7 +34,7 @@ test "http/router_collections" {
       HttpRequest::new("POST", "/collections/test", body="{\"dim\":3}"),
     )
     let response = router.route(HttpRequest::new("GET", "/collections"))
-    assert_eq(response.status, 200)
+    @test.assert_eq(response.status, 200)
   })
 }
 
@@ -43,7 +43,7 @@ test "http/router_not_found" {
   run_async_test(async fn() {
     let router = Router::with_storage(@storage.MemoryStorage::new())
     let response = router.route(HttpRequest::new("GET", "/unknown"))
-    assert_eq(response.status, 404)
+    @test.assert_eq(response.status, 404)
   })
 }
 
@@ -68,6 +68,6 @@ test "http/router_scroll_points" {
         body="{\"limit\":10,\"with_payload\":true}",
       ),
     )
-    assert_eq(response.status, 200)
+    @test.assert_eq(response.status, 200)
   })
 }

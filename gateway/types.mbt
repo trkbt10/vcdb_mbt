@@ -294,7 +294,7 @@ pub impl Show for SearchRequest with output(self, logger) {
   logger.write_string(", limit: ")
   Show::output(self.limit, logger)
   logger.write_string(", filter: ")
-  Show::output(self.filter, logger)
+  Debug::to_repr(self.filter).output(logger)
   logger.write_string(", with_payload: ")
   Show::output(self.with_payload, logger)
   logger.write_string(", with_vector: ")
@@ -344,9 +344,9 @@ pub impl Show for SearchHitResponse with output(self, logger) {
   logger.write_string(", score: ")
   Show::output(self.score, logger)
   logger.write_string(", payload: ")
-  Show::output(self.payload, logger)
+  Debug::to_repr(self.payload).output(logger)
   logger.write_string(", vector: ")
-  Show::output(self.vector, logger)
+  Debug::to_repr(self.vector).output(logger)
   logger.write_string(" }")
 }
 
@@ -432,7 +432,7 @@ pub struct ScrollRequest {
 ///|
 pub impl Show for ScrollRequest with output(self, logger) {
   logger.write_string("{ offset: ")
-  Show::output(self.offset, logger)
+  Debug::to_repr(self.offset).output(logger)
   logger.write_string(", limit: ")
   Show::output(self.limit, logger)
   logger.write_string(", with_payload: ")
@@ -468,9 +468,9 @@ pub impl Show for ScrollPointResponse with output(self, logger) {
   logger.write_string("{ id: ")
   Show::output(self.id, logger)
   logger.write_string(", payload: ")
-  Show::output(self.payload, logger)
+  Debug::to_repr(self.payload).output(logger)
   logger.write_string(", vector: ")
-  Show::output(self.vector, logger)
+  Debug::to_repr(self.vector).output(logger)
   logger.write_string(" }")
 }
 
@@ -499,7 +499,7 @@ pub impl Show for ScrollResponse with output(self, logger) {
   logger.write_string("{ points: ")
   Show::output(self.points, logger)
   logger.write_string(", next_page_offset: ")
-  Show::output(self.next_page_offset, logger)
+  Debug::to_repr(self.next_page_offset).output(logger)
   logger.write_string(" }")
 }
 
@@ -585,9 +585,9 @@ pub impl Show for ApiResponse with output(self, logger) {
   logger.write_string("{ status: ")
   Show::output(self.status, logger)
   logger.write_string(", result: ")
-  Show::output(self.result, logger)
+  Debug::to_repr(self.result).output(logger)
   logger.write_string(", error: ")
-  Show::output(self.error, logger)
+  Debug::to_repr(self.error).output(logger)
   logger.write_string(" }")
 }
 

@@ -22,7 +22,7 @@ pub(all) enum FileType {
   Wal // 0x01
   Segment // 0x02
   Index // 0x03
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub impl Show for FileType with output(self, logger) {

@@ -63,7 +63,7 @@ pub enum WalRecordType {
   Upsert // 1 - Insert or update vector with attrs
   Remove // 2 - Delete vector
   SetAttrs // 3 - Update attrs only
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub impl Show for WalRecordType with output(self, logger) {
@@ -102,7 +102,7 @@ pub struct WalRecord {
   vector : Array[Double]?
   /// Nanoseconds since Unix epoch. 0 = no timestamp (v1 compatibility).
   timestamp : Int64
-}
+} derive(Debug)
 
 ///|
 pub impl Show for WalRecord with output(self, logger) {
@@ -111,9 +111,9 @@ pub impl Show for WalRecord with output(self, logger) {
   logger.write_string(", id: ")
   Show::output(self.id, logger)
   logger.write_string(", attrs: ")
-  Show::output(self.attrs, logger)
+  Debug::to_repr(self.attrs).output(logger)
   logger.write_string(", vector: ")
-  Show::output(self.vector, logger)
+  Debug::to_repr(self.vector).output(logger)
   logger.write_string(", timestamp: ")
   Show::output(self.timestamp, logger)
   logger.write_string(" }")

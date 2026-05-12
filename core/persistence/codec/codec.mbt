@@ -90,7 +90,7 @@ pub fn attr_value_to_json(value : @types.AttrValue) -> Json {
 ///|
 /// Parse attrs option from JSON string.
 pub fn parse_attrs_json(json : String) -> @types.Attrs? {
-  let json = json.trim(chars=" \t\n\r").to_string()
+  let json = json.trim(chars=" \t\n\r").to_owned()
   if json == "null" {
     return None
   }

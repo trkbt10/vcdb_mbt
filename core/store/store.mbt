@@ -199,16 +199,16 @@ pub struct MoveInfo {
   moved_id : @types.VectorId?
   moved_from : Int?
   moved_to : Int?
-}
+} derive(Debug)
 
 ///|
 pub impl Show for MoveInfo with output(self, logger) {
   logger.write_string("{ moved_id: ")
-  Show::output(self.moved_id, logger)
+  Debug::to_repr(self.moved_id).output(logger)
   logger.write_string(", moved_from: ")
-  Show::output(self.moved_from, logger)
+  Debug::to_repr(self.moved_from).output(logger)
   logger.write_string(", moved_to: ")
-  Show::output(self.moved_to, logger)
+  Debug::to_repr(self.moved_to).output(logger)
   logger.write_string(" }")
 }
 

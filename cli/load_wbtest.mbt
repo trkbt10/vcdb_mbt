@@ -1,4 +1,7 @@
 ///|
+using @test {assert_eq}
+
+///|
 test "load/routing_uses_distributed_targets" {
   let (targets, target_to_shard) = load_crush_targets(4)
   let crush = @placement.CrushMap::new(4, 1, targets)

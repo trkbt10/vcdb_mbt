@@ -9,7 +9,7 @@
 /// (shard names, collection names, file paths, etc.).
 pub(all) struct TargetKey {
   value : String
-} derive(Eq, Compare, Hash)
+} derive(Eq, Compare, Hash, Debug)
 
 ///|
 pub impl Show for TargetKey with output(self, logger) {
@@ -32,7 +32,7 @@ pub struct CrushTarget {
   key : TargetKey // Logical storage key
   weight : Double // Device weight (default 1.0)
   zone : String? // Failure domain (optional)
-}
+} derive(Debug)
 
 ///|
 pub impl Show for CrushTarget with output(self, logger) {
@@ -41,7 +41,7 @@ pub impl Show for CrushTarget with output(self, logger) {
   logger.write_string(", weight: ")
   Show::output(self.weight, logger)
   logger.write_string(", zone: ")
-  Show::output(self.zone, logger)
+  Debug::to_repr(self.zone).output(logger)
   logger.write_string(" }")
 }
 

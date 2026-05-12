@@ -2,6 +2,7 @@
 package "trkbt10/vcdb/core/persistence/wal"
 
 import {
+  "moonbitlang/core/debug",
   "trkbt10/vcdb/core/binary",
   "trkbt10/vcdb/core/storage",
   "trkbt10/vcdb/core/store",
@@ -67,7 +68,7 @@ pub struct WalRecord {
   attrs : @types.Attrs?
   vector : Array[Double]?
   timestamp : Int64
-}
+} derive(@debug.Debug)
 pub fn WalRecord::remove(@types.VectorId, timestamp? : Int64) -> Self
 pub fn WalRecord::set_attrs(@types.VectorId, @types.Attrs, timestamp? : Int64) -> Self
 pub fn WalRecord::upsert(@types.VectorId, Array[Double], @types.Attrs, timestamp? : Int64) -> Self
@@ -77,7 +78,7 @@ pub enum WalRecordType {
   Upsert
   Remove
   SetAttrs
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn WalRecordType::from_byte(Byte) -> Self?
 pub fn WalRecordType::to_byte(Self) -> Byte
 pub impl Show for WalRecordType

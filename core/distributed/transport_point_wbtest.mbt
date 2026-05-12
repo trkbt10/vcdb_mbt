@@ -12,10 +12,10 @@ test "transport_point/jsonl_roundtrip_ascii" {
   let restored = TransportPoint::from_jsonl(line)
   assert_false(restored is None)
   let r = restored.unwrap()
-  assert_eq(r.id, point.id)
-  assert_eq(r.vector, point.vector)
-  assert_eq(r.attrs.get("title"), Some(@types.String("hello world")))
-  assert_eq(r.attrs.get("count"), Some(@types.Int(42L)))
+  @test.assert_eq(r.id, point.id)
+  @test.assert_eq(r.vector, point.vector)
+  @test.assert_eq(r.attrs.get("title"), Some(@types.String("hello world")))
+  @test.assert_eq(r.attrs.get("count"), Some(@types.Int(42L)))
 }
 
 ///|
@@ -36,16 +36,16 @@ test "transport_point/jsonl_roundtrip_unicode" {
   let restored = TransportPoint::from_jsonl(line)
   assert_false(restored is None)
   let r = restored.unwrap()
-  assert_eq(r.id, point.id)
-  assert_eq(r.vector, point.vector)
-  assert_eq(
+  @test.assert_eq(r.id, point.id)
+  @test.assert_eq(r.vector, point.vector)
+  @test.assert_eq(
     r.attrs.get("title"),
     Some(
       @types.String("犬の空中散歩が可能なエアマットの作り方"),
     ),
   )
-  assert_eq(r.attrs.get("category"), Some(@types.String("生活")))
-  assert_eq(r.attrs.get("emoji"), Some(@types.String("🐕")))
+  @test.assert_eq(r.attrs.get("category"), Some(@types.String("生活")))
+  @test.assert_eq(r.attrs.get("emoji"), Some(@types.String("🐕")))
 }
 
 ///|
@@ -57,7 +57,7 @@ test "transport_point/jsonl_roundtrip_hi_lo_id" {
   let point = TransportPoint::{ id, vector: [1.0], attrs }
   let line = point.to_jsonl()
   let restored = TransportPoint::from_jsonl(line).unwrap()
-  assert_eq(restored.id, @types.VectorId::from_int64(0x0001000200030004L))
+  @test.assert_eq(restored.id, @types.VectorId::from_int64(0x0001000200030004L))
 }
 
 ///|
@@ -84,5 +84,5 @@ test "transport_point/jsonl_empty_payload" {
   }
   let line = point.to_jsonl()
   let restored = TransportPoint::from_jsonl(line).unwrap()
-  assert_eq(restored.attrs.size(), 0)
+  @test.assert_eq(restored.attrs.size(), 0)
 }

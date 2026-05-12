@@ -19,7 +19,7 @@ pub(all) enum PartitionStatus {
   Connected
   /// Target is unreachable since the given timestamp (nanoseconds).
   Partitioned(Int64)
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub impl Show for PartitionStatus with output(self, logger) {
@@ -134,7 +134,7 @@ pub(all) enum ConflictResolution {
   KeepRemote
   /// Same timestamp; resolved deterministically by ID.
   TieBreakById
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub impl Show for ConflictResolution with output(self, logger) {

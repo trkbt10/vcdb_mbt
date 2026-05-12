@@ -8,6 +8,12 @@ import {
   "trkbt10/vcdb/gateway",
 }
 
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
+
+warnings = "-unused_package"
+
 options(
   "is-main": true,
   targets: {
@@ -15,6 +21,6 @@ options(
     "load.mbt": [ "native" ],
     "main.mbt": [ "native" ],
     "main_stub.mbt": [ "wasm", "wasm-gc", "js" ],
-    "wbtest.mbt": [ "native" ],
+    "native_gateway_wbtest.mbt": [ "native" ],
   },
 )

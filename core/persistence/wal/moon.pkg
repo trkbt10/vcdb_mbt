@@ -6,3 +6,8 @@ import {
   "trkbt10/vcdb/core/persistence/codec",
   "trkbt10/vcdb/core/storage",
 }
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/test",
+} for "wbtest"

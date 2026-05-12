@@ -2,6 +2,7 @@
 package "trkbt10/vcdb/core/persistence/codec"
 
 import {
+  "moonbitlang/core/debug",
   "trkbt10/vcdb/core/binary",
   "trkbt10/vcdb/core/types",
 }
@@ -58,7 +59,7 @@ pub(all) enum FileType {
   Wal
   Segment
   Index
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn FileType::extension(Self) -> String
 pub fn FileType::from_byte(Byte) -> Self?
 pub fn FileType::to_byte(Self) -> Byte

@@ -58,15 +58,15 @@ test "header/is_vcdb_file" {
 test "header/get_file_type" {
   let w1 = @binary.BinaryWriter::new()
   encode_header(w1, Wal, b'\x01')
-  inspect(get_file_type(w1.concat()), content="Some(Wal)")
+  @debug.debug_inspect(get_file_type(w1.concat()), content="Some(Wal)")
   let w2 = @binary.BinaryWriter::new()
   encode_header(w2, Segment, b'\x01')
-  inspect(get_file_type(w2.concat()), content="Some(Segment)")
+  @debug.debug_inspect(get_file_type(w2.concat()), content="Some(Segment)")
   let w3 = @binary.BinaryWriter::new()
   encode_header(w3, Index, b'\x01')
-  inspect(get_file_type(w3.concat()), content="Some(Index)")
+  @debug.debug_inspect(get_file_type(w3.concat()), content="Some(Index)")
   // Invalid
-  inspect(get_file_type(Bytes::make(12, b'\x00')), content="None")
+  @debug.debug_inspect(get_file_type(Bytes::make(12, b'\x00')), content="None")
 }
 
 ///|
@@ -80,8 +80,8 @@ test "header/file_type_roundtrip" {
     }
   }
   // Invalid type byte
-  inspect(FileType::from_byte(b'\x00'), content="None")
-  inspect(FileType::from_byte(b'\xFF'), content="None")
+  @debug.debug_inspect(FileType::from_byte(b'\x00'), content="None")
+  @debug.debug_inspect(FileType::from_byte(b'\xFF'), content="None")
 }
 
 ///|

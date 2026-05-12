@@ -89,6 +89,15 @@ fn walk_dir(
   if !@fs.path_exists(abs_dir) {
     return
   }
+  let is_root_dir = @fs.is_dir(abs_dir) catch {
+    e => {
+      raise_io_error(e)
+      false
+    }
+  }
+  if !is_root_dir {
+    raise IoFailed(abs_dir + " is not a directory")
+  }
   let entries = @fs.read_dir(abs_dir) catch {
     e => {
       raise_io_error(e)

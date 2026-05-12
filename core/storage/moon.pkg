@@ -7,6 +7,12 @@ import {
   "moonbitlang/x/path",
 }
 
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
+
+warnings = "-unused_package"
+
 options(
   targets: {
     "async_callback.mbt": [ "js" ],

@@ -20,13 +20,13 @@ test "lib/gateway_storage_read_propagates_missing_file" {
 test "wire/int64_roundtrip" {
   let id = @types.Int64Id(42L)
   let wire = @types.VectorId::to_wire_bytes(id)
-  assert_eq(wire.length(), 16)
+  @test.assert_eq(wire.length(), 16)
   // Lower 8 bytes must be zero for Int64Id
   for i in 8..<16 {
-    assert_eq(wire[i], b'\x00')
+    @test.assert_eq(wire[i], b'\x00')
   }
   let decoded = @types.VectorId::from_wire_bytes(wire)
-  assert_eq(decoded, Some(id))
+  @test.assert_eq(decoded, Some(id))
 }
 
 ///|
@@ -34,9 +34,9 @@ test "wire/int64_roundtrip" {
 test "wire/int64_max" {
   let id = @types.Int64Id(9223372036854775807L) // Int64::max_value
   let wire = @types.VectorId::to_wire_bytes(id)
-  assert_eq(wire.length(), 16)
+  @test.assert_eq(wire.length(), 16)
   let decoded = @types.VectorId::from_wire_bytes(wire)
-  assert_eq(decoded, Some(id))
+  @test.assert_eq(decoded, Some(id))
 }
 
 ///|
@@ -44,17 +44,17 @@ test "wire/int64_max" {
 test "wire/int64_negative" {
   let id = @types.Int64Id(-1L)
   let wire = @types.VectorId::to_wire_bytes(id)
-  assert_eq(wire.length(), 16)
+  @test.assert_eq(wire.length(), 16)
   // -1L in big-endian is 0xFF * 8
   for i in 0..<8 {
-    assert_eq(wire[i], b'\xff')
+    @test.assert_eq(wire[i], b'\xff')
   }
   // Lower 8 bytes must be zero
   for i in 8..<16 {
-    assert_eq(wire[i], b'\x00')
+    @test.assert_eq(wire[i], b'\x00')
   }
   let decoded = @types.VectorId::from_wire_bytes(wire)
-  assert_eq(decoded, Some(id))
+  @test.assert_eq(decoded, Some(id))
 }
 
 ///|
@@ -64,10 +64,10 @@ test "wire/int64_zero" {
   let wire = @types.VectorId::to_wire_bytes(id)
   // All bytes must be zero
   for i in 0..<16 {
-    assert_eq(wire[i], b'\x00')
+    @test.assert_eq(wire[i], b'\x00')
   }
   let decoded = @types.VectorId::from_wire_bytes(wire)
-  assert_eq(decoded, Some(id))
+  @test.assert_eq(decoded, Some(id))
 }
 
 ///|
@@ -76,9 +76,9 @@ test "wire/bytes16_roundtrip_uuid" {
   let uuid = "550e8400-e29b-41d4-a716-446655440000"
   let id = @types.VectorId::from_uuid_string(uuid).unwrap()
   let wire = @types.VectorId::to_wire_bytes(id)
-  assert_eq(wire.length(), 16)
+  @test.assert_eq(wire.length(), 16)
   let decoded = @types.VectorId::from_wire_bytes(wire)
-  assert_eq(decoded, Some(id))
+  @test.assert_eq(decoded, Some(id))
 }
 
 ///|
@@ -89,7 +89,7 @@ test "wire/bytes16_not_confused_with_int64" {
   let wire = @types.VectorId::to_wire_bytes(id)
   // Lower 8 bytes have a non-zero byte → must decode as Bytes16Id
   let decoded = @types.VectorId::from_wire_bytes(wire)
-  assert_eq(decoded, Some(id))
+  @test.assert_eq(decoded, Some(id))
   match decoded {
     Some(@types.Bytes16Id(_)) => ()
     _ => abort("expected Bytes16Id")
@@ -99,10 +99,16 @@ test "wire/bytes16_not_confused_with_int64" {
 ///|
 /// Wrong length returns None
 test "wire/invalid_length_returns_none" {
-  assert_eq(@types.VectorId::from_wire_bytes(b""), None)
-  assert_eq(@types.VectorId::from_wire_bytes(b"\x00\x01"), None)
-  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(15, b'\x00')), None)
-  assert_eq(@types.VectorId::from_wire_bytes(Bytes::make(17, b'\x00')), None)
+  @test.assert_eq(@types.VectorId::from_wire_bytes(b""), None)
+  @test.assert_eq(@types.VectorId::from_wire_bytes(b"\x00\x01"), None)
+  @test.assert_eq(
+    @types.VectorId::from_wire_bytes(Bytes::make(15, b'\x00')),
+    None,
+  )
+  @test.assert_eq(
+    @types.VectorId::from_wire_bytes(Bytes::make(17, b'\x00')),
+    None,
+  )
 }
 
 ///|
@@ -112,13 +118,13 @@ test "ffi/int64_add_has_get_remove" {
   let id = @types.Int64Id(1L)
   let wire = @types.VectorId::to_wire_bytes(id)
   let vec = [1.0, 0.0, 0.0, 0.0]
-  assert_eq(vcdb_add(inst, wire, vec), 0)
-  assert_eq(vcdb_has(inst, wire), 1)
+  @test.assert_eq(vcdb_add(inst, wire, vec), 0)
+  @test.assert_eq(vcdb_has(inst, wire), 1)
   let (got_vec, found) = vcdb_get(inst, wire)
-  assert_eq(found, 1)
-  assert_eq(got_vec.length(), 4)
-  assert_eq(vcdb_remove(inst, wire), 1)
-  assert_eq(vcdb_has(inst, wire), 0)
+  @test.assert_eq(found, 1)
+  @test.assert_eq(got_vec.length(), 4)
+  @test.assert_eq(vcdb_remove(inst, wire), 1)
+  @test.assert_eq(vcdb_has(inst, wire), 0)
   vcdb_destroy(inst)
 }
 
@@ -128,9 +134,9 @@ test "ffi/bytes16_wire_roundtrip_only" {
   let uuid = "550e8400-e29b-41d4-a716-446655440000"
   let id = @types.VectorId::from_uuid_string(uuid).unwrap()
   let wire = @types.VectorId::to_wire_bytes(id)
-  assert_eq(wire.length(), 16)
+  @test.assert_eq(wire.length(), 16)
   let decoded = @types.VectorId::from_wire_bytes(wire)
-  assert_eq(decoded, Some(id))
+  @test.assert_eq(decoded, Some(id))
 }
 
 ///|
@@ -142,23 +148,23 @@ test "ffi/bytes16_full_db_operations" {
   let wire = @types.VectorId::to_wire_bytes(id)
   // Add
   let add_result = vcdb_add(inst, wire, [1.0, 0.0, 0.0, 0.0])
-  assert_eq(add_result, 0)
+  @test.assert_eq(add_result, 0)
   // Has
   let has_result = vcdb_has(inst, wire)
-  assert_eq(has_result, 1)
+  @test.assert_eq(has_result, 1)
   // Get
   let get_result = vcdb_get(inst, wire)
-  assert_eq(get_result.1, 1)
+  @test.assert_eq(get_result.1, 1)
   // Search
   let search_results = vcdb_search(inst, [1.0, 0.0, 0.0, 0.0], 1)
-  assert_eq(search_results.length(), 1)
+  @test.assert_eq(search_results.length(), 1)
   let decoded = @types.VectorId::from_wire_bytes(search_results[0].0)
-  assert_eq(decoded, Some(id))
+  @test.assert_eq(decoded, Some(id))
   // Remove
   let remove_result = vcdb_remove(inst, wire)
-  assert_eq(remove_result, 1)
+  @test.assert_eq(remove_result, 1)
   let has_after = vcdb_has(inst, wire)
-  assert_eq(has_after, 0)
+  @test.assert_eq(has_after, 0)
   vcdb_destroy(inst)
 }
 
@@ -174,10 +180,10 @@ test "ffi/mixed_int64_and_bytes16" {
   let w_uuid = uuid_id.to_wire_bytes()
   let _ = vcdb_add(inst, w_int, [1.0, 0.0, 0.0])
   let _ = vcdb_add(inst, w_uuid, [0.0, 1.0, 0.0])
-  assert_eq(vcdb_has(inst, w_int), 1)
-  assert_eq(vcdb_has(inst, w_uuid), 1)
+  @test.assert_eq(vcdb_has(inst, w_int), 1)
+  @test.assert_eq(vcdb_has(inst, w_uuid), 1)
   let results = vcdb_search(inst, [1.0, 0.0, 0.0], 2)
-  assert_eq(results.length(), 2)
+  @test.assert_eq(results.length(), 2)
   vcdb_destroy(inst)
 }
 
@@ -192,11 +198,11 @@ test "ffi/search_id_roundtrip" {
   let _ = vcdb_add(inst, w1, [1.0, 0.0, 0.0, 0.0])
   let _ = vcdb_add(inst, w2, [0.0, 1.0, 0.0, 0.0])
   let results = vcdb_search(inst, [1.0, 0.0, 0.0, 0.0], 1)
-  assert_eq(results.length(), 1)
+  @test.assert_eq(results.length(), 1)
   let (result_wire, _score) = results[0]
-  assert_eq(result_wire.length(), 16)
+  @test.assert_eq(result_wire.length(), 16)
   let decoded = @types.VectorId::from_wire_bytes(result_wire)
-  assert_eq(decoded, Some(id1))
+  @test.assert_eq(decoded, Some(id1))
   vcdb_destroy(inst)
 }
 
@@ -205,8 +211,8 @@ test "ffi/search_id_roundtrip" {
 test "ffi/add_duplicate_returns_minus2" {
   let inst = vcdb_create(4)
   let wire = @types.VectorId::to_wire_bytes(@types.Int64Id(1L))
-  assert_eq(vcdb_add(inst, wire, [1.0, 0.0, 0.0, 0.0]), 0)
-  assert_eq(vcdb_add(inst, wire, [1.0, 0.0, 0.0, 0.0]), -2)
+  @test.assert_eq(vcdb_add(inst, wire, [1.0, 0.0, 0.0, 0.0]), 0)
+  @test.assert_eq(vcdb_add(inst, wire, [1.0, 0.0, 0.0, 0.0]), -2)
   vcdb_destroy(inst)
 }
 
@@ -215,11 +221,11 @@ test "ffi/add_duplicate_returns_minus2" {
 test "ffi/invalid_wire_bytes_returns_error" {
   let inst = vcdb_create(4)
   let bad = b"\x00\x01"
-  assert_eq(vcdb_add(inst, bad, [1.0, 0.0, 0.0, 0.0]), -1)
-  assert_eq(vcdb_has(inst, bad), -1)
-  assert_eq(vcdb_remove(inst, bad), -1)
+  @test.assert_eq(vcdb_add(inst, bad, [1.0, 0.0, 0.0, 0.0]), -1)
+  @test.assert_eq(vcdb_has(inst, bad), -1)
+  @test.assert_eq(vcdb_remove(inst, bad), -1)
   let (_, found) = vcdb_get(inst, bad)
-  assert_eq(found, -1)
+  @test.assert_eq(found, -1)
   vcdb_destroy(inst)
 }
 
@@ -229,6 +235,6 @@ test "ffi/crush_placement_deterministic" {
   let wire = @types.VectorId::to_wire_bytes(@types.Int64Id(42L))
   let pg1 = crush_placement_group(wire, 16)
   let pg2 = crush_placement_group(wire, 16)
-  assert_eq(pg1, pg2)
+  @test.assert_eq(pg1, pg2)
   assert_true(pg1 >= 0 && pg1 < 16)
 }

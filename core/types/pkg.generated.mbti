@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "trkbt10/vcdb/core/types"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub fn attr_value_to_number(AttrValue) -> Double?
 
@@ -27,10 +31,10 @@ pub(all) enum AttrValue {
   Int(Int64)
   Float(Double)
   String(String)
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub impl Show for AttrValue
 
-pub(all) struct Attrs(Map[String, AttrValue])
+pub(all) struct Attrs(Map[String, AttrValue]) derive(@debug.Debug)
 pub fn Attrs::clear(Self) -> Unit
 pub fn Attrs::copy(Self) -> Self
 pub fn Attrs::get(Self, String) -> AttrValue?
@@ -57,7 +61,7 @@ pub(all) struct Bytes16 {
   b13 : Byte
   b14 : Byte
   b15 : Byte
-}
+} derive(@debug.Debug)
 pub fn Bytes16::compare(Self, Self) -> Int
 pub fn Bytes16::from_hi_lo(Int64, Int64) -> Self
 pub fn Bytes16::from_uuid_string(String) -> Self?
@@ -73,7 +77,7 @@ pub(all) struct DatabaseOptions {
   metric : Metric
   capacity : Int
   strategy : Strategy
-}
+} derive(@debug.Debug)
 pub fn DatabaseOptions::default(Int) -> Self
 pub impl Show for DatabaseOptions
 
@@ -84,14 +88,14 @@ pub(all) struct HNSWParams {
   level_mult : Double
   seed : UInt64
   allow_replace_deleted : Bool
-}
+} derive(@debug.Debug)
 pub fn HNSWParams::default() -> Self
 pub impl Show for HNSWParams
 
 pub(all) struct IVFParams {
   nlist : Int
   nprobe : Int
-}
+} derive(@debug.Debug)
 pub fn IVFParams::default() -> Self
 pub impl Show for IVFParams
 
@@ -99,7 +103,7 @@ pub(all) enum Metric {
   Cosine
   L2
   Dot
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn Metric::from_name(String) -> Self?
 pub fn Metric::to_name(Self) -> String
 pub impl Show for Metric
@@ -109,7 +113,7 @@ pub(all) struct NumericRange {
   gte : Double?
   lt : Double?
   lte : Double?
-}
+} derive(@debug.Debug)
 pub fn NumericRange::between(Double, Double, lower_inclusive? : Bool, upper_inclusive? : Bool) -> Self
 pub fn NumericRange::empty() -> Self
 pub fn NumericRange::gt(Double) -> Self
@@ -123,14 +127,14 @@ pub(all) struct SearchHit {
   id : VectorId
   score : Double
   attrs : Attrs
-}
+} derive(@debug.Debug)
 pub impl Show for SearchHit
 
 pub(all) enum Strategy {
   Bruteforce
   HNSW(HNSWParams)
   IVF(IVFParams)
-}
+} derive(@debug.Debug)
 pub fn Strategy::default_hnsw() -> Self
 pub fn Strategy::default_ivf() -> Self
 pub fn Strategy::from_name(String) -> Self?
@@ -140,7 +144,7 @@ pub impl Show for Strategy
 pub(all) enum VectorId {
   Int64Id(Int64)
   Bytes16Id(Bytes16)
-}
+} derive(@debug.Debug)
 pub fn VectorId::as_bytes16(Self) -> Bytes16?
 pub fn VectorId::as_int64(Self) -> Int64?
 pub fn VectorId::compare(Self, Self) -> Int
@@ -158,7 +162,7 @@ pub impl Show for VectorId
 pub(all) struct VectorRecord {
   vector : Array[Double]
   attrs : Attrs
-}
+} derive(@debug.Debug)
 pub impl Show for VectorRecord
 
 // Type aliases

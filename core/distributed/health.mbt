@@ -20,7 +20,7 @@ pub(all) enum ShardStatus {
   Degraded
   /// Target has exceeded the failure threshold and is considered unavailable.
   Failed
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub impl Show for ShardStatus with output(self, logger) {
@@ -44,7 +44,7 @@ pub(all) struct ShardHealth {
   consecutive_failures : Int
   /// Most recent error message, if any.
   last_error : String?
-}
+} derive(Debug)
 
 ///|
 /// Tracks health state for all targets in a distributed deployment.

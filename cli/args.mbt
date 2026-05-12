@@ -204,7 +204,7 @@ pub fn parse_vector(s : String) -> Array[Double]? {
   let parts = split_by_comma(s)
   let result : Array[Double] = []
   for part in parts {
-    let trimmed = part.trim(chars=" ").to_string()
+    let trimmed = part.trim(chars=" ").to_owned()
     if trimmed.length() == 0 {
       continue
     }
@@ -246,8 +246,8 @@ pub fn parse_payload(s : String) -> Json {
   for part in parts {
     let kv = split_by_equals(part)
     if kv.length() >= 2 {
-      let key = kv[0].trim(chars=" ").to_string()
-      let value = kv[1].trim(chars=" ").to_string()
+      let key = kv[0].trim(chars=" ").to_owned()
+      let value = kv[1].trim(chars=" ").to_owned()
       // Try to parse as number first
       let parse_result : Result[Double, _] = try? @string.parse_double(value)
       match parse_result {

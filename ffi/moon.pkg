@@ -12,6 +12,12 @@ import {
   "moonbitlang/async/js_async",
 }
 
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
+
+warnings = "-unused_package"
+
 options(
   link: {
     "js": {
@@ -68,8 +74,8 @@ options(
     },
   },
   targets: {
+    "ffi_wbtest.mbt": [ "js" ],
     "gateway_exports.mbt": [ "js" ],
     "persistent_exports.mbt": [ "js" ],
-    "wbtest.mbt": [ "js" ],
   },
 )

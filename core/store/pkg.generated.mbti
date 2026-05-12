@@ -2,6 +2,7 @@
 package "trkbt10/vcdb/core/store"
 
 import {
+  "moonbitlang/core/debug",
   "trkbt10/vcdb/core/types",
 }
 
@@ -41,7 +42,7 @@ pub struct MoveInfo {
   moved_id : @types.VectorId?
   moved_from : Int?
   moved_to : Int?
-}
+} derive(@debug.Debug)
 pub impl Show for MoveInfo
 
 // Type aliases

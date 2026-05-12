@@ -1,4 +1,7 @@
 ///|
+using @test {assert_eq}
+
+///|
 /// Tests for distributed merge, routing, and rebalance.
 
 ///|

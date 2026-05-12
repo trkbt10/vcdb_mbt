@@ -116,8 +116,8 @@ test "ulid/routing_is_deterministic" {
   let pg_a = pg_for_id(id, map)
   let pg_b = pg_for_id(id, map)
   let pg_c = pg_for_id(id, map)
-  assert_eq(pg_a, pg_b)
-  assert_eq(pg_b, pg_c)
+  @test.assert_eq(pg_a, pg_b)
+  @test.assert_eq(pg_b, pg_c)
   assert_true(pg_a >= 0 && pg_a < 16)
 }
 
@@ -145,7 +145,7 @@ test "uuid/routing_is_deterministic" {
   })
   let s1 = pg_for_id(id, map)
   let s2 = pg_for_id(id, map)
-  assert_eq(s1, s2)
+  @test.assert_eq(s1, s2)
   assert_true(s1 >= 0 && s1 < 16)
 }
 
@@ -247,7 +247,7 @@ test "ulid/group_by_target_all_points_accounted" {
     total = total + pts.length()
   }
   // Every point must appear in exactly one target group
-  assert_eq(total, 50)
+  @test.assert_eq(total, 50)
 }
 
 ///|
@@ -294,7 +294,7 @@ test "mixed/group_by_pg_int64id_and_bytes16id" {
   for _, pts in groups {
     total = total + pts.length()
   }
-  assert_eq(total, 20)
+  @test.assert_eq(total, 20)
   for p in points {
     let (id, _, _) = p
     let expected = pg_for_id(id, map)
@@ -320,7 +320,7 @@ test "ulid/targets_for_id_returns_correct_count" {
     ulid_bytes(1_700_000_000_000UL, 0xABU, 0x123456789ABCDEF0UL),
   )
   let replicas = test_targets_for_id(id, map)
-  assert_eq(replicas.length(), 2)
+  @test.assert_eq(replicas.length(), 2)
   // Both replica keys must be distinct
   assert_true(replicas[0] != replicas[1])
 }
@@ -368,8 +368,8 @@ test "ulid/different_ids_can_map_to_different_pgs" {
   assert_true(sa >= 0 && sa < 16)
   assert_true(sb >= 0 && sb < 16)
   // Determinism
-  assert_eq(pg_for_id(a, map), sa)
-  assert_eq(pg_for_id(b, map), sb)
+  @test.assert_eq(pg_for_id(a, map), sa)
+  @test.assert_eq(pg_for_id(b, map), sb)
 }
 
 ///|
@@ -407,12 +407,15 @@ test "ulid/transport_point_jsonl_round_trip" {
   match TransportPoint::from_jsonl(line) {
     None => assert_true(false)
     Some(restored) => {
-      assert_eq(restored.id, id)
-      assert_eq(restored.vector.length(), 3)
-      assert_eq(restored.attrs.get("label"), Some(@types.String("ulid-point")))
-      assert_eq(restored.attrs.get("score"), Some(@types.Float(0.99)))
+      @test.assert_eq(restored.id, id)
+      @test.assert_eq(restored.vector.length(), 3)
+      @test.assert_eq(
+        restored.attrs.get("label"),
+        Some(@types.String("ulid-point")),
+      )
+      @test.assert_eq(restored.attrs.get("score"), Some(@types.Float(0.99)))
       let map = make_cluster(16, 1)
-      assert_eq(pg_for_id(restored.id, map), pg_for_id(id, map))
+      @test.assert_eq(pg_for_id(restored.id, map), pg_for_id(id, map))
     }
   }
 }
@@ -432,9 +435,9 @@ test "uuid/transport_point_jsonl_round_trip" {
       match TransportPoint::from_jsonl(line) {
         None => assert_true(false)
         Some(restored) => {
-          assert_eq(restored.id, id)
+          @test.assert_eq(restored.id, id)
           let map = make_cluster(8, 1)
-          assert_eq(pg_for_id(restored.id, map), pg_for_id(id, map))
+          @test.assert_eq(pg_for_id(restored.id, map), pg_for_id(id, map))
         }
       }
     }
@@ -459,8 +462,8 @@ test "mixed/transport_point_int64id_and_bytes16id_both_survive_jsonl" {
   let r_int = TransportPoint::from_jsonl(p_int.to_jsonl()).unwrap()
   let r_ulid = TransportPoint::from_jsonl(p_ulid.to_jsonl()).unwrap()
 
-  assert_eq(r_int.id, p_int.id)
-  assert_eq(r_ulid.id, p_ulid.id)
-  assert_eq(pg_for_id(r_int.id, map), pg_for_id(p_int.id, map))
-  assert_eq(pg_for_id(r_ulid.id, map), pg_for_id(p_ulid.id, map))
+  @test.assert_eq(r_int.id, p_int.id)
+  @test.assert_eq(r_ulid.id, p_ulid.id)
+  @test.assert_eq(pg_for_id(r_int.id, map), pg_for_id(p_int.id, map))
+  @test.assert_eq(pg_for_id(r_ulid.id, map), pg_for_id(p_ulid.id, map))
 }

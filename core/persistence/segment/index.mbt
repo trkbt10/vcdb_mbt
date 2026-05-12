@@ -137,7 +137,7 @@ pub impl Show for DecodedIndexFile with output(self, logger) {
   logger.write_string(", entries: ")
   Show::output(self.entries, logger)
   logger.write_string(", ann: ")
-  Show::output(self.ann, logger)
+  Debug::to_repr(self.ann).output(logger)
   logger.write_string(" }")
 }
 

@@ -7,7 +7,7 @@ pub(all) enum Metric {
   Cosine
   L2
   Dot
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub impl Show for Metric with output(self, logger) {
@@ -59,7 +59,7 @@ pub(all) struct Bytes16 {
   b13 : Byte
   b14 : Byte
   b15 : Byte
-}
+} derive(Debug)
 
 ///|
 pub fn Bytes16::new(
@@ -366,7 +366,7 @@ pub(all) enum VectorId {
   Int64Id(Int64)
   /// 128-bit byte array ID (UUID, ULID, or any 16-byte identifier)
   Bytes16Id(Bytes16)
-}
+} derive(Debug)
 
 ///|
 pub impl Show for VectorId with output(self, logger) {
@@ -426,7 +426,7 @@ pub(all) enum AttrValue {
   Int(Int64)
   Float(Double)
   String(String)
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub impl Show for AttrValue with output(self, logger) {
@@ -457,7 +457,7 @@ pub impl Show for AttrValue with output(self, logger) {
 
 ///|
 /// Attributes map - empty map as default
-pub(all) struct Attrs(Map[String, AttrValue])
+pub(all) struct Attrs(Map[String, AttrValue]) derive(Debug)
 
 ///|
 pub impl Show for Attrs with output(self, logger) {
@@ -470,7 +470,7 @@ pub(all) struct SearchHit {
   id : VectorId
   score : Double
   attrs : Attrs
-}
+} derive(Debug)
 
 ///|
 pub impl Show for SearchHit with output(self, logger) {
@@ -488,7 +488,7 @@ pub impl Show for SearchHit with output(self, logger) {
 pub(all) struct VectorRecord {
   vector : Array[Double]
   attrs : Attrs
-}
+} derive(Debug)
 
 ///|
 pub impl Show for VectorRecord with output(self, logger) {
@@ -508,7 +508,7 @@ pub(all) struct HNSWParams {
   level_mult : Double // default: 1/ln(M)
   seed : UInt64 // default: 42
   allow_replace_deleted : Bool // default: false
-}
+} derive(Debug)
 
 ///|
 pub impl Show for HNSWParams with output(self, logger) {
@@ -545,7 +545,7 @@ pub let hnsw_ef_construction_max : Int = 1000
 pub(all) struct IVFParams {
   nlist : Int // default: 64
   nprobe : Int // default: sqrt(nlist)
-}
+} derive(Debug)
 
 ///|
 pub impl Show for IVFParams with output(self, logger) {
@@ -569,7 +569,7 @@ pub(all) enum Strategy {
   Bruteforce
   HNSW(HNSWParams)
   IVF(IVFParams)
-}
+} derive(Debug)
 
 ///|
 pub impl Show for Strategy with output(self, logger) {
@@ -616,7 +616,7 @@ pub(all) struct DatabaseOptions {
   metric : Metric // default: Cosine
   capacity : Int // default: 1024
   strategy : Strategy // default: Bruteforce
-}
+} derive(Debug)
 
 ///|
 pub impl Show for DatabaseOptions with output(self, logger) {
@@ -889,18 +889,18 @@ pub(all) struct NumericRange {
   gte : Double? // greater than or equal
   lt : Double? // less than
   lte : Double? // less than or equal
-}
+} derive(Debug)
 
 ///|
 pub impl Show for NumericRange with output(self, logger) {
   logger.write_string("{ gt: ")
-  Show::output(self.gt, logger)
+  Debug::to_repr(self.gt).output(logger)
   logger.write_string(", gte: ")
-  Show::output(self.gte, logger)
+  Debug::to_repr(self.gte).output(logger)
   logger.write_string(", lt: ")
-  Show::output(self.lt, logger)
+  Debug::to_repr(self.lt).output(logger)
   logger.write_string(", lte: ")
-  Show::output(self.lte, logger)
+  Debug::to_repr(self.lte).output(logger)
   logger.write_string(" }")
 }
 

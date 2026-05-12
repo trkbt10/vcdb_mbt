@@ -13,6 +13,12 @@ import {
   "trkbt10/vcdb/core/distributed",
 }
 
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
+
+warnings = "-unused_package"
+
 options(
   targets: {
     "dump.mbt": [ "native" ],

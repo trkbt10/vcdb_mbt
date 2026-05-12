@@ -2,3 +2,7 @@ import {
   "trkbt10/vcdb/gateway",
   "trkbt10/vcdb/core/storage",
 }
+
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
