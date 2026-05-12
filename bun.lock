@@ -113,17 +113,7 @@
         "vcdb": "workspace:*",
       },
     },
-    "packages/webview-bridge": {
-      "name": "@vcdb/webview-bridge",
-      "version": "0.0.1",
-      "dependencies": {
-        "@vcdb/data-source": "workspace:*",
-      },
-      "devDependencies": {
-        "typescript": "^5.9.3",
-      },
-    },
-    "web-dashboard": {
+    "packages/web-dashboard": {
       "name": "@vcdb/web-dashboard",
       "version": "0.0.1",
       "dependencies": {
@@ -144,6 +134,16 @@
         "tsx": "^4.20.6",
         "typescript": "^5.9.3",
         "vite": "^7.3.0",
+      },
+    },
+    "packages/webview-bridge": {
+      "name": "@vcdb/webview-bridge",
+      "version": "0.0.1",
+      "dependencies": {
+        "@vcdb/data-source": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
       },
     },
   },
@@ -334,7 +334,7 @@
 
     "@vcdb/vcdb-features": ["@vcdb/vcdb-features@workspace:packages/vcdb-features"],
 
-    "@vcdb/web-dashboard": ["@vcdb/web-dashboard@workspace:web-dashboard"],
+    "@vcdb/web-dashboard": ["@vcdb/web-dashboard@workspace:packages/web-dashboard"],
 
     "@vcdb/webview-bridge": ["@vcdb/webview-bridge@workspace:packages/webview-bridge"],
 

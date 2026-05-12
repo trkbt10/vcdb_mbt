@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@vcdb/api-client": ["../api-client/src/index.ts"],
+      "@vcdb/data-source": ["../data-source/src/index.ts"],
+      "@vcdb/db-viewer": ["../db-viewer/src/index.ts"],
+      "@vcdb/ui-kit": ["../ui-kit/src/index.ts"],
+      "@vcdb/ui-kit/theme": ["../ui-kit/src/theme/index.ts"],
+      "@vcdb/ui-kit/toast": ["../ui-kit/src/toast/index.ts"],
+      "@vcdb/vcdb-features": ["../vcdb-features/src/index.ts"],
+      "@vcdb/vcdb-features/*": ["../vcdb-features/src/*"]
+    },
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "src/test/**/*"]
+}

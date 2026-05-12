@@ -4,8 +4,7 @@
   "type": "module",
   "packageManager": "bun@1.3.13",
   "workspaces": [
-    "packages/*",
-    "web-dashboard"
+    "packages/*"
   ],
   "scripts": {
     "typecheck": "bun run --filter '*' typecheck",
