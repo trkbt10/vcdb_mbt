@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Input, Button, Select } from "@/components/ui";
+import { Modal, Input, Button, Select } from "@vcdb/ui-kit";
 import styles from "./CreateDatabaseModal.module.css";
 
 type CreateDatabaseData = {

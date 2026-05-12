@@ -1,4 +1,4 @@
-import { Button, FormField, Input, Select } from "@/components/ui";
+import { Button, FormField, Input, Select } from "@vcdb/ui-kit";
 import type { FieldDef } from "vcdb/types";
 import { TYPE_OPTIONS, OP_OPTIONS } from "@/constants";
 import styles from "./FieldDefsEditor.module.css";

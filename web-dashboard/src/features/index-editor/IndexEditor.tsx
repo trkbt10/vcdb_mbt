@@ -7,7 +7,7 @@ import {
   Section,
   OptionGrid,
   Toggle,
-} from "@/components/ui";
+} from "@vcdb/ui-kit";
 import type {
   IndexConfig,
   VectorIndexConfig,

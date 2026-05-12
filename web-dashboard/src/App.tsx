@@ -1,6 +1,6 @@
-import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ThemeProvider } from "@vcdb/ui-kit/theme";
 import { DatabaseProvider } from "@/contexts/DatabaseContext";
-import { ToastProvider } from "@/contexts/ToastContext";
+import { ToastProvider } from "@vcdb/ui-kit/toast";
 import { RegistryProvider } from "@/features/registry/hooks/useRegistry";
 import { Shell } from "@/components/layout/Shell";
 

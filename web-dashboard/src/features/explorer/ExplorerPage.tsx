@@ -6,11 +6,12 @@ import {
   type LayerDefinition,
 } from "react-panel-layout";
 import { useDatabase } from "@/contexts/DatabaseContext";
-import { useToast } from "@/contexts/ToastContext";
+import { useToast } from "@vcdb/ui-kit/toast";
 import { useKeyboard, SHORTCUTS } from "@/hooks";
-import { Spinner, TabBar, Button, type TabItem } from "@/components/ui";
+import { Spinner, TabBar, Button, type TabItem } from "@vcdb/ui-kit";
+import { DataTable, type ScoredRecord } from "@vcdb/db-viewer";
+import { VECTOR_FIELD } from "@vcdb/data-source";
 import {
-  DataTable,
   QueryBar,
   type QueryBarRef,
   type SearchQuery,
@@ -31,6 +32,14 @@ type DataRow = {
   attrs: Record<string, unknown> | null;
   vector?: number[];
 };
+
+function toScoredRecord(row: DataRow): ScoredRecord {
+  const fields = { ...(row.attrs ?? {}) } as ScoredRecord["fields"];
+  if (row.vector) {
+    fields[VECTOR_FIELD] = row.vector;
+  }
+  return { id: row.id, score: row.score, fields };
+}
 
 const TABS: TabItem[] = [
   { id: "data", label: "Data" },
@@ -178,9 +187,12 @@ export function ExplorerPage() {
       />
       <div className={styles.tableContainer}>
         <DataTable
-          data={rows}
+          records={rows.map(toScoredRecord)}
           selectedId={selectedRow?.id}
-          onSelect={setSelectedRow}
+          onSelect={(record) => {
+            const found = rows.find((r) => r.id === record.id);
+            setSelectedRow(found ?? null);
+          }}
           loading={searchState.loading || dataLoading}
         />
       </div>

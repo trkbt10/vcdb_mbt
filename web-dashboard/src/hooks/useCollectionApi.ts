@@ -1,14 +1,14 @@
 import { useState, useCallback, useEffect } from "react";
-import { createGatewayClient } from "@/api/gateway";
-import type {
-  Attrs,
-  BulkResult,
-  CollectionStats,
-  ListVectorsResult,
-  PointRecord,
-  SearchHit,
-  VectorRowInput,
-} from "@/api/types";
+import {
+  createGatewayClient,
+  type Attrs,
+  type BulkResult,
+  type CollectionStats,
+  type ListVectorsResult,
+  type PointRecord,
+  type SearchHit,
+  type VectorRowInput,
+} from "@vcdb/api-client";
 
 const gatewayClient = createGatewayClient();
 

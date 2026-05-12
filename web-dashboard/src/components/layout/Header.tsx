@@ -1,5 +1,5 @@
-import { useTheme } from "@/contexts/ThemeContext";
-import { Logo, Sun, Moon } from "@/components/ui";
+import { useTheme } from "@vcdb/ui-kit/theme";
+import { Logo, Sun, Moon } from "@vcdb/ui-kit";
 import type { DatabaseInfo } from "@/features/registry/components";
 import styles from "./Header.module.css";
 

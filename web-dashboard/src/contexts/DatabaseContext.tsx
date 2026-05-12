@@ -14,7 +14,7 @@ import type {
   PointRecord,
   SearchHit,
   VectorRowInput,
-} from "@/api/types";
+} from "@vcdb/api-client";
 
 type DatabaseContextValue = {
   databaseName: string | null;

@@ -1,4 +1,4 @@
-import { Input, Button } from "@/components/ui";
+import { Input, Button } from "@vcdb/ui-kit";
 import type { WizardData } from "../types";
 import { WizardStepLayout } from "./WizardStepLayout";
 import styles from "./StorageForm.module.css";

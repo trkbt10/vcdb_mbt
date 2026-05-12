@@ -1,4 +1,4 @@
-import { FormField, Input, Section } from "@/components/ui";
+import { FormField, Input, Section } from "@vcdb/ui-kit";
 import styles from "./StorageEditor.module.css";
 
 export type StorageConfig = {

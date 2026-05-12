@@ -1,4 +1,4 @@
-import { FormField, Input, Section, Toggle } from "@/components/ui";
+import { FormField, Input, Section, Toggle } from "@vcdb/ui-kit";
 import styles from "./CrushEditor.module.css";
 
 export type CrushConfig = {

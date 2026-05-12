@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Modal, Input, Button, Select } from "@/components/ui";
+import { Modal, Input, Button, Select } from "@vcdb/ui-kit";
 import type {
   EmbeddingStrategy,
   DatabaseEmbeddingConfig,

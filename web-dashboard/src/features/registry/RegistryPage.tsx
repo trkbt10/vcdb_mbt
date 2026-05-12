@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router";
 import { useDatabase } from "@/contexts/DatabaseContext";
-import { useToast } from "@/contexts/ToastContext";
+import { useToast } from "@vcdb/ui-kit/toast";
 import { ConnectionManager, type DatabaseInfo } from "./components";
 
 export function RegistryPage() {

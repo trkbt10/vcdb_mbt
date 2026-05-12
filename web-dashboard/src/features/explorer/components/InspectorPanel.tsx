@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Button, Input, VectorInput, FormField } from "@/components/ui";
+import { Button, Input, VectorInput, FormField } from "@vcdb/ui-kit";
 import { useDatabase } from "@/contexts/DatabaseContext";
-import { useToast } from "@/contexts/ToastContext";
+import { useToast } from "@vcdb/ui-kit/toast";
 import { useAsyncFn } from "react-use";
 import styles from "./InspectorPanel.module.css";
 

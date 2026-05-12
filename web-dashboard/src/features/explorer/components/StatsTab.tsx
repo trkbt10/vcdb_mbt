@@ -1,6 +1,6 @@
 import { useDatabase } from "@/contexts/DatabaseContext";
-import { Button } from "@/components/ui";
-import { useToast } from "@/contexts/ToastContext";
+import { Button } from "@vcdb/ui-kit";
+import { useToast } from "@vcdb/ui-kit/toast";
 import styles from "./StatsTab.module.css";
 
 export function StatsTab() {

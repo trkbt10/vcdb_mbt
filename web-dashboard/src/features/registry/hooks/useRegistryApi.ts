@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { createGatewayClient } from "@/api/gateway";
+import { createGatewayClient } from "@vcdb/api-client";
 import type { DatabaseInfo } from "../types";
 
 const gatewayClient = createGatewayClient();

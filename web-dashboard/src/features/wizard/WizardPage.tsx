@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useToast } from "@/contexts/ToastContext";
+import { useToast } from "@vcdb/ui-kit/toast";
 import { useRegistry } from "@/features/registry/hooks/useRegistry";
 import { useWizard } from "./hooks/useWizard";
 import {

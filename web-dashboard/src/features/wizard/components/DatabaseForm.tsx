@@ -1,4 +1,4 @@
-import { Input, Button, FormField, RadioGroup } from "@/components/ui";
+import { Input, Button, FormField, RadioGroup } from "@vcdb/ui-kit";
 import type { Metric } from "vcdb/types/public";
 import type { WizardData } from "../types";
 import { WizardStepLayout } from "./WizardStepLayout";

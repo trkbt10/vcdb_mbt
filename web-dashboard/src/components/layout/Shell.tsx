@@ -6,9 +6,8 @@ import {
 } from "react-panel-layout";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
-import { ToastContainer } from "./ToastContainer";
 import { useDatabase } from "@/contexts/DatabaseContext";
-import { useToast } from "@/contexts/ToastContext";
+import { ToastContainer, useToast } from "@vcdb/ui-kit/toast";
 import type { DatabaseInfo } from "@/features/registry/components";
 import { ExplorerPage } from "@/features/explorer";
 import styles from "./Shell.module.css";

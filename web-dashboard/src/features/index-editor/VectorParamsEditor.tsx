@@ -1,4 +1,4 @@
-import { FormField, Input, Select } from "@/components/ui";
+import { FormField, Input, Select } from "@vcdb/ui-kit";
 import type { VectorIndexConfig } from "vcdb/meta/index-types";
 import { HNSW_CONSTRAINTS, IVF_CONSTRAINTS } from "vcdb/types/public";
 import { METRIC_OPTIONS } from "@/constants";

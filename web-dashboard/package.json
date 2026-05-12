@@ -12,6 +12,10 @@
     "test:e2e": "bash e2e-test.sh"
   },
   "dependencies": {
+    "@vcdb/api-client": "workspace:*",
+    "@vcdb/data-source": "workspace:*",
+    "@vcdb/db-viewer": "workspace:*",
+    "@vcdb/ui-kit": "workspace:*",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-panel-layout": "^0.6.0",

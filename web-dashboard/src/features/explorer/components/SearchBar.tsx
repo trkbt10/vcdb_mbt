@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useImperativeHandle, forwardRef } from "react";
-import { Input, Button } from "@/components/ui";
+import { Input, Button } from "@vcdb/ui-kit";
 import styles from "./SearchBar.module.css";
 
 type SearchMode = "vector" | "filter";

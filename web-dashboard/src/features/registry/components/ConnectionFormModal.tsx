@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Modal, Input, Button } from "@/components/ui";
+import { Modal, Input, Button } from "@vcdb/ui-kit";
 import type { DatabaseInfo } from "../types";
 import { DEFAULT_HOST, DEFAULT_PORT } from "../../../constants";
 import styles from "./ConnectionFormModal.module.css";

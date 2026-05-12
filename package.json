@@ -1,0 +1,15 @@
+{
+  "name": "vcdb-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.13",
+  "workspaces": [
+    "packages/*",
+    "web-dashboard"
+  ],
+  "scripts": {
+    "typecheck": "bun run --filter '*' typecheck",
+    "build": "bun run --filter '*' build",
+    "test": "bun run --filter '*' test"
+  }
+}

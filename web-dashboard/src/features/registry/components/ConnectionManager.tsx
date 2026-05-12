@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRegistry } from "../hooks/useRegistry";
 import { ConnectionItem } from "./ConnectionItem";
 import { CreateDatabaseModal } from "./CreateDatabaseModal";
-import { Plus, Refresh, ConfirmDialog, Spinner } from "@/components/ui";
+import { Plus, Refresh, ConfirmDialog, Spinner } from "@vcdb/ui-kit";
 import type { DatabaseInfo } from "../types";
 import styles from "./ConnectionManager.module.css";
 

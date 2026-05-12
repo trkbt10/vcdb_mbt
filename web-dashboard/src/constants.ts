@@ -8,7 +8,7 @@ export const DEFAULT_HOST = "localhost";
 /**
  * Index strategy options (Single Source of Truth)
  */
-import type { OptionGridItem } from "@/components/ui";
+import type { OptionGridItem } from "@vcdb/ui-kit";
 
 export type VectorStrategyKind = "hnsw" | "ivf" | "bruteforce";
 export type AttributeStrategyKind = "bptree" | "lsm" | "bitmap" | "basic";

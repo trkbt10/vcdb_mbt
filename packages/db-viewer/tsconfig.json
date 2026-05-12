@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["react", "react-dom"],
+    "paths": {
+      "@vcdb/data-source": ["../data-source/src/index.ts"],
+      "@vcdb/ui-kit": ["../ui-kit/src/index.ts"],
+      "@vcdb/ui-kit/*": ["../ui-kit/src/*"]
+    }
+  },
+  "include": ["src"]
+}

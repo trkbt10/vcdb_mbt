@@ -1,6 +1,6 @@
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme } from "@vcdb/ui-kit/theme";
 import { useDatabase } from "@/contexts/DatabaseContext";
-import { Button, PageHeader, ArrowLeft } from "@/components/ui";
+import { Button, PageHeader, ArrowLeft } from "@vcdb/ui-kit";
 import styles from "./SettingsPage.module.css";
 
 type SettingsPageProps = {

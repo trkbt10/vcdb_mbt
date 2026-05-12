@@ -1,4 +1,4 @@
-import { FormField, Select } from "@/components/ui";
+import { FormField, Select } from "@vcdb/ui-kit";
 import type { AttributeIndexConfig } from "vcdb/meta/index-types";
 import type { FieldDef, CompositeOrder } from "vcdb/types";
 import { ORDER_OPTIONS } from "@/constants";

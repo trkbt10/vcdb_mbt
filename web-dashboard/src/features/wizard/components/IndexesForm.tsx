@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Button } from "@/components/ui";
+import { Button } from "@vcdb/ui-kit";
 import type { IndexConfig } from "vcdb/meta/index-types";
 import type { WizardData, IndexEntry } from "../types";
 import { IndexEditor } from "./IndexEditor";

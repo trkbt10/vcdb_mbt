@@ -1,4 +1,4 @@
-import { Database, StatusBadge, Trash, Settings } from "@/components/ui";
+import { Database, StatusBadge, Trash, Settings } from "@vcdb/ui-kit";
 import type { DatabaseInfo } from "../types";
 import styles from "./ConnectionItem.module.css";
 

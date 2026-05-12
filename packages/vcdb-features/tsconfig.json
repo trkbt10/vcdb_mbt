@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["react", "react-dom"],
+    "paths": {
+      "@vcdb/api-client": ["../api-client/src/index.ts"],
+      "@vcdb/data-source": ["../data-source/src/index.ts"],
+      "@vcdb/ui-kit": ["../ui-kit/src/index.ts"],
+      "@vcdb/ui-kit/*": ["../ui-kit/src/*"],
+      "vcdb/*": ["../sdk/src/*"]
+    }
+  },
+  "include": ["src"]
+}

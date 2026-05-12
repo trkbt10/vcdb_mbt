@@ -12,3 +12,8 @@ web-dashboard/node_modules/
 web-dashboard/dist/
 web-dashboard/playwright-report/
 web-dashboard/test-results/
+
+# Workspace
+node_modules/
+packages/*/node_modules/
+packages/*/dist/

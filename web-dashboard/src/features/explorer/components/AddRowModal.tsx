@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Modal, Button, Input, VectorInput } from "@/components/ui";
+import { Modal, Button, Input, VectorInput } from "@vcdb/ui-kit";
 import { useDatabase } from "@/contexts/DatabaseContext";
-import { useToast } from "@/contexts/ToastContext";
+import { useToast } from "@vcdb/ui-kit/toast";
 import { useAsyncFn } from "react-use";
 import styles from "./AddRowModal.module.css";
 

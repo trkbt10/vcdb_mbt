@@ -1,0 +1,36 @@
+{
+  "name": "@vcdb/vcdb-features",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./wizard": "./src/wizard/index.ts",
+    "./index-editor": "./src/index-editor/index.ts",
+    "./storage-editor": "./src/storage-editor/index.ts",
+    "./registry": "./src/registry/index.ts",
+    "./server-config": "./src/server-config/index.ts",
+    "./settings": "./src/settings/index.ts"
+  },
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@vcdb/api-client": "workspace:*",
+    "@vcdb/data-source": "workspace:*",
+    "@vcdb/ui-kit": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "vcdb": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}

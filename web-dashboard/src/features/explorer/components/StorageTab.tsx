@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAsync } from "react-use";
-import { Button, Spinner, Section } from "@/components/ui";
+import { Button, Spinner, Section } from "@vcdb/ui-kit";
 import { useDatabase } from "@/contexts/DatabaseContext";
-import { useToast } from "@/contexts/ToastContext";
+import { useToast } from "@vcdb/ui-kit/toast";
 import {
   StorageEditor,
   CrushEditor,

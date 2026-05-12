@@ -17,7 +17,13 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@vcdb/api-client": ["../packages/api-client/src/index.ts"],
+      "@vcdb/data-source": ["../packages/data-source/src/index.ts"],
+      "@vcdb/db-viewer": ["../packages/db-viewer/src/index.ts"],
+      "@vcdb/ui-kit": ["../packages/ui-kit/src/index.ts"],
+      "@vcdb/ui-kit/theme": ["../packages/ui-kit/src/theme/index.ts"],
+      "@vcdb/ui-kit/toast": ["../packages/ui-kit/src/toast/index.ts"]
     },
     "types": ["vite/client"]
   },
@@ -30,13 +36,8 @@
     "src/hooks/index.ts",
     "src/hooks/useKeyboard.ts",
     "src/hooks/useCollectionApi.ts",
-    "src/api/types.ts",
-    "src/api/gateway.ts",
     "src/contexts/DatabaseContext.tsx",
-    "src/contexts/ThemeContext.tsx",
-    "src/contexts/ToastContext.tsx",
     "src/components/layout/**/*",
-    "src/components/ui/**/*",
     "src/features/registry/hooks/useRegistry.tsx",
     "src/features/registry/hooks/useRegistryApi.ts",
     "src/features/registry/types.ts",

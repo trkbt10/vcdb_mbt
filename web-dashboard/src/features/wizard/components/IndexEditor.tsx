@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Button, FormField, Input, Select, OptionGrid } from "@/components/ui";
+import { Button, FormField, Input, Select, OptionGrid } from "@vcdb/ui-kit";
 import type {
   IndexConfig,
   VectorIndexConfig,

@@ -1,50 +1,53 @@
 import React, { useMemo, useState, useCallback } from "react";
+import {
+  VECTOR_FIELD,
+  type DataRecord,
+  type FieldValue,
+  type RecordId,
+  type ScoredRecord,
+} from "@vcdb/data-source";
 import styles from "./DataTable.module.css";
 
-type Column = {
+export type Column = {
   key: string;
   label: string;
   width?: number;
-  render?: (value: unknown, row: DataRow) => React.ReactNode;
+  render?: (value: FieldValue | undefined, record: ScoredRecord) => React.ReactNode;
 };
 
-type DataRow = {
-  id: number;
-  score?: number;
-  attrs: Record<string, unknown> | null;
-  vector?: number[];
-};
-
-type DataTableProps = {
-  data: DataRow[];
+export type DataTableProps = {
+  records: ScoredRecord[];
   columns?: Column[];
-  selectedId?: number | null;
-  onSelect?: (row: DataRow) => void;
-  onDoubleClick?: (row: DataRow) => void;
+  selectedId?: RecordId | null;
+  onSelect?: (record: ScoredRecord) => void;
+  onDoubleClick?: (record: ScoredRecord) => void;
   pageSize?: number;
   loading?: boolean;
 };
 
-function renderCellValue(col: Column, value: unknown, row: DataRow): React.ReactNode {
+const ID_KEY = "__id";
+const SCORE_KEY = "__score";
+
+function renderCellValue(col: Column, value: FieldValue | undefined, record: ScoredRecord): React.ReactNode {
   if (col.render) {
-    return col.render(value, row);
+    return col.render(value, record);
   }
   return formatValue(value);
 }
 
 type TableBodyContentProps = {
   loading: boolean;
-  pagedData: DataRow[];
+  pagedRecords: ScoredRecord[];
   columns: Column[];
-  selectedId?: number | null;
-  onSelect?: (row: DataRow) => void;
-  onDoubleClick?: (row: DataRow) => void;
-  getValue: (row: DataRow, key: string) => unknown;
+  selectedId?: RecordId | null;
+  onSelect?: (record: ScoredRecord) => void;
+  onDoubleClick?: (record: ScoredRecord) => void;
+  getValue: (record: ScoredRecord, key: string) => FieldValue | undefined;
 };
 
 function TableBodyContent({
   loading,
-  pagedData,
+  pagedRecords,
   columns,
   selectedId,
   onSelect,
@@ -60,7 +63,7 @@ function TableBodyContent({
       </tr>
     );
   }
-  if (pagedData.length === 0) {
+  if (pagedRecords.length === 0) {
     return (
       <tr>
         <td colSpan={columns.length} className={styles.empty}>
@@ -69,37 +72,38 @@ function TableBodyContent({
       </tr>
     );
   }
-  return pagedData.map((row, i) => (
+  return pagedRecords.map((record, i) => (
     <tr
-      key={row.id}
+      key={String(record.id)}
       className={styles.tr}
-      data-row-id={row.id}
+      data-row-id={String(record.id)}
       data-odd={i % 2 === 1}
-      data-selected={selectedId === row.id}
-      onClick={() => onSelect?.(row)}
-      onDoubleClick={() => onDoubleClick?.(row)}
+      data-selected={selectedId === record.id}
+      onClick={() => onSelect?.(record)}
+      onDoubleClick={() => onDoubleClick?.(record)}
     >
       {columns.map((col) => (
         <td key={col.key} className={styles.td}>
-          {renderCellValue(col, getValue(row, col.key), row)}
+          {renderCellValue(col, getValue(record, col.key), record)}
         </td>
       ))}
     </tr>
   ));
 }
 
-function truncateVector(vector: number[] | undefined): string {
-  if (!vector || vector.length === 0) {
+function truncateVector(vector: FieldValue | undefined): string {
+  if (!Array.isArray(vector) || vector.length === 0 || !vector.every((v) => typeof v === "number")) {
     return "[]";
   }
-  const preview = vector.slice(0, 4).map((v) => v.toFixed(3));
-  if (vector.length > 4) {
+  const nums = vector as number[];
+  const preview = nums.slice(0, 4).map((v) => v.toFixed(3));
+  if (nums.length > 4) {
     return `[${preview.join(", ")}, ...]`;
   }
   return `[${preview.join(", ")}]`;
 }
 
-function formatValue(value: unknown): string {
+function formatValue(value: FieldValue | undefined): string {
   if (value === null || value === undefined) {
     return "-";
   }
@@ -109,8 +113,16 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
+function compareValues(a: FieldValue | undefined, b: FieldValue | undefined): number {
+  if (a === b) return 0;
+  if (a === null || a === undefined) return 1;
+  if (b === null || b === undefined) return -1;
+  if (typeof a === "number" && typeof b === "number") return a < b ? -1 : 1;
+  return String(a) < String(b) ? -1 : 1;
+}
+
 export function DataTable({
-  data,
+  records,
   columns: propColumns,
   selectedId,
   onSelect,
@@ -122,90 +134,70 @@ export function DataTable({
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  // Auto-detect columns from first row's attrs
+  const hasScores = useMemo(() => records.some((r) => r.score !== undefined), [records]);
+  const hasVector = useMemo(
+    () => records.some((r) => Array.isArray(r.fields[VECTOR_FIELD])),
+    [records],
+  );
+
   const columns = useMemo<Column[]>(() => {
     if (propColumns) {
       return propColumns;
     }
 
-    const baseColumns: Column[] = [
-      { key: "id", label: "ID", width: 80 },
-      { key: "score", label: "Score", width: 100 },
-    ];
+    const baseColumns: Column[] = [{ key: ID_KEY, label: "ID", width: 80 }];
+    if (hasScores) {
+      baseColumns.push({ key: SCORE_KEY, label: "Score", width: 100 });
+    }
 
-    // Collect all unique attr keys from data
-    const attrKeys = new Set<string>();
-    for (const row of data) {
-      if (row.attrs) {
-        for (const key of Object.keys(row.attrs)) {
-          attrKeys.add(key);
+    const fieldKeys = new Set<string>();
+    for (const record of records) {
+      for (const key of Object.keys(record.fields)) {
+        if (key !== VECTOR_FIELD) {
+          fieldKeys.add(key);
         }
       }
     }
 
-    const attrColumns: Column[] = Array.from(attrKeys).map((key) => ({
-      key: `attrs.${key}`,
-      label: key,
-    }));
-
-    baseColumns.push(...attrColumns);
-    baseColumns.push({
-      key: "vector",
-      label: "Vector",
-      render: (_, row) => (
-        <span className={styles.vectorPreview}>
-          {truncateVector(row.vector)}
-        </span>
-      ),
-    });
-
-    return baseColumns;
-  }, [propColumns, data]);
-
-  // Sort data
-  const sortedData = useMemo(() => {
-    if (!sortKey) {
-      return data;
+    for (const key of fieldKeys) {
+      baseColumns.push({ key, label: key });
     }
 
-    return [...data].sort((a, b) => {
-      let aVal: unknown;
-      let bVal: unknown;
+    if (hasVector) {
+      baseColumns.push({
+        key: VECTOR_FIELD,
+        label: "Vector",
+        render: (value) => (
+          <span className={styles.vectorPreview}>{truncateVector(value)}</span>
+        ),
+      });
+    }
 
-      if (sortKey.startsWith("attrs.")) {
-        const attrKey = sortKey.slice(6);
-        aVal = a.attrs?.[attrKey];
-        bVal = b.attrs?.[attrKey];
-      } else if (sortKey === "id") {
-        aVal = a.id;
-        bVal = b.id;
-      } else if (sortKey === "score") {
-        aVal = a.score;
-        bVal = b.score;
-      }
+    return baseColumns;
+  }, [propColumns, records, hasScores, hasVector]);
 
-      if (aVal === bVal) {
-        return 0;
-      }
-      if (aVal === null || aVal === undefined) {
-        return 1;
-      }
-      if (bVal === null || bVal === undefined) {
-        return -1;
-      }
+  const getValue = useCallback((record: ScoredRecord, key: string): FieldValue | undefined => {
+    if (key === ID_KEY) return record.id;
+    if (key === SCORE_KEY) return record.score ?? null;
+    return record.fields[key];
+  }, []);
 
-      const cmp = aVal < bVal ? -1 : 1;
+  const sortedRecords = useMemo(() => {
+    if (!sortKey) {
+      return records;
+    }
+    return [...records].sort((a, b) => {
+      const cmp = compareValues(getValue(a, sortKey), getValue(b, sortKey));
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [data, sortKey, sortDir]);
+  }, [records, sortKey, sortDir, getValue]);
 
-  // Paginate
-  const pagedData = useMemo(() => {
+  const pagedRecords = useMemo(() => {
     const start = page * pageSize;
-    return sortedData.slice(start, start + pageSize);
-  }, [sortedData, page, pageSize]);
+    return sortedRecords.slice(start, start + pageSize);
+  }, [sortedRecords, page, pageSize]);
 
-  const totalPages = Math.ceil(data.length / pageSize);
+  const totalPages = Math.ceil(records.length / pageSize);
 
   const handleSort = useCallback(
     (key: string) => {
@@ -218,23 +210,6 @@ export function DataTable({
     },
     [sortKey],
   );
-
-  const getValue = (row: DataRow, key: string): unknown => {
-    if (key.startsWith("attrs.")) {
-      const attrKey = key.slice(6);
-      return row.attrs?.[attrKey];
-    }
-    if (key === "id") {
-      return row.id;
-    }
-    if (key === "score") {
-      return row.score;
-    }
-    if (key === "vector") {
-      return row.vector;
-    }
-    return undefined;
-  };
 
   return (
     <div className={styles.container}>
@@ -264,7 +239,7 @@ export function DataTable({
           <tbody>
             <TableBodyContent
               loading={loading}
-              pagedData={pagedData}
+              pagedRecords={pagedRecords}
               columns={columns}
               selectedId={selectedId}
               onSelect={onSelect}
@@ -292,7 +267,7 @@ export function DataTable({
             ‹
           </button>
           <span className={styles.pageInfo}>
-            Page {page + 1} of {totalPages} ({data.length} rows)
+            Page {page + 1} of {totalPages} ({records.length} rows)
           </span>
           <button
             className={styles.pageBtn}
@@ -313,3 +288,5 @@ export function DataTable({
     </div>
   );
 }
+
+export type { DataRecord };

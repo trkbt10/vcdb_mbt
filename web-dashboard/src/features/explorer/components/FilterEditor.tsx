@@ -1,4 +1,4 @@
-import { Input, Select } from "@/components/ui";
+import { Input, Select } from "@vcdb/ui-kit";
 import styles from "./FilterEditor.module.css";
 
 export type FilterCondition = {

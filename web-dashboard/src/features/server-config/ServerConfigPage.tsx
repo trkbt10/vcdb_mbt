@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useServerConfig } from "./hooks/useServerConfig";
-import { Button, PageHeader, ArrowLeft, Input } from "@/components/ui";
-import { useToast } from "@/contexts/ToastContext";
+import { Button, PageHeader, ArrowLeft, Input } from "@vcdb/ui-kit";
+import { useToast } from "@vcdb/ui-kit/toast";
 import styles from "./ServerConfigPage.module.css";
 
 type ServerConfigPageProps = {
