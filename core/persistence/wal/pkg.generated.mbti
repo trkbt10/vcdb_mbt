@@ -35,6 +35,8 @@ pub fn verify_wal_header(@binary.BinaryReader) -> Bool
 
 pub let wal_footer_magic : UInt
 
+pub fn wal_records_for_replay(Bytes, cutoff_ts? : Int64) -> Array[WalRecord]
+
 pub let wal_version : Byte
 
 // Errors

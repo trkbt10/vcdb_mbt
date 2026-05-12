@@ -32,7 +32,9 @@ pub fn BitmapAttrIndex::set_attrs(
   // Add new attrs to indexes
   for_each_attr(attrs, fn(key, value) {
     add_to_eq_index(self.eq_map, key, value, id)
-    add_to_exists_index(self.exists_map, key, id)
+    if attr_value_counts_as_exists(value) {
+      add_to_exists_index(self.exists_map, key, id)
+    }
   })
   // Store attrs (defensive copy to prevent external mutation)
   self.data.set(id, attrs.copy())

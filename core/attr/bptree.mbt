@@ -753,9 +753,11 @@ pub fn BPTreeAttrIndex::set_attrs(
     let field_tree = get_or_create_field_tree(self, key)
     bptree_insert(field_tree, encode_attr_value(value), id)
     // Add to exists tree
-    let exists_tree = get_or_create_exists_tree(self, key)
-    let exists_key = make_exists_key()
-    bptree_insert(exists_tree, exists_key, id)
+    if attr_value_counts_as_exists(value) {
+      let exists_tree = get_or_create_exists_tree(self, key)
+      let exists_key = make_exists_key()
+      bptree_insert(exists_tree, exists_key, id)
+    }
   })
   // Store attrs (defensive copy to prevent external mutation)
   self.data.set(id, attrs.copy())

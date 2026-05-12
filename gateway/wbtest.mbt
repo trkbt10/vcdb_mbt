@@ -51,6 +51,21 @@ test "json/parse_object" {
 }
 
 ///|
+test "json/int64_id_string_and_safe_number" {
+  match parse_json("{\"id\":\"9007199254740993\",\"small\":42}") {
+    Some(obj) => {
+      assert_eq(get_int64_id(obj, "id"), Some(9007199254740993L))
+      assert_eq(get_int64_id(obj, "small"), Some(42L))
+    }
+    None => assert_true(false)
+  }
+  match parse_json("{\"id\":9007199254740992}") {
+    Some(obj) => assert_eq(get_int64_id(obj, "id"), None)
+    None => assert_true(false)
+  }
+}
+
+///|
 test "json/parse_nested" {
   let result = parse_json("{\"items\": [1, 2, 3], \"meta\": {\"count\": 3}}")
   match result {
@@ -497,6 +512,96 @@ test "request/scroll_points" {
           _ => assert_true(false)
         }
       }
+      _ => assert_true(false)
+    }
+  })
+}
+
+///|
+test "request/large_int64_id_string_roundtrip" {
+  run_async_test(async fn() {
+    let manager : CollectionManager[@storage.MemoryStorage] = CollectionManager::with_storage(
+      @storage.MemoryStorage::new(),
+    )
+    let create = execute_path_request(
+      manager, "POST", "/collections/demo", "{\"dim\":2,\"strategy\":\"Bruteforce\"}",
+    )
+    assert_eq(create.status, "ok")
+
+    let large_id = "9007199254740993"
+    let upsert = execute_path_request(
+      manager,
+      "PUT",
+      "/collections/demo/points",
+      "{\"points\":[{\"id\":\"" +
+      large_id +
+      "\",\"vector\":[1,0],\"payload\":{}}]}",
+    )
+    assert_eq(upsert.status, "ok")
+
+    let get_resp = execute_path_request(
+      manager,
+      "GET",
+      "/collections/demo/points/" + large_id,
+      "",
+    )
+    assert_eq(get_resp.status, "ok")
+    match get_resp.result {
+      Some(Object(point)) =>
+        match point.get("id") {
+          Some(String(id)) => assert_eq(id, large_id)
+          _ => assert_true(false)
+        }
+      _ => assert_true(false)
+    }
+
+    let search = execute_path_request(
+      manager, "POST", "/collections/demo/points/search", "{\"vector\":[1,0],\"limit\":1}",
+    )
+    assert_eq(search.status, "ok")
+    match search.result {
+      Some(Object(search_obj)) =>
+        match search_obj.get("result") {
+          Some(Array(hits)) =>
+            match hits[0] {
+              Object(hit) =>
+                match hit.get("id") {
+                  Some(String(id)) => assert_eq(id, large_id)
+                  _ => assert_true(false)
+                }
+              _ => assert_true(false)
+            }
+          _ => assert_true(false)
+        }
+      _ => assert_true(false)
+    }
+
+    let scroll = execute_path_request(
+      manager, "POST", "/collections/demo/points/scroll", "{\"limit\":1}",
+    )
+    assert_eq(scroll.status, "ok")
+    match scroll.result {
+      Some(Object(scroll_obj)) =>
+        match scroll_obj.get("next_page_offset") {
+          Some(String(offset)) => assert_eq(offset, large_id)
+          _ => assert_true(false)
+        }
+      _ => assert_true(false)
+    }
+
+    let next_scroll = execute_path_request(
+      manager,
+      "POST",
+      "/collections/demo/points/scroll",
+      "{\"offset\":\"" + large_id + "\",\"limit\":1}",
+    )
+    assert_eq(next_scroll.status, "ok")
+    match next_scroll.result {
+      Some(Object(scroll_obj)) =>
+        match scroll_obj.get("points") {
+          Some(Array(points)) => assert_eq(points.length(), 0)
+          _ => assert_true(false)
+        }
       _ => assert_true(false)
     }
   })

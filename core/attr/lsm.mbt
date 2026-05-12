@@ -187,8 +187,10 @@ pub fn LSMAttrIndex::set_attrs(
   for_each_attr(attrs, fn(key, value) {
     let mem_key = lsm_encode_memtable_key(key, value)
     memtable_add_id(self.memtable, mem_key, id)
-    let exists_key = lsm_encode_exists_key(key)
-    memtable_add_id(self.exists_memtable, exists_key, id)
+    if attr_value_counts_as_exists(value) {
+      let exists_key = lsm_encode_exists_key(key)
+      memtable_add_id(self.exists_memtable, exists_key, id)
+    }
   })
   // Store attrs (defensive copy to prevent external mutation)
   self.data.set(id, attrs.copy())

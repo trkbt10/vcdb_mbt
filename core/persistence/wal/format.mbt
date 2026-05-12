@@ -20,7 +20,7 @@
 ///   Header: same as v1 (version byte = 0x04)
 ///   Records: Type (1) + Flags (1) + Timestamp (8) + IDWireLen (4) + ID (wire bytes) + AttrsLen (4) + VectorLen (4) + Attrs + Vector
 ///   Footer: same as v1
-///   ID uses VectorId::to_wire_bytes() / from_wire_bytes() — SoT for all ID serialization.
+///   ID uses VectorId::to_wire_bytes() / from_wire_bytes().
 ///
 /// Flags byte:
 ///   bit 0 (0x01) = has_timestamp  — always set in v2/v3/v4
@@ -182,7 +182,7 @@ fn encode_wal_record_to(w : @binary.BinaryWriter, record : WalRecord) -> Unit {
   w.push_byte(flag_has_timestamp)
   // Timestamp (8 bytes, Int64 nanoseconds)
   w.push_i64(record.timestamp)
-  // ID: length-prefixed wire bytes (SoT: VectorId::to_wire_bytes)
+  // ID: length-prefixed wire bytes from VectorId::to_wire_bytes
   let id_wire = record.id.to_wire_bytes()
   w.push_u32(id_wire.length().reinterpret_as_uint())
   w.push_bytes(id_wire)
@@ -247,7 +247,7 @@ fn decode_wal_record_versioned(
   //   v1: fixed 8 bytes (no IDLen byte, no timestamp)
   //   v2: fixed 8 bytes (no IDLen byte, has timestamp)
   //   v3: IDLen(1) + payload(IDLen bytes), flag_has_128bit_id for Bytes16Id
-  //   v4: WireLen(u32=4) + wire bytes (SoT: VectorId::from_wire_bytes)
+  //   v4: WireLen(u32=4) + wire bytes consumed by VectorId::from_wire_bytes
   let id : @types.VectorId = if version == wal_version {
     // v4: length-prefixed wire bytes
     if r.remaining() < 4 {
@@ -460,7 +460,7 @@ pub fn decode_wal_records(data : Bytes) -> Array[WalRecord] {
 }
 
 ///|
-/// Merge an existing WAL with a new WAL segment (SoT for WAL merge).
+/// Merge an existing WAL with a new WAL segment.
 pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
   let w = @binary.BinaryWriter::new()
   let mut use_existing = false
@@ -515,10 +515,31 @@ pub fn merge_wal(existing : Bytes, new_segment : Bytes) -> Bytes {
 }
 
 ///|
+/// Decode replayable WAL records after validating header and checksum.
+pub fn wal_records_for_replay(
+  data : Bytes,
+  cutoff_ts? : Int64 = 0L,
+) -> Array[WalRecord] {
+  if data.length() < @codec.header_size {
+    return []
+  }
+  let header_reader = @binary.BinaryReader::new(data)
+  if !verify_wal_header(header_reader) {
+    return []
+  }
+  if !verify_wal_checksum(data) {
+    return []
+  }
+  if cutoff_ts > 0L {
+    filter_wal_by_timestamp(data, cutoff_ts)
+  } else {
+    decode_wal_records(data)
+  }
+}
 
 ///|
 /// Replay WAL binary data into a CoreStore (no Storage dependency).
-/// This is the SoT for WAL replay logic. Used by:
+/// Used by:
 /// - AsyncWalRuntime::replay_into (reads from AsyncStorage, then delegates here)
 /// - JS persistent exports (passes WAL bytes directly)
 ///
@@ -528,21 +549,7 @@ pub fn replay_wal_data(
   store : @store.CoreStore,
   cutoff_ts? : Int64 = 0L,
 ) -> Int {
-  if data.length() < @codec.header_size {
-    return 0
-  }
-  let header_reader = @binary.BinaryReader::new(data)
-  if !verify_wal_header(header_reader) {
-    return 0
-  }
-  if !verify_wal_checksum(data) {
-    return 0
-  }
-  let records = if cutoff_ts > 0L {
-    filter_wal_by_timestamp(data, cutoff_ts)
-  } else {
-    decode_wal_records(data)
-  }
+  let records = wal_records_for_replay(data, cutoff_ts~)
   let mut applied = 0
   for record in records {
     match record.record_type {

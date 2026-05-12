@@ -242,6 +242,57 @@ test "persistent/replay_preserves_metric_and_strategy" {
   })
 }
 
+///|
+test "persistent/hnsw_snapshot_wal_replay_preserves_tombstones" {
+  run_async_test(async fn() {
+    let wal_store = TestAsyncStorage::new()
+    let snap_store = TestAsyncStorage::new()
+    let db = PersistentDB::init(
+      wal_store,
+      snap_store,
+      "",
+      "hnsw-tombstone",
+      2,
+      64,
+      metric=@types.Dot,
+      strategy=@types.Strategy::default_hnsw(),
+      checkpoint_threshold=1000,
+      checkpoint_bytes=0,
+    )
+    db.upsert(
+      [
+        (make_vid(1), [1.0, 0.0], make_attrs("name", "deleted")),
+        (make_vid(2), [0.0, 1.0], make_attrs("name", "alive")),
+      ],
+      100L,
+    )
+    let _ = db.remove(make_vid(1), 200L)
+    db.checkpoint()
+    inspect(db.has(make_vid(1)), content="false")
+    db.upsert([(make_vid(3), [0.5, 0.5], make_attrs("name", "new"))], 300L)
+
+    let reloaded = PersistentDB::init(
+      wal_store,
+      snap_store,
+      "",
+      "hnsw-tombstone",
+      2,
+      64,
+      metric=@types.Dot,
+      strategy=@types.Strategy::default_hnsw(),
+      checkpoint_threshold=1000,
+      checkpoint_bytes=0,
+    )
+    inspect(reloaded.has(make_vid(1)), content="false")
+    inspect(reloaded.has(make_vid(2)), content="true")
+    inspect(reloaded.has(make_vid(3)), content="true")
+    let hits = reloaded.search([1.0, 0.0], 10, None)
+    for hit in hits {
+      assert_true(hit.id != make_vid(1))
+    }
+  })
+}
+
 // ════════════════════════════════════════════════════════════════
 // Test 3: Checkpoint ordering
 // ════════════════════════════════════════════════════════════════
@@ -739,12 +790,12 @@ test "persistent/remove_nonexistent" {
 }
 
 // ════════════════════════════════════════════════════════════════
-// Test 15: WAL SoT — replay_wal_data is the single replay path
-// Verify that init uses the same replay function as manual replay
+// Test 15: WAL replay consistency
+// Verify that init and manual replay produce equivalent store state
 // ════════════════════════════════════════════════════════════════
 
 ///|
-test "persistent/wal_sot_replay_consistency" {
+test "persistent/wal_replay_consistency" {
   run_async_test(async fn() {
     let wal_store = TestAsyncStorage::new()
     let snap_store = TestAsyncStorage::new()

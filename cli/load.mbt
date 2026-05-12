@@ -40,7 +40,8 @@ pub async fn execute_load(matches : @argparse.Matches) -> Unit {
       }
     None => @types.Strategy::default_hnsw()
   }
-  let crush = @placement.CrushMap::new(shard_count, 1, [])
+  let (targets, target_to_shard) = load_crush_targets(shard_count)
+  let crush = @placement.CrushMap::new(shard_count, 1, targets)
   let shards : Array[
     @vcdb.PersistentDB[@storage.NativeFileStorage, @storage.NativeFileStorage],
   ] = []
@@ -91,7 +92,7 @@ pub async fn execute_load(matches : @argparse.Matches) -> Unit {
         if line_bytes.length() > 0 {
           let line = @codec.decode_utf8(Bytes::from_array(line_bytes))
           line_bytes.clear()
-          if upsert_from_line(shards, crush, line, timestamp) {
+          if upsert_from_line(shards, target_to_shard, crush, line, timestamp) {
             loaded += 1
           } else {
             errors += 1
@@ -105,7 +106,7 @@ pub async fn execute_load(matches : @argparse.Matches) -> Unit {
   file.close()
   if line_bytes.length() > 0 {
     let line = @codec.decode_utf8(Bytes::from_array(line_bytes))
-    if upsert_from_line(shards, crush, line, timestamp) {
+    if upsert_from_line(shards, target_to_shard, crush, line, timestamp) {
       loaded += 1
     } else {
       errors += 1
@@ -145,10 +146,38 @@ pub async fn execute_load(matches : @argparse.Matches) -> Unit {
 }
 
 ///|
+fn load_crush_targets(
+  shard_count : Int,
+) -> (Array[@placement.CrushTarget], Map[@placement.TargetKey, Int]) {
+  let targets : Array[@placement.CrushTarget] = []
+  let target_to_shard : Map[@placement.TargetKey, Int] = {}
+  for i in 0..<shard_count {
+    let key = @placement.TargetKey::new("shard-" + i.to_string())
+    targets.push(@placement.CrushTarget::from_key(key))
+    target_to_shard.set(key, i)
+  }
+  (targets, target_to_shard)
+}
+
+///|
+fn shard_index_for_id(
+  id : @types.VectorId,
+  crush : @placement.CrushMap,
+  target_to_shard : Map[@placement.TargetKey, Int],
+) -> Int? {
+  let targets = @distributed.targets_for_id(id, crush)
+  if targets.is_empty() {
+    return None
+  }
+  target_to_shard.get(targets[0])
+}
+
+///|
 async fn upsert_from_line(
   shards : Array[
     @vcdb.PersistentDB[@storage.NativeFileStorage, @storage.NativeFileStorage],
   ],
+  target_to_shard : Map[@placement.TargetKey, Int],
   crush : @placement.CrushMap,
   line : String,
   timestamp : Int64,
@@ -157,7 +186,10 @@ async fn upsert_from_line(
     Some(p) => p
     None => return false
   }
-  let shard = @distributed.shard_for_id(point.id, crush)
+  let shard = match shard_index_for_id(point.id, crush, target_to_shard) {
+    Some(i) => i
+    None => return false
+  }
   shards[shard].upsert([(point.id, point.vector, point.attrs)], timestamp) catch {
     _ => return false
   }

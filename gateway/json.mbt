@@ -9,6 +9,49 @@ pub fn parse_json(s : String) -> Json? {
 }
 
 ///|
+let max_safe_json_int64 : Int64 = 9007199254740991L
+
+///|
+let max_safe_json_number : Double = 9007199254740991.0
+
+///|
+fn is_json_safe_int64(value : Int64) -> Bool {
+  value <= max_safe_json_int64 && value >= 0L - max_safe_json_int64
+}
+
+///|
+fn number_to_safe_int64(n : Double) -> Int64? {
+  if n > max_safe_json_number || n < 0.0 - max_safe_json_number {
+    return None
+  }
+  let value = n.to_int64()
+  if value.to_double() == n {
+    Some(value)
+  } else {
+    None
+  }
+}
+
+///|
+fn parse_int64_string(s : String) -> Int64? {
+  let result : Result[Int64, _] = try? @string.parse_int64(s)
+  match result {
+    Ok(value) => Some(value)
+    Err(_) => None
+  }
+}
+
+///|
+/// Convert an Int64 ID to JSON without losing precision for large IDs.
+fn int64_id_to_json(value : Int64) -> Json {
+  if is_json_safe_int64(value) {
+    value.to_double().to_json()
+  } else {
+    value.to_string().to_json()
+  }
+}
+
+///|
 /// Extract a vector (Array[Double]) from a JSON array
 pub fn json_to_vector(json : Json) -> Array[Double]? {
   match json {
@@ -102,6 +145,23 @@ pub fn get_int64(obj : Json, key : String) -> Int64? {
     Object(m) =>
       match m.get(key) {
         Some(Number(n, ..)) => Some(n.to_int64())
+        _ => None
+      }
+    _ => None
+  }
+}
+
+///|
+/// Get a JSON API ID field.
+///
+/// Numeric IDs are accepted only when they are exactly representable as a JSON
+/// number. Large Int64 IDs must be sent as strings.
+fn get_int64_id(obj : Json, key : String) -> Int64? {
+  match obj {
+    Object(m) =>
+      match m.get(key) {
+        Some(Number(n, ..)) => number_to_safe_int64(n)
+        Some(String(s)) => parse_int64_string(s)
         _ => None
       }
     _ => None

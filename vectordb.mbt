@@ -1,5 +1,5 @@
 ///|
-/// PersistentDB[W, S] — The single source of truth for all vector database operations.
+/// PersistentDB[W, S] coordinates vector database operations.
 ///
 /// All reads and writes go through this type. Persistence is controlled
 /// by the storage backends injected via type parameters:
@@ -65,6 +65,42 @@ fn[W, S] PersistentDB::wrap(
 }
 
 ///|
+/// Replay WAL records into an existing VectorDB engine.
+///
+/// This preserves strategy-specific state such as HNSW tombstones from a
+/// snapshot while applying post-snapshot WAL mutations.
+fn VectorDB::replay_wal_data(self : VectorDB, data : Bytes) -> Int {
+  let records = @wal.wal_records_for_replay(data)
+  let mut applied = 0
+  for record in records {
+    match record.record_type {
+      @wal.Upsert =>
+        match record.vector {
+          Some(vector) => {
+            let attrs = match record.attrs {
+              Some(a) => a
+              None => @types.empty_attrs()
+            }
+            let _ = self.upsert(record.id, vector, attrs)
+            applied = applied + 1
+          }
+          None => ()
+        }
+      @wal.Remove => if self.remove(record.id) { applied = applied + 1 }
+      @wal.SetAttrs =>
+        match record.attrs {
+          Some(attrs) =>
+            if self.update_attrs(record.id, attrs) {
+              applied = applied + 1
+            }
+          None => ()
+        }
+    }
+  }
+  applied
+}
+
+///|
 /// Initialize from storage: load WAL + snapshot, replay, build engine.
 ///
 /// Call sequence:
@@ -108,14 +144,9 @@ pub async fn[W : @storage.AsyncStorage, S : @storage.AsyncStorage] PersistentDB:
   let engine = match snapshot_data {
     Some(data) => {
       let existing = VectorDB::deserialize(data)
-      let store = existing.store
       if wal_data.length() > 0 {
-        let applied = @wal.replay_wal_data(wal_data, store)
-        if applied > 0 {
-          VectorDB::from_store(store, options)
-        } else {
-          existing
-        }
+        let _ = existing.replay_wal_data(wal_data)
+        existing
       } else {
         existing
       }

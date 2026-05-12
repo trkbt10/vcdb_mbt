@@ -920,6 +920,56 @@ test "api/search_range_prefilter" {
 }
 
 ///|
+/// Test: indexed filter paths treat Null as not existing.
+test "api/filter_null_exists_semantics" {
+  run_async_test(async fn() {
+    let db = @vcdb.PersistentDB::in_memory_bruteforce(2)
+    let attrs_null = @types.empty_attrs()
+    attrs_null.set("deleted_at", @types.Null)
+    let attrs_missing = @types.empty_attrs()
+    let attrs_value = @types.empty_attrs()
+    attrs_value.set("deleted_at", @types.String("2024-01-01"))
+    let _ = db.add(@types.VectorId::from_int(1), [1.0, 0.0], attrs_null, 0L)
+    let _ = db.add(@types.VectorId::from_int(2), [0.0, 1.0], attrs_missing, 0L)
+    let _ = db.add(@types.VectorId::from_int(3), [0.5, 0.5], attrs_value, 0L)
+
+    let exists_expr = @filter.FilterExpr::exists("deleted_at")
+    let is_null_expr = @filter.FilterExpr::is_null("deleted_at")
+    inspect(db.count_filtered(expr=Some(exists_expr)), content="1")
+    inspect(db.count_filtered(expr=Some(is_null_expr)), content="2")
+
+    let exists_search = db.search_with_expr(
+      [1.0, 0.0],
+      10,
+      Some(exists_expr),
+      None,
+      @filter.PreFilter,
+    )
+    inspect(exists_search.length(), content="1")
+    inspect(exists_search[0].id, content="Int64Id(3)")
+    let is_null_search = db.search_with_expr(
+      [1.0, 0.0],
+      10,
+      Some(is_null_expr),
+      None,
+      @filter.PreFilter,
+    )
+    inspect(is_null_search.length(), content="2")
+
+    let exists_scroll = db.scroll_filtered(expr=Some(exists_expr), limit=10)
+    inspect(exists_scroll.length(), content="1")
+    let (exists_id, _) = exists_scroll[0]
+    inspect(exists_id, content="Int64Id(3)")
+    let is_null_scroll = db.scroll_filtered(expr=Some(is_null_expr), limit=10)
+    inspect(is_null_scroll.length(), content="2")
+    let (null_id0, _) = is_null_scroll[0]
+    let (null_id1, _) = is_null_scroll[1]
+    inspect(null_id0, content="Int64Id(1)")
+    inspect(null_id1, content="Int64Id(2)")
+  })
+}
+
+///|
 /// Test: HNSW remove and search consistency
 /// Note: HNSW uses tombstone-based removal - physical size remains unchanged
 /// until compact() is called. Heavy tombstoning degrades recall.

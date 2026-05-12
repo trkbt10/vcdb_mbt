@@ -70,7 +70,9 @@ pub fn BasicAttrIndex::set_attrs(
   // Add new attrs to indexes
   for_each_attr(attrs, fn(key, value) {
     add_to_eq_index(self.eq_map, key, value, id)
-    add_to_exists_index(self.exists_map, key, id)
+    if attr_value_counts_as_exists(value) {
+      add_to_exists_index(self.exists_map, key, id)
+    }
     match attr_value_to_number(value) {
       Some(num) => add_to_num_index(self.num_map, key, num, id)
       None => ()

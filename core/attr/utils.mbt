@@ -13,6 +13,15 @@ fn for_each_attr(
 }
 
 ///|
+/// Whether a value should make its key visible to `exists(key)` filters.
+fn attr_value_counts_as_exists(value : @types.AttrValue) -> Bool {
+  match value {
+    @types.Null => false
+    _ => true
+  }
+}
+
+///|
 /// Add ID to the equality index for a key-value pair.
 fn add_to_eq_index(
   eq_map : Map[String, Map[String, Array[@types.VectorId]]],
