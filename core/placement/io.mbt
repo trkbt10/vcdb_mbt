@@ -48,7 +48,7 @@ priv struct SegState {
   target_key : TargetKey
 }
 
-// ── In-memory segment construction (SoT) ────────────────────
+// Shared in-memory segment construction.
 //
 // All segment building happens here with zero I/O. Both the sync
 // and async write paths call this, then persist the result using
@@ -71,8 +71,8 @@ pub(all) struct MemorySegment {
 
 ///|
 /// Build segments in memory without writing to storage.
-/// This is the SoT for segment construction — sync and async
-/// write paths both call this, then persist the resulting bytes.
+/// Sync and async write paths both call this, then persist the
+/// resulting bytes.
 pub fn write_segments_in_memory(
   store : @store.CoreStore,
   opts : SegmentOptions,
@@ -329,7 +329,7 @@ pub struct LoadDistributedResult {
   ann_bytes : Bytes?
 }
 
-// ── In-memory store reconstruction (SoT) ────────────────────
+// Shared in-memory store reconstruction.
 //
 // Reconstruct a CoreStore from already-fetched bytes. No I/O.
 // Both sync and async load paths fetch bytes their own way,
@@ -338,8 +338,7 @@ pub struct LoadDistributedResult {
 ///|
 /// Reconstruct CoreStore from index file + segment bytes (fast path).
 ///
-/// segment_data maps segment name → bytes (already fetched by caller).
-/// This is the SoT for index-based reconstruction.
+/// segment_data maps segment name to bytes already fetched by caller.
 pub fn reconstruct_from_index(
   index_bytes : Bytes,
   manifest_bytes : Bytes,
@@ -664,59 +663,56 @@ fn extract_string_field(json : String, field : String) -> String {
 }
 
 ///|
-fn extract_int_field(json : String, field : String) -> Int {
+fn extract_number_field(
+  json : String,
+  field : String,
+  allow_minus : Bool,
+) -> String? {
   let pattern = "\"" + field + "\":"
   let start = match find_substr(json, pattern) {
     Some(i) => i + pattern.length()
-    None => return 0
+    None => return None
   }
   let chars = json.to_array()[start:]
   let num_chars : Array[Char] = []
   for c in chars {
-    if c >= '0' && c <= '9' {
+    if (c >= '0' && c <= '9') || (allow_minus && c == '-') {
       num_chars.push(c)
     } else if !num_chars.is_empty() {
       break
     }
   }
   if num_chars.is_empty() {
-    0
+    None
   } else {
-    let result : Result[Int, _] = try? @string.parse_int(
-      String::from_array(num_chars),
-    )
-    match result {
-      Ok(n) => n
-      Err(_) => 0
+    Some(String::from_array(num_chars))
+  }
+}
+
+///|
+fn extract_int_field(json : String, field : String) -> Int {
+  match extract_number_field(json, field, false) {
+    None => 0
+    Some(num) => {
+      let result : Result[Int, _] = try? @string.parse_int(num)
+      match result {
+        Ok(n) => n
+        Err(_) => 0
+      }
     }
   }
 }
 
 ///|
 fn extract_int64_field(json : String, field : String) -> Int64 {
-  let pattern = "\"" + field + "\":"
-  let start = match find_substr(json, pattern) {
-    Some(i) => i + pattern.length()
-    None => return 0L
-  }
-  let chars = json.to_array()[start:]
-  let num_chars : Array[Char] = []
-  for c in chars {
-    if (c >= '0' && c <= '9') || c == '-' {
-      num_chars.push(c)
-    } else if !num_chars.is_empty() {
-      break
-    }
-  }
-  if num_chars.is_empty() {
-    0L
-  } else {
-    let result : Result[Int64, _] = try? @string.parse_int64(
-      String::from_array(num_chars),
-    )
-    match result {
-      Ok(n) => n
-      Err(_) => 0L
+  match extract_number_field(json, field, true) {
+    None => 0L
+    Some(num) => {
+      let result : Result[Int64, _] = try? @string.parse_int64(num)
+      match result {
+        Ok(n) => n
+        Err(_) => 0L
+      }
     }
   }
 }

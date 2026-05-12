@@ -71,6 +71,17 @@ test "binary/push_bytes" {
 }
 
 ///|
+test "binary/bytes_equal" {
+  let same1 = Bytes::from_array([b'a', b'b', b'c'][:])
+  let same2 = Bytes::from_array([b'a', b'b', b'c'][:])
+  let diff_value = Bytes::from_array([b'a', b'b', b'd'][:])
+  let diff_len = Bytes::from_array([b'a', b'b'][:])
+  inspect(bytes_equal(same1, same2), content="true")
+  inspect(bytes_equal(same1, diff_value), content="false")
+  inspect(bytes_equal(same1, diff_len), content="false")
+}
+
+///|
 /// Test: BinaryReader position tracking
 test "binary/reader_position" {
   let bytes = Bytes::from_array(

@@ -12,7 +12,7 @@ test "lib/gateway_storage_read_propagates_missing_file" {
 
 // ── VectorId wire format contract tests ─────────────────────
 //
-// These tests are the SoT for the FFI wire format.
+// These tests define the FFI wire format contract.
 // If any of these fail, the JS side must be updated to match.
 
 ///|

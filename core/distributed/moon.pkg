@@ -4,4 +4,5 @@ import {
   "trkbt10/vcdb/core/placement",
   "trkbt10/vcdb/core/persistence/wal",
   "trkbt10/vcdb/core/persistence/codec",
+  "trkbt10/vcdb/core/binary",
 }

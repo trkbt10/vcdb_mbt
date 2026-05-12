@@ -322,7 +322,7 @@ pub fn CoreStore::serialize(self : CoreStore) -> Bytes {
     },
   )
   w.push_u32(self.count.reinterpret_as_uint())
-  // Write ids: length-prefixed wire bytes (SoT: VectorId::to_wire_bytes)
+  // Write ids: length-prefixed wire bytes via VectorId::to_wire_bytes.
   for i in 0..<self.count {
     let wire = self.ids[i].to_wire_bytes()
     w.push_u32(wire.length().reinterpret_as_uint())
@@ -417,7 +417,7 @@ pub fn CoreStore::deserialize(data : Bytes) -> CoreStore {
         )
       }
     } else {
-      // v2+: length-prefixed wire bytes (SoT: VectorId::from_wire_bytes)
+      // v2+: length-prefixed wire bytes via VectorId::from_wire_bytes.
       let wire_len = r.read_u32().reinterpret_as_int()
       let wire = r.read_bytes(wire_len)
       match @types.VectorId::from_wire_bytes(wire) {

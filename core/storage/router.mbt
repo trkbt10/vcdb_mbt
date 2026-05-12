@@ -2,7 +2,7 @@
 /// Path helpers for storage operations
 ///
 /// Centralized path construction. File extension constants are
-/// defined in core/persistence/codec/header.mbt (the SoT).
+/// defined in core/persistence/codec/header.mbt.
 
 ///|
 /// Config file extension (not part of binary format, defined here)

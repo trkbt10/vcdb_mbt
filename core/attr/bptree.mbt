@@ -69,20 +69,6 @@ fn bytes_compare(a : Bytes, b : Bytes) -> Int {
 }
 
 ///|
-/// Check if two byte arrays are equal
-fn bytes_equal(a : Bytes, b : Bytes) -> Bool {
-  if a.length() != b.length() {
-    return false
-  }
-  for i in 0..<a.length() {
-    if a[i] != b[i] {
-      return false
-    }
-  }
-  true
-}
-
-///|
 /// Encode AttrValue to order-preserving bytes
 fn encode_attr_value(value : @types.AttrValue) -> Bytes {
   let w = @binary.BinaryWriter::new()
@@ -367,7 +353,7 @@ fn find_leaf(tree : BPTree, key : Bytes) -> Int {
 /// Find entry in leaf
 fn find_entry(entries : Array[BPLeafEntry], key : Bytes) -> Int {
   for i in 0..<entries.length() {
-    if bytes_equal(entries[i].key, key) {
+    if @binary.bytes_equal(entries[i].key, key) {
       return i
     }
   }

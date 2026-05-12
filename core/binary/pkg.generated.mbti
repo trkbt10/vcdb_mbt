@@ -2,6 +2,8 @@
 package "trkbt10/vcdb/core/binary"
 
 // Values
+pub fn bytes_equal(Bytes, Bytes) -> Bool
+
 pub fn crc32(Bytes) -> UInt
 
 pub fn crc32_fast(Bytes) -> UInt

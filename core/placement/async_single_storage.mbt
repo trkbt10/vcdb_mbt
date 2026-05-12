@@ -1,7 +1,7 @@
 ///|
 /// Async segmented save/load — target-independent.
 ///
-/// Segment construction uses write_segments_in_memory (SoT in io.mbt).
+/// Segment construction uses write_segments_in_memory in io.mbt.
 /// Only the actual storage writes/reads are async via AsyncStorage trait.
 
 ///|
@@ -16,7 +16,7 @@ pub async fn[S : @storage.AsyncStorage] async_save_segmented(
   let crush = CrushMap::new(32, 1, [CrushTarget::new("local")])
   let opts = SegmentOptions::segmented(base_name, crush, segment_bytes)
 
-  // Build segments in memory (SoT: write_segments_in_memory in io.mbt)
+  // Build segments in memory.
   let mem = write_segments_in_memory(store, opts)
 
   // Persist segments to storage (async)
@@ -58,7 +58,7 @@ pub async fn[S : @storage.AsyncStorage] async_save_segmented(
 /// Load a CoreStore from async storage using segments.
 ///
 /// Fetches bytes asynchronously, then delegates reconstruction
-/// to reconstruct_from_index / reconstruct_from_segments (SoT in io.mbt).
+/// to reconstruct_from_index / reconstruct_from_segments in io.mbt.
 pub async fn[S : @storage.AsyncStorage] async_load_segmented(
   base_name : String,
   storage : S,

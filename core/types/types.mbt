@@ -905,28 +905,38 @@ pub impl Show for NumericRange with output(self, logger) {
 }
 
 ///|
+fn numeric_range(
+  gt : Double?,
+  gte : Double?,
+  lt : Double?,
+  lte : Double?,
+) -> NumericRange {
+  { gt, gte, lt, lte }
+}
+
+///|
 pub fn NumericRange::empty() -> NumericRange {
-  { gt: None, gte: None, lt: None, lte: None }
+  numeric_range(None, None, None, None)
 }
 
 ///|
 pub fn NumericRange::gt(value : Double) -> NumericRange {
-  { gt: Some(value), gte: None, lt: None, lte: None }
+  numeric_range(Some(value), None, None, None)
 }
 
 ///|
 pub fn NumericRange::gte(value : Double) -> NumericRange {
-  { gt: None, gte: Some(value), lt: None, lte: None }
+  numeric_range(None, Some(value), None, None)
 }
 
 ///|
 pub fn NumericRange::lt(value : Double) -> NumericRange {
-  { gt: None, gte: None, lt: Some(value), lte: None }
+  numeric_range(None, None, Some(value), None)
 }
 
 ///|
 pub fn NumericRange::lte(value : Double) -> NumericRange {
-  { gt: None, gte: None, lt: None, lte: Some(value) }
+  numeric_range(None, None, None, Some(value))
 }
 
 ///|
@@ -936,28 +946,28 @@ pub fn NumericRange::between(
   lower_inclusive? : Bool = true,
   upper_inclusive? : Bool = true,
 ) -> NumericRange {
-  {
-    gt: if lower_inclusive {
+  numeric_range(
+    if lower_inclusive {
       None
     } else {
       Some(lower)
     },
-    gte: if lower_inclusive {
+    if lower_inclusive {
       Some(lower)
     } else {
       None
     },
-    lt: if upper_inclusive {
+    if upper_inclusive {
       None
     } else {
       Some(upper)
     },
-    lte: if upper_inclusive {
+    if upper_inclusive {
       Some(upper)
     } else {
       None
     },
-  }
+  )
 }
 
 ///|

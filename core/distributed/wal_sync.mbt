@@ -8,7 +8,7 @@
 /// at a known timestamp. The primary extracts records since that timestamp
 /// and packages them as a WalShipment.
 ///
-/// Reuses existing WAL infrastructure (SoT in format.mbt):
+/// Reuses existing WAL infrastructure in format.mbt:
 ///   - decode_wal_records for parsing
 ///   - encode_wal_segment for packaging
 ///   - merge_wal for applying shipments
@@ -122,7 +122,7 @@ pub fn extract_wal_since(
 ///|
 /// Apply a WAL shipment to a replica's existing WAL.
 ///
-/// Delegates to merge_wal (SoT in format.mbt) for the actual merge.
+/// Delegates to merge_wal in format.mbt for the actual merge.
 /// Returns the merged WAL bytes.
 pub fn apply_wal_shipment(
   existing_wal : Bytes,

@@ -9,7 +9,7 @@ pub(all) struct TransportPoint {
 }
 
 ///|
-/// JSONL format (SoT — both to_jsonl and from_jsonl use this definition):
+/// JSONL format used by both to_jsonl and from_jsonl:
 ///
 /// Int64Id:   {"id":{"hi":<i32>,"lo":<i32>},"vector":[<f64>,...],"payload":{...}}
 /// Bytes16Id: {"id":{"uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"},"vector":[<f64>,...],"payload":{...}}

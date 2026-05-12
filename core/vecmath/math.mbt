@@ -1,7 +1,5 @@
 ///|
-/// Normalize a vector to unit L2 norm in place.
-/// Leaves a zero vector unchanged (avoids dividing by zero).
-pub fn normalize_in_place(vec : Array[Double]) -> Unit {
+fn sum_squares(vec : Array[Double]) -> Double {
   let len = vec.length()
   let end4 = len - len % 4
   let mut s0 = 0.0
@@ -26,8 +24,18 @@ pub fn normalize_in_place(vec : Array[Double]) -> Unit {
     sum += v * v
     i += 1
   }
+  sum
+}
+
+///|
+/// Normalize a vector to unit L2 norm in place.
+/// Leaves a zero vector unchanged (avoids dividing by zero).
+pub fn normalize_in_place(vec : Array[Double]) -> Unit {
+  let len = vec.length()
+  let end4 = len - len % 4
+  let sum = sum_squares(vec)
   let inv = if sum > 0.0 { 1.0 / sum.sqrt() } else { 1.0 }
-  i = 0
+  let mut i = 0
   while i < end4 {
     vec[i] = vec[i] * inv
     vec[i + 1] = vec[i + 1] * inv
@@ -132,31 +140,7 @@ pub fn get_score_fn(
 ///|
 /// Compute L2 norm of a vector
 pub fn l2_norm(vec : Array[Double]) -> Double {
-  let len = vec.length()
-  let end4 = len - len % 4
-  let mut s0 = 0.0
-  let mut s1 = 0.0
-  let mut s2 = 0.0
-  let mut s3 = 0.0
-  let mut i = 0
-  while i < end4 {
-    let v0 = vec[i]
-    let v1 = vec[i + 1]
-    let v2 = vec[i + 2]
-    let v3 = vec[i + 3]
-    s0 += v0 * v0
-    s1 += v1 * v1
-    s2 += v2 * v2
-    s3 += v3 * v3
-    i += 4
-  }
-  let mut sum = s0 + s1 + s2 + s3
-  while i < len {
-    let v = vec[i]
-    sum += v * v
-    i += 1
-  }
-  sum.sqrt()
+  sum_squares(vec).sqrt()
 }
 
 ///|

@@ -34,8 +34,6 @@ pub(all) struct Attrs(Map[String, AttrValue])
 pub fn Attrs::clear(Self) -> Unit
 pub fn Attrs::copy(Self) -> Self
 pub fn Attrs::get(Self, String) -> AttrValue?
-#deprecated
-pub fn Attrs::inner(Self) -> Map[String, AttrValue]
 pub fn Attrs::is_empty(Self) -> Bool
 pub fn Attrs::keys(Self) -> Array[String]
 pub fn Attrs::set(Self, String, AttrValue) -> Unit

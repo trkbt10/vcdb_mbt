@@ -104,7 +104,7 @@ pub fn vcdb_dim(instance_id : Int) -> Int {
   }
 }
 
-// ── ID encode / decode (SoT for JS ↔ VectorId conversion) ────
+// ID encode / decode for JS <-> VectorId conversion.
 
 ///|
 /// Encode a VectorId to 16 bytes.

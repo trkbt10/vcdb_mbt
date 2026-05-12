@@ -10,8 +10,8 @@
 /// - Each target holds data for exactly the PGs assigned to it.
 /// - Reads query one target per PG. Writes go to all targets for each PG.
 ///
-/// This is the SoT for all routing decisions — platform adapters must use
-/// these functions rather than implementing their own hash.
+/// Platform adapters must use these routing functions rather than
+/// implementing their own hash.
 
 ///|
 /// Group upsert points by target using CRUSH placement.

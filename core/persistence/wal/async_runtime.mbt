@@ -54,7 +54,7 @@ pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::load(
 ///|
 /// Append records to the WAL.
 /// Merges in-memory (no read from storage), then writes to storage.
-/// Delegates merge logic to format.mbt's merge_wal (the SoT).
+/// Delegates merge logic to format.mbt's merge_wal.
 pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::append(
   self : AsyncWalRuntime[S],
   records : Array[WalRecord],
@@ -72,7 +72,7 @@ pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::append(
 
 ///|
 /// Replay WAL records into a CoreStore. Returns number of records applied.
-/// Delegates replay logic to replay_wal_data (SoT in runtime.mbt).
+/// Delegates replay logic to replay_wal_data in runtime.mbt.
 ///
 /// Uses in-memory buffer if loaded, otherwise reads from storage.
 pub async fn[S : @storage.AsyncStorage] AsyncWalRuntime::replay_into(

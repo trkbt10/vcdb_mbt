@@ -86,7 +86,7 @@ pub struct AsyncRebalanceState {
 ///|
 /// Create a rebalance state from an existing manifest and new CRUSH map.
 ///
-/// Internally calls plan_rebalance (SoT in crush.mbt) to compute moves.
+/// Internally calls plan_rebalance in crush.mbt to compute moves.
 pub fn AsyncRebalanceState::new(
   manifest : PlacementManifest,
   new_crush : CrushMap,

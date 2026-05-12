@@ -1,7 +1,7 @@
 ///|
 /// JSONL export for VectorDB.
 ///
-/// Uses TransportPoint::to_jsonl as the format SoT.
+/// Uses TransportPoint::to_jsonl for the shared JSONL format.
 
 ///|
 /// Export all points as JSONL lines.

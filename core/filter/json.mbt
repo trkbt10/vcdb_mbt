@@ -1,5 +1,5 @@
 ///|
-/// JSON ↔ FilterExpr conversion (SoT for the filter JSON format).
+/// JSON ↔ FilterExpr conversion for the filter JSON format.
 ///
 /// Structured format (1:1 with FilterExpr):
 ///   {"match": {"key": "category", "value": "科学"}}

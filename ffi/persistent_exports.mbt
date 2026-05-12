@@ -34,7 +34,7 @@ let persistent_instances : @hashmap.HashMap[
 
 ///|
 /// Monotonic counter for persistent instance ID allocation.
-/// SoT for instance ID generation — JS must not generate IDs independently.
+/// JS must not generate persistent instance IDs independently.
 priv struct PersistentCounter {
   mut value : Int
 }
@@ -55,7 +55,7 @@ pub fn persistent_allocate_id() -> Int {
   id
 }
 
-// ── Callback name derivation (SoT) ──────────────────────────
+// Callback name derivation.
 
 ///|
 fn wal_callback_name(instance_id : Int) -> String {

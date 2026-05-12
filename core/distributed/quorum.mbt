@@ -156,7 +156,7 @@ pub fn evaluate_read_quorum(
     let mut all_match = true
     let reference = valid_results[0].1
     for i = 1; i < valid_results.length(); i = i + 1 {
-      if !bytes_equal(reference, valid_results[i].1) {
+      if !@binary.bytes_equal(reference, valid_results[i].1) {
         all_match = false
         break
       }
@@ -171,20 +171,6 @@ pub fn evaluate_read_quorum(
   }
 
   { quorum_met, value, achieved, required: config.r, consistent }
-}
-
-///|
-/// Byte-level equality comparison.
-fn bytes_equal(a : Bytes, b : Bytes) -> Bool {
-  if a.length() != b.length() {
-    return false
-  }
-  for i in 0..<a.length() {
-    if a[i] != b[i] {
-      return false
-    }
-  }
-  true
 }
 
 ///|
