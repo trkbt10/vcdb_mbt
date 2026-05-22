@@ -43,6 +43,30 @@ const parsePayload = (json: string): Record<string, unknown> | null => {
   }
 };
 
+/**
+ * Allocate a PersistentDB instance id.
+ *
+ * Prefer the MoonBit-side allocator (`persistent_allocate_id`) when the
+ * loaded WASM build exports it — that keeps the id space aligned with the
+ * runtime that actually owns the persistent state. Older builds don't
+ * export the function; in that case we fall back to a JS-side counter
+ * that is unique within this module. The counter starts high enough that
+ * a future overlap with WASM-allocated ids stays unlikely.
+ *
+ * This is the single source of truth for "where does an instance id come
+ * from?" — every consumer (including the wrappers in @vcdb/data-source-vcdb)
+ * should rely on PersistentDB.create's default rather than rolling their own.
+ */
+let jsAllocatedInstanceIds = 1 << 20;
+function allocatePersistentInstanceId(ffi: PersistentFfi): number {
+  if (typeof ffi.persistent_allocate_id === "function") {
+    return ffi.persistent_allocate_id();
+  }
+  const id = jsAllocatedInstanceIds;
+  jsAllocatedInstanceIds += 1;
+  return id;
+}
+
 /* ── VectorId ↔ wire bytes ───────────────────────────────────── */
 
 /**
@@ -189,7 +213,7 @@ export class PersistentDB {
       throw new Error("PersistentDB.create() requires loadModule() to have been called first.");
     }
     const ffi = getPersistentFfi();
-    const instanceId = options.instanceId ?? ffi.persistent_allocate_id();
+    const instanceId = options.instanceId ?? allocatePersistentInstanceId(ffi);
     const {
       dim,
       capacity,

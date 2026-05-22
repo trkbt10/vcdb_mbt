@@ -98,8 +98,15 @@ export interface AsyncStorageCallbacks {
  * Scroll result: (idBytes: Uint8Array(16), payloadJson)
  */
 export interface PersistentFfi {
-  /** Allocate a unique instance ID. SoT for ID generation — JS must not generate IDs independently. */
-  persistent_allocate_id(): number;
+  /**
+   * Allocate a unique instance ID.
+   *
+   * Optional: older WASM builds did not export this. When absent,
+   * `PersistentDB.create` falls back to a JS-side counter. Consumers
+   * should not invoke this directly — go through `PersistentDB.create`,
+   * which is the single source of truth for instance ids.
+   */
+  persistent_allocate_id?: () => number;
   persistent_register_wal_storage(
     instanceId: number,
     read: AsyncStorageCallbacks["read"],

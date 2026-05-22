@@ -1,9 +1,13 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "types": ["node"],
     "paths": {
       "@vcdb/api-client": ["../api-client/src/index.ts"],
-      "@vcdb/data-source": ["../data-source/src/index.ts"]
+      "@vcdb/data-source": ["../data-source/src/index.ts"],
+      "vcdb": ["../vcdb/src/index.ts"],
+      "vcdb/storage/node": ["../vcdb/src/storage/node.ts"],
+      "vcdb/storage/types": ["../vcdb/src/storage/types.ts"]
     }
   },
   "include": ["src"]

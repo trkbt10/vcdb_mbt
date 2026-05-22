@@ -6,6 +6,8 @@
       "@vcdb/api-client": ["../api-client/src/index.ts"],
       "@vcdb/data-source": ["../data-source/src/index.ts"],
       "@vcdb/data-source-vcdb": ["../data-source-vcdb/src/index.ts"],
+      "@vcdb/data-source-vcdb/persistent": ["../data-source-vcdb/src/persistent.ts"],
+      "@vcdb/data-source-vcdb/shape": ["../data-source-vcdb/src/shape.ts"],
       "@vcdb/db-viewer": ["../db-viewer/src/index.ts"],
       "@vcdb/ui-kit": ["../ui-kit/src/index.ts"],
       "@vcdb/ui-kit/theme": ["../ui-kit/src/theme/index.ts"],

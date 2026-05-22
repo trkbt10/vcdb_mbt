@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./shape": "./src/shape.ts"
+    "./shape": "./src/shape.ts",
+    "./persistent": "./src/persistent.ts"
   },
   "files": ["src"],
   "scripts": {
@@ -13,9 +14,11 @@
   },
   "dependencies": {
     "@vcdb/api-client": "workspace:*",
-    "@vcdb/data-source": "workspace:*"
+    "@vcdb/data-source": "workspace:*",
+    "vcdb": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^20.11.0",
     "typescript": "^5.9.3"
   }
 }

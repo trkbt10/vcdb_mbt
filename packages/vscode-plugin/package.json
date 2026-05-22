@@ -31,7 +31,34 @@
         "vcdb.gatewayUrl": {
           "type": "string",
           "default": "http://127.0.0.1:6333",
-          "description": "Base URL of the running vcdb gateway."
+          "description": "Base URL of the running vcdb gateway. Used when vcdb.dataDir is empty."
+        },
+        "vcdb.dataDir": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute or workspace-relative path to a PersistentDB-format directory (with a data/ subdir of *.data.bin + *.vwal files). When set, the extension opens the data in-process and the gatewayUrl setting is ignored."
+        },
+        "vcdb.persistent.dim": {
+          "type": "number",
+          "default": 0,
+          "description": "Vector dimension of the PersistentDB-format data. Required when vcdb.dataDir is set — the binary files don't carry it."
+        },
+        "vcdb.persistent.metric": {
+          "type": "string",
+          "enum": ["cosine", "l2", "dot"],
+          "default": "cosine",
+          "description": "Distance metric the PersistentDB was created with."
+        },
+        "vcdb.persistent.strategy": {
+          "type": "string",
+          "enum": ["bruteforce", "hnsw", "ivf"],
+          "default": "hnsw",
+          "description": "ANN strategy the PersistentDB was created with."
+        },
+        "vcdb.persistent.capacity": {
+          "type": "number",
+          "default": 4096,
+          "description": "Initial capacity hint passed to PersistentDB.create. Expanded on demand."
         }
       }
     }
