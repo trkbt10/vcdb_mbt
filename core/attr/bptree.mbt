@@ -149,6 +149,94 @@ fn read_prefixed_bytes(r : @binary.BinaryReader) -> Bytes {
 }
 
 ///|
+/// On-disk format for VectorIds inside a BPTreeAttrIndex / BPTree leaf.
+///
+/// Three concrete layouts have shipped over time:
+///   - V1Int64       — version <= 1: fixed 8-byte i64
+///   - V2TagByte     — version == 2 in trkbt10/vcdb <= 0.3.0: 1-byte tag
+///                     (0x00 = Int64 + 8 bytes; 0x01 = Bytes16 + 16 bytes).
+///                     Used by indexion's cache files written via the
+///                     old release; we keep reading them.
+///   - V3WireBytes   — version >= 2 in this branch: u32 length + N wire
+///                     bytes via VectorId::from_wire_bytes. Same encoding
+///                     was originally introduced under the version=2 label,
+///                     which is what makes the v2 disambiguation necessary.
+///
+/// Detection (only relevant when version == 2): peek the first byte that
+/// belongs to the next VectorId. V2TagByte always starts with 0x00 or
+/// 0x01; V3WireBytes starts with the LE low byte of u32 length, which is
+/// 0x08 for Int64Id (wire length 8) or 0x10 for Bytes16Id (wire length 16)
+/// — no overlap.
+priv enum IdFormat {
+  V1Int64
+  V2TagByte
+  V3WireBytes
+}
+
+///|
+/// Read a single VectorId in whichever historical layout matches `fmt`.
+fn read_vector_id_with_format(
+  r : @binary.BinaryReader,
+  fmt : IdFormat,
+) -> @types.VectorId? {
+  match fmt {
+    V1Int64 => Some(@types.Int64Id(r.read_i64()))
+    V2TagByte =>
+      match r.read_byte() {
+        b'\x00' => Some(@types.Int64Id(r.read_i64()))
+        b'\x01' =>
+          Some(
+            @types.Bytes16Id({
+              b0: r.read_byte(),
+              b1: r.read_byte(),
+              b2: r.read_byte(),
+              b3: r.read_byte(),
+              b4: r.read_byte(),
+              b5: r.read_byte(),
+              b6: r.read_byte(),
+              b7: r.read_byte(),
+              b8: r.read_byte(),
+              b9: r.read_byte(),
+              b10: r.read_byte(),
+              b11: r.read_byte(),
+              b12: r.read_byte(),
+              b13: r.read_byte(),
+              b14: r.read_byte(),
+              b15: r.read_byte(),
+            }),
+          )
+        // Unknown tag — surface as "no id" rather than aborting deep in
+        // the reader; the caller already tolerates missing ids.
+        _ => None
+      }
+    V3WireBytes => {
+      let wire_len = r.read_u32().reinterpret_as_int()
+      let wire = r.read_bytes(wire_len)
+      @types.VectorId::from_wire_bytes(wire)
+    }
+  }
+}
+
+///|
+/// Pick the right `IdFormat` based on the version u32 from the file
+/// header and, for version==2, a peek at the first ID byte. `peek_byte`
+/// may be None when the index is empty (no data entries to peek); in
+/// that case we default to V3WireBytes since an empty file written by
+/// the current code is what locally-built deployments will produce.
+fn detect_id_format(version : UInt, peek_byte : Byte?) -> IdFormat {
+  if version <= 1U {
+    V1Int64
+  } else if version >= 3U {
+    V3WireBytes
+  } else {
+    match peek_byte {
+      Some(b'\x00') | Some(b'\x01') => V2TagByte
+      _ => V3WireBytes
+    }
+  }
+}
+
+///|
 /// Write a typed attribute value
 fn write_attr_value(w : @binary.BinaryWriter, value : @types.AttrValue) -> Unit {
   match value {
@@ -249,8 +337,10 @@ fn serialize_bptree(tree : BPTree) -> Bytes {
 }
 
 ///|
-/// Deserialize a B+ tree node graph
-fn deserialize_bptree(data : Bytes, version : UInt) -> BPTree {
+/// Deserialize a B+ tree node graph. `fmt` is the VectorId layout
+/// detected at the enclosing BPTreeAttrIndex header; tree leaves use the
+/// same layout as the data map, so we just propagate it.
+fn deserialize_bptree(data : Bytes, fmt : IdFormat) -> BPTree {
   let r = @binary.BinaryReader::new(data)
   let order = r.read_u32().reinterpret_as_int()
   let root_idx = r.read_i32()
@@ -266,17 +356,9 @@ fn deserialize_bptree(data : Bytes, version : UInt) -> BPTree {
         let posting_count = r.read_u32().reinterpret_as_int()
         let value : Array[@types.VectorId] = []
         for _ in 0..<posting_count {
-          if version <= 1U {
-            // v1: fixed 8-byte Int64
-            value.push(@types.Int64Id(r.read_i64()))
-          } else {
-            // v2+: length-prefixed wire bytes
-            let wire_len = r.read_u32().reinterpret_as_int()
-            let wire = r.read_bytes(wire_len)
-            match @types.VectorId::from_wire_bytes(wire) {
-              Some(id) => value.push(id)
-              None => ()
-            }
+          match read_vector_id_with_format(r, fmt) {
+            Some(id) => value.push(id)
+            None => ()
           }
         }
         entries.push({ key, value })
@@ -842,7 +924,12 @@ pub fn BPTreeAttrIndex::range(
 /// Serialize a B+ tree attribute index, including node graphs and stored attrs
 pub fn BPTreeAttrIndex::serialize(self : BPTreeAttrIndex) -> Bytes {
   let w = @binary.BinaryWriter::new()
-  w.push_u32(2U) // v2: VectorId wire bytes format
+  // v3 = length-prefixed VectorId wire bytes (current).
+  // v2 also meant "length-prefixed" in this codebase but trkbt10/vcdb <=
+  // 0.3.0 shipped a different "v2" layout (1-byte tag + fixed-size id).
+  // Bumping to v3 here keeps the two encodings under distinct labels so
+  // readers can route without ambiguous peek-based detection.
+  w.push_u32(3U)
   w.push_u32(self.order.reinterpret_as_uint())
   let data_count = self.data.length()
   w.push_u32(data_count.reinterpret_as_uint())
@@ -868,27 +955,29 @@ pub fn BPTreeAttrIndex::serialize(self : BPTreeAttrIndex) -> Bytes {
 }
 
 ///|
-/// Deserialize a B+ tree attribute index from serialized bytes
+/// Deserialize a B+ tree attribute index from serialized bytes.
+///
+/// Three on-disk layouts are supported (see `IdFormat` for the history).
+/// The legacy v2-tag-byte layout shipped by trkbt10/vcdb <= 0.3.0 is
+/// distinguished from the current length-prefixed layout by peeking the
+/// first byte of the first VectorId — the two encodings never share a
+/// possible first byte, so the choice is unambiguous when data exists.
+/// Empty indices default to the current layout.
 pub fn BPTreeAttrIndex::deserialize(data : Bytes) -> BPTreeAttrIndex {
   let r = @binary.BinaryReader::new(data)
   let version = r.read_u32()
   let order = r.read_u32().reinterpret_as_int()
-  let data_map : Map[@types.VectorId, @types.Attrs] = {}
   let data_count = r.read_u32().reinterpret_as_int()
+  let peek = if data_count > 0 { Some(r.peek_byte()) } else { None }
+  let fmt = detect_id_format(version, peek)
+  let data_map : Map[@types.VectorId, @types.Attrs] = {}
   for _ in 0..<data_count {
-    if version <= 1U {
-      // v1: fixed 8-byte Int64 key
-      let id = @types.Int64Id(r.read_i64())
-      data_map.set(id, read_attrs(r))
-    } else {
-      // v2+: length-prefixed wire bytes key
-      let wire_len = r.read_u32().reinterpret_as_int()
-      let wire = r.read_bytes(wire_len)
-      match @types.VectorId::from_wire_bytes(wire) {
-        Some(id) => data_map.set(id, read_attrs(r))
-        None => {
-          let _ = read_attrs(r)
-        }
+    match read_vector_id_with_format(r, fmt) {
+      Some(id) => data_map.set(id, read_attrs(r))
+      None => {
+        // Unknown id encoding — keep the stream aligned by consuming
+        // the trailing attrs even though we can't index them.
+        let _ = read_attrs(r)
       }
     }
   }
@@ -896,13 +985,13 @@ pub fn BPTreeAttrIndex::deserialize(data : Bytes) -> BPTreeAttrIndex {
   let field_tree_count = r.read_u32().reinterpret_as_int()
   for _ in 0..<field_tree_count {
     let field = read_string(r)
-    field_trees.set(field, deserialize_bptree(read_prefixed_bytes(r), version))
+    field_trees.set(field, deserialize_bptree(read_prefixed_bytes(r), fmt))
   }
   let exists_trees : Map[String, BPTree] = {}
   let exists_tree_count = r.read_u32().reinterpret_as_int()
   for _ in 0..<exists_tree_count {
     let field = read_string(r)
-    exists_trees.set(field, deserialize_bptree(read_prefixed_bytes(r), version))
+    exists_trees.set(field, deserialize_bptree(read_prefixed_bytes(r), fmt))
   }
   { field_trees, exists_trees, data: data_map, order }
 }

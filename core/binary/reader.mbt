@@ -85,6 +85,15 @@ pub fn BinaryReader::read_byte(self : BinaryReader) -> Byte {
 }
 
 ///|
+/// Read the byte at the current position without advancing the cursor.
+/// Used by version-aware decoders that need to disambiguate two on-disk
+/// layouts that share a `version` tag but differ in their entry encoding.
+pub fn BinaryReader::peek_byte(self : BinaryReader) -> Byte {
+  self.ensure(1)
+  self.data[self.offset]
+}
+
+///|
 /// Read len bytes. Aborts if not enough data remaining.
 pub fn BinaryReader::read_bytes(self : BinaryReader, len : Int) -> Bytes {
   self.ensure(len)
