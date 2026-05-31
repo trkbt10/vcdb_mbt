@@ -26,7 +26,7 @@ fn TestAsyncStorage::new() -> TestAsyncStorage {
 }
 
 ///|
-impl @storage.AsyncStorage for TestAsyncStorage with async_read(
+impl @storage.AsyncStorage for TestAsyncStorage with fn async_read(
   self,
   path,
   _kind,
@@ -41,7 +41,7 @@ impl @storage.AsyncStorage for TestAsyncStorage with async_read(
 }
 
 ///|
-impl @storage.AsyncStorage for TestAsyncStorage with async_write(
+impl @storage.AsyncStorage for TestAsyncStorage with fn async_write(
   self,
   path,
   data,
@@ -55,7 +55,7 @@ impl @storage.AsyncStorage for TestAsyncStorage with async_write(
 }
 
 ///|
-impl @storage.AsyncStorage for TestAsyncStorage with async_atomic_write(
+impl @storage.AsyncStorage for TestAsyncStorage with fn async_atomic_write(
   self,
   path,
   data,
@@ -69,7 +69,7 @@ impl @storage.AsyncStorage for TestAsyncStorage with async_atomic_write(
 }
 
 ///|
-impl @storage.AsyncStorage for TestAsyncStorage with async_del(
+impl @storage.AsyncStorage for TestAsyncStorage with fn async_del(
   self,
   path,
   _kind,
@@ -82,7 +82,7 @@ impl @storage.AsyncStorage for TestAsyncStorage with async_del(
 }
 
 ///|
-impl @storage.AsyncStorage for TestAsyncStorage with async_exists(
+impl @storage.AsyncStorage for TestAsyncStorage with fn async_exists(
   self,
   path,
   _kind,
@@ -94,7 +94,7 @@ impl @storage.AsyncStorage for TestAsyncStorage with async_exists(
 }
 
 ///|
-impl @storage.AsyncStorage for TestAsyncStorage with async_list(
+impl @storage.AsyncStorage for TestAsyncStorage with fn async_list(
   self,
   _kind,
   resolve,
@@ -694,7 +694,7 @@ test "persistent/same_id_upsert_last_write_wins" {
     match db.get(make_vid(1)) {
       Some(r) => {
         inspect(r.vector[1], content="1")
-        inspect(r.attrs.to_string().contains("\"2\""), content="true")
+        assert_true(r.attrs.get("ver") is Some(@types.String("2")))
       }
       None => inspect(false, content="true")
     }
@@ -713,7 +713,7 @@ test "persistent/same_id_upsert_last_write_wins" {
     match db2.get(make_vid(1)) {
       Some(r) => {
         inspect(r.vector[1], content="1")
-        inspect(r.attrs.to_string().contains("\"2\""), content="true")
+        assert_true(r.attrs.get("ver") is Some(@types.String("2")))
       }
       None => inspect(false, content="true")
     }
@@ -982,11 +982,11 @@ test "persistent/shared_storage_prefix_isolation" {
     inspect(shard_a.size(), content="1")
     inspect(shard_b.size(), content="1")
     match shard_a.get(make_vid(1)) {
-      Some(r) => inspect(r.attrs.to_string().contains("\"a\""), content="true")
+      Some(r) => assert_true(r.attrs.get("src") is Some(@types.String("a")))
       None => inspect(false, content="true")
     }
     match shard_b.get(make_vid(1)) {
-      Some(r) => inspect(r.attrs.to_string().contains("\"b\""), content="true")
+      Some(r) => assert_true(r.attrs.get("src") is Some(@types.String("b")))
       None => inspect(false, content="true")
     }
     // WAL paths should differ
@@ -1019,11 +1019,11 @@ test "persistent/shared_storage_prefix_isolation" {
     inspect(shard_a2.size(), content="1")
     inspect(shard_b2.size(), content="1")
     match shard_a2.get(make_vid(1)) {
-      Some(r) => inspect(r.attrs.to_string().contains("\"a\""), content="true")
+      Some(r) => assert_true(r.attrs.get("src") is Some(@types.String("a")))
       None => inspect(false, content="true")
     }
     match shard_b2.get(make_vid(1)) {
-      Some(r) => inspect(r.attrs.to_string().contains("\"b\""), content="true")
+      Some(r) => assert_true(r.attrs.get("src") is Some(@types.String("b")))
       None => inspect(false, content="true")
     }
   })
