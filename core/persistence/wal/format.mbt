@@ -382,6 +382,7 @@ fn read_wal_version(data : Bytes) -> Byte? {
       if file_type == Wal &&
         (
           version == wal_version ||
+          version == wal_version_v3 ||
           version == wal_version_v2 ||
           version == wal_version_v1
         ) {
