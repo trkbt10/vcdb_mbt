@@ -96,7 +96,7 @@ pub fn[T] ReplicatedStorage::backend_count(self : ReplicatedStorage[T]) -> Int {
 // write_quorum backends have acknowledged.
 
 ///|
-pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_read(
+pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with fn async_read(
   self,
   path,
   kind,
@@ -108,7 +108,7 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_read
 }
 
 ///|
-pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_write(
+pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with fn async_write(
   self,
   path,
   data,
@@ -140,7 +140,7 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_writ
 }
 
 ///|
-pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_atomic_write(
+pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with fn async_atomic_write(
   self,
   path,
   data,
@@ -175,7 +175,7 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_atom
 }
 
 ///|
-pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_del(
+pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with fn async_del(
   self,
   path,
   kind,
@@ -203,7 +203,7 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_del(
 }
 
 ///|
-pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_exists(
+pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with fn async_exists(
   self,
   path,
   kind,
@@ -215,7 +215,7 @@ pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_exis
 }
 
 ///|
-pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with async_list(
+pub impl[T : AsyncStorage] AsyncStorage for ReplicatedStorage[T] with fn async_list(
   self,
   kind,
   resolve,

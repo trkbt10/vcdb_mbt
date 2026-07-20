@@ -97,21 +97,21 @@ pub(all) enum StorageKind {
 
 // Traits
 pub(open) trait AsyncStorage {
-  async_read(Self, String, StorageKind, (Bytes) -> Unit, (String) -> Unit) -> Unit
-  async_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
-  async_atomic_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
-  async_del(Self, String, StorageKind, () -> Unit, (String) -> Unit) -> Unit
-  async_exists(Self, String, StorageKind, (Bool) -> Unit, (String) -> Unit) -> Unit
-  async_list(Self, StorageKind, (Array[String]) -> Unit, (String) -> Unit) -> Unit
+  fn async_read(Self, String, StorageKind, (Bytes) -> Unit, (String) -> Unit) -> Unit
+  fn async_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  fn async_atomic_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  fn async_del(Self, String, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  fn async_exists(Self, String, StorageKind, (Bool) -> Unit, (String) -> Unit) -> Unit
+  fn async_list(Self, StorageKind, (Array[String]) -> Unit, (String) -> Unit) -> Unit
 }
 
 pub trait Storage {
-  read(Self, String, StorageKind) -> Bytes raise IOError
-  write(Self, String, Bytes, StorageKind) -> Unit raise IOError
-  append(Self, String, Bytes, StorageKind) -> Unit raise IOError
-  atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
-  del(Self, String, StorageKind) -> Unit raise IOError
-  exists(Self, String, StorageKind) -> Bool
-  list(Self, StorageKind) -> Array[String] raise IOError
+  fn read(Self, String, StorageKind) -> Bytes raise IOError
+  fn write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  fn append(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  fn atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  fn del(Self, String, StorageKind) -> Unit raise IOError
+  fn exists(Self, String, StorageKind) -> Bool
+  fn list(Self, StorageKind) -> Array[String] raise IOError
 }
 

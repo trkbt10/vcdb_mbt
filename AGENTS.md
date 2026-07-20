@@ -12,8 +12,8 @@ You can browse and install extra skills here:
   blackbox test files (ending in `_test.mbt`) and whitebox test files (ending in
   `_wbtest.mbt`).
 
-- In the toplevel directory, there is a `moon.mod.json` file listing module
-  metadata.
+- In the toplevel directory, there is a `moon.mod` file (TOML; formerly
+  `moon.mod.json`) listing module metadata.
 
 ## Coding convention
 

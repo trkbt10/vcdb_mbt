@@ -23,7 +23,31 @@
 ///|
 test "migration/v2_real_artifact_17ef48f" {
   // real wal_version 0x02 segment emitted by 17ef48f's own encode_wal_segment
-  let data = Bytes::from_array([b'\x56', b'\x43', b'\x44', b'\x42', b'\x4d', b'\x42', b'\x54', b'\x00', b'\x01', b'\x02', b'\x00', b'\x00', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x61', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x3f', b'\x00', b'\x00', b'\x00', b'\x40', b'\x00', b'\x00', b'\x40', b'\x40', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x62', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x40', b'\x00', b'\x00', b'\xa0', b'\x40', b'\x00', b'\x00', b'\xc0', b'\x40', b'\x03', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x63', b'\x22', b'\x7d', b'\x02', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x04', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x6e', b'\x75', b'\x6c', b'\x6c', b'\x57', b'\x43', b'\x52', b'\x43', b'\x69', b'\xfb', b'\x90', b'\x27'][:])
+  let data = Bytes::from_array(
+    [
+      b'\x56', b'\x43', b'\x44', b'\x42', b'\x4d', b'\x42', b'\x54', b'\x00', b'\x01',
+      b'\x02', b'\x00', b'\x00', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c', b'\x00',
+      b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a',
+      b'\x22', b'\x61', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x3f', b'\x00',
+      b'\x00', b'\x00', b'\x40', b'\x00', b'\x00', b'\x40', b'\x40', b'\x01', b'\x01',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x02',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00',
+      b'\x00', b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73',
+      b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x62', b'\x22', b'\x7d', b'\x00',
+      b'\x00', b'\x80', b'\x40', b'\x00', b'\x00', b'\xa0', b'\x40', b'\x00', b'\x00',
+      b'\xc0', b'\x40', b'\x03', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22',
+      b'\x63', b'\x22', b'\x7d', b'\x02', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x04', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x6e', b'\x75', b'\x6c', b'\x6c', b'\x57', b'\x43', b'\x52',
+      b'\x43', b'\x69', b'\xfb', b'\x90', b'\x27',
+    ][:],
+  )
   assert_true(verify_wal_header(@binary.BinaryReader::new(data)))
   let rv = @binary.BinaryReader::new(data)
   rv.skip(9)
@@ -87,7 +111,31 @@ test "migration/v2_real_artifact_17ef48f" {
 ///|
 test "migration/v3_real_artifact_4db6088" {
   // real wal_version 0x03 segment emitted by 4db6088's own encode_wal_segment
-  let data = Bytes::from_array([b'\x56', b'\x43', b'\x44', b'\x42', b'\x4d', b'\x42', b'\x54', b'\x00', b'\x01', b'\x03', b'\x00', b'\x00', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x08', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x61', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x3f', b'\x00', b'\x00', b'\x00', b'\x40', b'\x00', b'\x00', b'\x40', b'\x40', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x08', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x62', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x40', b'\x00', b'\x00', b'\xa0', b'\x40', b'\x00', b'\x00', b'\xc0', b'\x40', b'\x03', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x08', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x63', b'\x22', b'\x7d', b'\x02', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x08', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x04', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x6e', b'\x75', b'\x6c', b'\x6c', b'\x57', b'\x43', b'\x52', b'\x43', b'\x38', b'\x36', b'\xce', b'\x16'][:])
+  let data = Bytes::from_array(
+    [
+      b'\x56', b'\x43', b'\x44', b'\x42', b'\x4d', b'\x42', b'\x54', b'\x00', b'\x01',
+      b'\x03', b'\x00', b'\x00', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x08', b'\x01', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c',
+      b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22',
+      b'\x3a', b'\x22', b'\x61', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x3f',
+      b'\x00', b'\x00', b'\x00', b'\x40', b'\x00', b'\x00', b'\x40', b'\x40', b'\x01',
+      b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x08', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b',
+      b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x62', b'\x22',
+      b'\x7d', b'\x00', b'\x00', b'\x80', b'\x40', b'\x00', b'\x00', b'\xa0', b'\x40',
+      b'\x00', b'\x00', b'\xc0', b'\x40', b'\x03', b'\x01', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x08', b'\x01', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63',
+      b'\x22', b'\x3a', b'\x22', b'\x63', b'\x22', b'\x7d', b'\x02', b'\x01', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x08', b'\x02',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x04', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x6e', b'\x75', b'\x6c',
+      b'\x6c', b'\x57', b'\x43', b'\x52', b'\x43', b'\x38', b'\x36', b'\xce', b'\x16',
+    ][:],
+  )
   assert_true(verify_wal_header(@binary.BinaryReader::new(data)))
   let rv = @binary.BinaryReader::new(data)
   rv.skip(9)
@@ -151,7 +199,36 @@ test "migration/v3_real_artifact_4db6088" {
 ///|
 test "migration/v4_real_artifact_0254f3c" {
   // real wal_version 0x04 segment emitted by 0254f3c's own encode_wal_segment
-  let data = Bytes::from_array([b'\x56', b'\x43', b'\x44', b'\x42', b'\x4d', b'\x42', b'\x54', b'\x00', b'\x01', b'\x04', b'\x00', b'\x00', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x61', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x3f', b'\x00', b'\x00', b'\x00', b'\x40', b'\x00', b'\x00', b'\x40', b'\x40', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x62', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x40', b'\x00', b'\x00', b'\xa0', b'\x40', b'\x00', b'\x00', b'\xc0', b'\x40', b'\x03', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22', b'\x63', b'\x22', b'\x7d', b'\x02', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x04', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x6e', b'\x75', b'\x6c', b'\x6c', b'\x57', b'\x43', b'\x52', b'\x43', b'\x3e', b'\x89', b'\x06', b'\xae'][:])
+  let data = Bytes::from_array(
+    [
+      b'\x56', b'\x43', b'\x44', b'\x42', b'\x4d', b'\x42', b'\x54', b'\x00', b'\x01',
+      b'\x04', b'\x00', b'\x00', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x01', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00',
+      b'\x00', b'\x0c', b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72',
+      b'\x63', b'\x22', b'\x3a', b'\x22', b'\x61', b'\x22', b'\x7d', b'\x00', b'\x00',
+      b'\x80', b'\x3f', b'\x00', b'\x00', b'\x00', b'\x40', b'\x00', b'\x00', b'\x40',
+      b'\x40', b'\x01', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x0c',
+      b'\x00', b'\x00', b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22',
+      b'\x3a', b'\x22', b'\x62', b'\x22', b'\x7d', b'\x00', b'\x00', b'\x80', b'\x40',
+      b'\x00', b'\x00', b'\xa0', b'\x40', b'\x00', b'\x00', b'\xc0', b'\x40', b'\x03',
+      b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x0b', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x7b', b'\x22', b'\x73', b'\x72', b'\x63', b'\x22', b'\x3a', b'\x22',
+      b'\x63', b'\x22', b'\x7d', b'\x02', b'\x01', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x02', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x04', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x6e', b'\x75', b'\x6c', b'\x6c',
+      b'\x57', b'\x43', b'\x52', b'\x43', b'\x3e', b'\x89', b'\x06', b'\xae',
+    ][:],
+  )
   assert_true(verify_wal_header(@binary.BinaryReader::new(data)))
   let rv = @binary.BinaryReader::new(data)
   rv.skip(9)

@@ -19,6 +19,7 @@ pub struct BinaryReader {
 }
 pub fn BinaryReader::has_more(Self) -> Bool
 pub fn BinaryReader::new(Bytes) -> Self
+pub fn BinaryReader::peek_byte(Self) -> Byte
 pub fn BinaryReader::position(Self) -> Int
 pub fn BinaryReader::read_byte(Self) -> Byte
 pub fn BinaryReader::read_bytes(Self, Int) -> Bytes

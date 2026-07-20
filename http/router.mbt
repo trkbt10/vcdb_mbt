@@ -12,7 +12,7 @@ pub struct HttpRequest {
 }
 
 ///|
-pub impl Show for HttpRequest with output(self, logger) {
+pub impl Show for HttpRequest with fn output(self, logger) {
   logger.write_string("{ http_method: ")
   Show::output(self.http_method, logger)
   logger.write_string(", path: ")
@@ -33,7 +33,7 @@ pub struct HttpResponse {
 }
 
 ///|
-pub impl Show for HttpResponse with output(self, logger) {
+pub impl Show for HttpResponse with fn output(self, logger) {
   logger.write_string("{ status: ")
   Show::output(self.status, logger)
   logger.write_string(", headers: ")

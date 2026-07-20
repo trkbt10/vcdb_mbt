@@ -39,7 +39,7 @@ pub impl Scored for ScoredItem
 
 // Traits
 pub trait Scored {
-  score(Self) -> Double
+  fn score(Self) -> Double
 }
 pub impl Scored for @types.SearchHit
 

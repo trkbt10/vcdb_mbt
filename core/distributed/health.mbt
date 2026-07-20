@@ -23,7 +23,7 @@ pub(all) enum ShardStatus {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for ShardStatus with output(self, logger) {
+pub impl Show for ShardStatus with fn output(self, logger) {
   match self {
     Healthy => logger.write_string("Healthy")
     Degraded => logger.write_string("Degraded")

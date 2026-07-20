@@ -1,0 +1,18 @@
+name = "trkbt10/vcdb"
+
+version = "0.3.0"
+
+import {
+  "moonbitlang/async@0.19.4",
+  "moonbitlang/x@0.4.40",
+}
+
+readme = "README.md"
+
+repository = "https://github.com/trkbt10/vcdb_mbt"
+
+license = "Apache-2.0"
+
+keywords = [ "vector-database", "ann", "hnsw", "ivf", "similarity-search" ]
+
+description = "High-performance vector database with multiple ANN algorithms"

@@ -12,7 +12,7 @@ pub(all) enum LeafExpr {
 }
 
 ///|
-pub impl Show for LeafExpr with output(self, logger) {
+pub impl Show for LeafExpr with fn output(self, logger) {
   match self {
     Match(key, value) => {
       logger.write_string("Match(")
@@ -51,7 +51,7 @@ pub(all) enum FilterExpr {
 }
 
 ///|
-pub impl Show for FilterExpr with output(self, logger) {
+pub impl Show for FilterExpr with fn output(self, logger) {
   match self {
     Leaf(leaf) => {
       logger.write_string("Leaf(")
@@ -87,7 +87,7 @@ pub(all) enum FilterStrategy {
 }
 
 ///|
-pub impl Show for FilterStrategy with output(self, logger) {
+pub impl Show for FilterStrategy with fn output(self, logger) {
   match self {
     PreFilter => logger.write_string("PreFilter")
     PostFilter => logger.write_string("PostFilter")

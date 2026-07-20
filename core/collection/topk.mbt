@@ -57,7 +57,7 @@ pub fn[T] push_top_k(
 ///|
 /// Scored trait for items with a score field
 pub trait Scored {
-  score(Self) -> Double
+  fn score(Self) -> Double
 }
 
 ///|
@@ -100,7 +100,7 @@ pub fn[T : Scored] push_sorted_desc(
 
 ///|
 /// Scored wrapper for SearchHit
-pub impl Scored for @types.SearchHit with score(self) -> Double {
+pub impl Scored for @types.SearchHit with fn score(self) -> Double {
   self.score
 }
 
@@ -112,7 +112,7 @@ pub(all) struct ScoredItem {
 }
 
 ///|
-pub impl Show for ScoredItem with output(self, logger) {
+pub impl Show for ScoredItem with fn output(self, logger) {
   logger.write_string("ScoredItem { idx: ")
   logger.write_string(self.idx.to_string())
   logger.write_string(", s: ")
@@ -121,7 +121,7 @@ pub impl Show for ScoredItem with output(self, logger) {
 }
 
 ///|
-pub impl Scored for ScoredItem with score(self) -> Double {
+pub impl Scored for ScoredItem with fn score(self) -> Double {
   self.s
 }
 

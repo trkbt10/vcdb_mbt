@@ -268,12 +268,12 @@ pub(all) struct WalShipment {
 
 // Traits
 pub(open) trait ShardTransport {
-  shard_upsert(Self, @placement.TargetKey, Array[TransportPoint], Int64, () -> Unit, (String) -> Unit) -> Unit
-  shard_search(Self, @placement.TargetKey, Array[Double], Int, String, (Array[@types.SearchHit]) -> Unit, (String) -> Unit) -> Unit
-  shard_get(Self, @placement.TargetKey, @types.VectorId, (@types.VectorRecord?) -> Unit, (String) -> Unit) -> Unit
-  shard_has(Self, @placement.TargetKey, @types.VectorId, (Bool) -> Unit, (String) -> Unit) -> Unit
-  shard_remove(Self, @placement.TargetKey, @types.VectorId, Int64, (Bool) -> Unit, (String) -> Unit) -> Unit
-  shard_scroll(Self, @placement.TargetKey, String, Int64?, Int, (Array[ShardScrollEntry]) -> Unit, (String) -> Unit) -> Unit
-  shard_count(Self, @placement.TargetKey, String, (Int) -> Unit, (String) -> Unit) -> Unit
+  fn shard_upsert(Self, @placement.TargetKey, Array[TransportPoint], Int64, () -> Unit, (String) -> Unit) -> Unit
+  fn shard_search(Self, @placement.TargetKey, Array[Double], Int, String, (Array[@types.SearchHit]) -> Unit, (String) -> Unit) -> Unit
+  fn shard_get(Self, @placement.TargetKey, @types.VectorId, (@types.VectorRecord?) -> Unit, (String) -> Unit) -> Unit
+  fn shard_has(Self, @placement.TargetKey, @types.VectorId, (Bool) -> Unit, (String) -> Unit) -> Unit
+  fn shard_remove(Self, @placement.TargetKey, @types.VectorId, Int64, (Bool) -> Unit, (String) -> Unit) -> Unit
+  fn shard_scroll(Self, @placement.TargetKey, String, Int64?, Int, (Array[ShardScrollEntry]) -> Unit, (String) -> Unit) -> Unit
+  fn shard_count(Self, @placement.TargetKey, String, (Int) -> Unit, (String) -> Unit) -> Unit
 }
 

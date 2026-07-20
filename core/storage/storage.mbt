@@ -19,13 +19,13 @@ pub(all) enum StorageKind {
 /// Storage trait - abstraction for file-like storage operations
 /// kind parameter allows app to route different data types to different backends
 pub trait Storage {
-  read(Self, String, StorageKind) -> Bytes raise IOError
-  write(Self, String, Bytes, StorageKind) -> Unit raise IOError
-  append(Self, String, Bytes, StorageKind) -> Unit raise IOError
-  atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
-  del(Self, String, StorageKind) -> Unit raise IOError
-  exists(Self, String, StorageKind) -> Bool
-  list(Self, StorageKind) -> Array[String] raise IOError
+  fn read(Self, String, StorageKind) -> Bytes raise IOError
+  fn write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  fn append(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  fn atomic_write(Self, String, Bytes, StorageKind) -> Unit raise IOError
+  fn del(Self, String, StorageKind) -> Unit raise IOError
+  fn exists(Self, String, StorageKind) -> Bool
+  fn list(Self, StorageKind) -> Array[String] raise IOError
 }
 
 ///|
@@ -119,37 +119,37 @@ pub fn MemoryStorage::clear(self : MemoryStorage) -> Unit {
 ///|
 /// Storage trait implementation for MemoryStorage
 /// MemoryStorage ignores kind - stores all data in single map
-pub impl Storage for MemoryStorage with read(self, path, _kind) {
+pub impl Storage for MemoryStorage with fn read(self, path, _kind) {
   self.read(path)
 }
 
 ///|
-pub impl Storage for MemoryStorage with write(self, path, data, _kind) {
+pub impl Storage for MemoryStorage with fn write(self, path, data, _kind) {
   self.write(path, data)
 }
 
 ///|
-pub impl Storage for MemoryStorage with append(self, path, data, _kind) {
+pub impl Storage for MemoryStorage with fn append(self, path, data, _kind) {
   self.append(path, data)
 }
 
 ///|
-pub impl Storage for MemoryStorage with atomic_write(self, path, data, _kind) {
+pub impl Storage for MemoryStorage with fn atomic_write(self, path, data, _kind) {
   self.atomic_write(path, data)
 }
 
 ///|
-pub impl Storage for MemoryStorage with del(self, path, _kind) {
+pub impl Storage for MemoryStorage with fn del(self, path, _kind) {
   self.del(path)
 }
 
 ///|
-pub impl Storage for MemoryStorage with exists(self, path, _kind) {
+pub impl Storage for MemoryStorage with fn exists(self, path, _kind) {
   self.exists(path)
 }
 
 ///|
-pub impl Storage for MemoryStorage with list(self, _kind) {
+pub impl Storage for MemoryStorage with fn list(self, _kind) {
   self.list()
 }
 
@@ -158,7 +158,7 @@ pub impl Storage for MemoryStorage with list(self, _kind) {
 /// Since all operations are in-memory, resolve is called synchronously.
 /// This enables MemoryStorage to be used with PersistentVectorDB, AsyncWalRuntime,
 /// and all async persistence infrastructure — critical for testing.
-pub impl AsyncStorage for MemoryStorage with async_read(
+pub impl AsyncStorage for MemoryStorage with fn async_read(
   self,
   path,
   _kind,
@@ -172,7 +172,7 @@ pub impl AsyncStorage for MemoryStorage with async_read(
 }
 
 ///|
-pub impl AsyncStorage for MemoryStorage with async_write(
+pub impl AsyncStorage for MemoryStorage with fn async_write(
   self,
   path,
   data,
@@ -185,7 +185,7 @@ pub impl AsyncStorage for MemoryStorage with async_write(
 }
 
 ///|
-pub impl AsyncStorage for MemoryStorage with async_atomic_write(
+pub impl AsyncStorage for MemoryStorage with fn async_atomic_write(
   self,
   path,
   data,
@@ -198,7 +198,7 @@ pub impl AsyncStorage for MemoryStorage with async_atomic_write(
 }
 
 ///|
-pub impl AsyncStorage for MemoryStorage with async_del(
+pub impl AsyncStorage for MemoryStorage with fn async_del(
   self,
   path,
   _kind,
@@ -214,7 +214,7 @@ pub impl AsyncStorage for MemoryStorage with async_del(
 }
 
 ///|
-pub impl AsyncStorage for MemoryStorage with async_exists(
+pub impl AsyncStorage for MemoryStorage with fn async_exists(
   self,
   path,
   _kind,
@@ -225,7 +225,7 @@ pub impl AsyncStorage for MemoryStorage with async_exists(
 }
 
 ///|
-pub impl AsyncStorage for MemoryStorage with async_list(
+pub impl AsyncStorage for MemoryStorage with fn async_list(
   self,
   _kind,
   resolve,

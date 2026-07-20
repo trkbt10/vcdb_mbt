@@ -10,7 +10,7 @@ pub(all) enum Metric {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for Metric with output(self, logger) {
+pub impl Show for Metric with fn output(self, logger) {
   match self {
     Cosine => logger.write_string("Cosine")
     L2 => logger.write_string("L2")
@@ -84,7 +84,7 @@ pub fn Bytes16::new(
 }
 
 ///|
-pub impl Eq for Bytes16 with equal(self, other) {
+pub impl Eq for Bytes16 with fn equal(self, other) {
   self.b0 == other.b0 &&
   self.b1 == other.b1 &&
   self.b2 == other.b2 &&
@@ -169,7 +169,7 @@ pub fn Bytes16::compare(self : Bytes16, other : Bytes16) -> Int {
 }
 
 ///|
-pub impl Hash for Bytes16 with hash_combine(self, hasher) {
+pub impl Hash for Bytes16 with fn hash_combine(self, hasher) {
   hasher.combine_byte(self.b0)
   hasher.combine_byte(self.b1)
   hasher.combine_byte(self.b2)
@@ -189,7 +189,7 @@ pub impl Hash for Bytes16 with hash_combine(self, hasher) {
 }
 
 ///|
-pub impl Show for Bytes16 with output(self, logger) {
+pub impl Show for Bytes16 with fn output(self, logger) {
   let hex = "0123456789abcdef"
   let chars : Array[Char] = []
   let bytes = [
@@ -369,7 +369,7 @@ pub(all) enum VectorId {
 } derive(Debug)
 
 ///|
-pub impl Show for VectorId with output(self, logger) {
+pub impl Show for VectorId with fn output(self, logger) {
   match self {
     Int64Id(v) => {
       logger.write_string("Int64Id(")
@@ -385,7 +385,7 @@ pub impl Show for VectorId with output(self, logger) {
 }
 
 ///|
-pub impl Eq for VectorId with equal(self, other) {
+pub impl Eq for VectorId with fn equal(self, other) {
   match (self, other) {
     (Int64Id(a), Int64Id(b)) => a == b
     (Bytes16Id(a), Bytes16Id(b)) => a == b
@@ -405,7 +405,7 @@ pub fn VectorId::compare(self : VectorId, other : VectorId) -> Int {
 }
 
 ///|
-pub impl Hash for VectorId with hash_combine(self, hasher) {
+pub impl Hash for VectorId with fn hash_combine(self, hasher) {
   match self {
     Int64Id(v) => {
       hasher.combine_int(0)
@@ -429,7 +429,7 @@ pub(all) enum AttrValue {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for AttrValue with output(self, logger) {
+pub impl Show for AttrValue with fn output(self, logger) {
   match self {
     Null => logger.write_string("Null")
     Bool(b) => {
@@ -460,7 +460,7 @@ pub impl Show for AttrValue with output(self, logger) {
 pub(all) struct Attrs(Map[String, AttrValue]) derive(Debug)
 
 ///|
-pub impl Show for Attrs with output(self, logger) {
+pub impl Show for Attrs with fn output(self, logger) {
   Show::output(self.0, logger)
 }
 
@@ -473,7 +473,7 @@ pub(all) struct SearchHit {
 } derive(Debug)
 
 ///|
-pub impl Show for SearchHit with output(self, logger) {
+pub impl Show for SearchHit with fn output(self, logger) {
   logger.write_string("{ id: ")
   Show::output(self.id, logger)
   logger.write_string(", score: ")
@@ -491,7 +491,7 @@ pub(all) struct VectorRecord {
 } derive(Debug)
 
 ///|
-pub impl Show for VectorRecord with output(self, logger) {
+pub impl Show for VectorRecord with fn output(self, logger) {
   logger.write_string("{ vector: ")
   Show::output(self.vector, logger)
   logger.write_string(", attrs: ")
@@ -511,7 +511,7 @@ pub(all) struct HNSWParams {
 } derive(Debug)
 
 ///|
-pub impl Show for HNSWParams with output(self, logger) {
+pub impl Show for HNSWParams with fn output(self, logger) {
   logger.write_string("{ m: ")
   Show::output(self.m, logger)
   logger.write_string(", ef_construction: ")
@@ -548,7 +548,7 @@ pub(all) struct IVFParams {
 } derive(Debug)
 
 ///|
-pub impl Show for IVFParams with output(self, logger) {
+pub impl Show for IVFParams with fn output(self, logger) {
   logger.write_string("{ nlist: ")
   Show::output(self.nlist, logger)
   logger.write_string(", nprobe: ")
@@ -572,7 +572,7 @@ pub(all) enum Strategy {
 } derive(Debug)
 
 ///|
-pub impl Show for Strategy with output(self, logger) {
+pub impl Show for Strategy with fn output(self, logger) {
   match self {
     Bruteforce => logger.write_string("Bruteforce")
     HNSW(params) => {
@@ -619,7 +619,7 @@ pub(all) struct DatabaseOptions {
 } derive(Debug)
 
 ///|
-pub impl Show for DatabaseOptions with output(self, logger) {
+pub impl Show for DatabaseOptions with fn output(self, logger) {
   logger.write_string("{ dim: ")
   Show::output(self.dim, logger)
   logger.write_string(", metric: ")
@@ -892,7 +892,7 @@ pub(all) struct NumericRange {
 } derive(Debug)
 
 ///|
-pub impl Show for NumericRange with output(self, logger) {
+pub impl Show for NumericRange with fn output(self, logger) {
   logger.write_string("{ gt: ")
   Debug::to_repr(self.gt).output(logger)
   logger.write_string(", gte: ")

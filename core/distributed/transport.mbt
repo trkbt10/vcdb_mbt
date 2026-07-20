@@ -15,7 +15,7 @@
 ///|
 pub(open) trait ShardTransport {
   /// Upsert points into a specific target node.
-  shard_upsert(
+  fn shard_upsert(
     Self,
     @placement.TargetKey,
     Array[TransportPoint],
@@ -25,7 +25,7 @@ pub(open) trait ShardTransport {
   ) -> Unit
 
   /// Search a specific target node. Returns hits via resolve callback.
-  shard_search(
+  fn shard_search(
     Self,
     @placement.TargetKey,
     Array[Double],
@@ -36,7 +36,7 @@ pub(open) trait ShardTransport {
   ) -> Unit
 
   /// Get a vector from a specific target node.
-  shard_get(
+  fn shard_get(
     Self,
     @placement.TargetKey,
     @types.VectorId,
@@ -45,7 +45,7 @@ pub(open) trait ShardTransport {
   ) -> Unit
 
   /// Check if a vector exists on a specific target node.
-  shard_has(
+  fn shard_has(
     Self,
     @placement.TargetKey,
     @types.VectorId,
@@ -54,7 +54,7 @@ pub(open) trait ShardTransport {
   ) -> Unit
 
   /// Remove a vector from a specific target node.
-  shard_remove(
+  fn shard_remove(
     Self,
     @placement.TargetKey,
     @types.VectorId,
@@ -64,7 +64,7 @@ pub(open) trait ShardTransport {
   ) -> Unit
 
   /// Scroll entries from a specific target node.
-  shard_scroll(
+  fn shard_scroll(
     Self,
     @placement.TargetKey,
     String,
@@ -75,7 +75,7 @@ pub(open) trait ShardTransport {
   ) -> Unit
 
   /// Count filtered entries on a specific target node.
-  shard_count(
+  fn shard_count(
     Self,
     @placement.TargetKey,
     String,

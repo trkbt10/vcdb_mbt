@@ -226,37 +226,42 @@ pub fn NativeFileStorage::list(
 }
 
 ///|
-pub impl Storage for NativeFileStorage with read(self, path, kind) {
+pub impl Storage for NativeFileStorage with fn read(self, path, kind) {
   self.read(path, kind)
 }
 
 ///|
-pub impl Storage for NativeFileStorage with write(self, path, data, kind) {
+pub impl Storage for NativeFileStorage with fn write(self, path, data, kind) {
   self.write(path, data, kind)
 }
 
 ///|
-pub impl Storage for NativeFileStorage with append(self, path, data, kind) {
+pub impl Storage for NativeFileStorage with fn append(self, path, data, kind) {
   self.append(path, data, kind)
 }
 
 ///|
-pub impl Storage for NativeFileStorage with atomic_write(self, path, data, kind) {
+pub impl Storage for NativeFileStorage with fn atomic_write(
+  self,
+  path,
+  data,
+  kind,
+) {
   self.atomic_write(path, data, kind)
 }
 
 ///|
-pub impl Storage for NativeFileStorage with del(self, path, kind) {
+pub impl Storage for NativeFileStorage with fn del(self, path, kind) {
   self.del(path, kind)
 }
 
 ///|
-pub impl Storage for NativeFileStorage with exists(self, path, kind) {
+pub impl Storage for NativeFileStorage with fn exists(self, path, kind) {
   self.exists(path, kind)
 }
 
 ///|
-pub impl Storage for NativeFileStorage with list(self, kind) {
+pub impl Storage for NativeFileStorage with fn list(self, kind) {
   self.list(kind)
 }
 
@@ -274,7 +279,7 @@ fn io_error_message(e : IOError) -> String {
 /// Wraps synchronous filesystem I/O — resolve is called immediately.
 /// This enables NativeFileStorage to be used with PersistentVectorDB
 /// and all async persistence infrastructure on native targets.
-pub impl AsyncStorage for NativeFileStorage with async_read(
+pub impl AsyncStorage for NativeFileStorage with fn async_read(
   self,
   path,
   kind,
@@ -291,7 +296,7 @@ pub impl AsyncStorage for NativeFileStorage with async_read(
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_write(
+pub impl AsyncStorage for NativeFileStorage with fn async_write(
   self,
   path,
   data,
@@ -309,7 +314,7 @@ pub impl AsyncStorage for NativeFileStorage with async_write(
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_atomic_write(
+pub impl AsyncStorage for NativeFileStorage with fn async_atomic_write(
   self,
   path,
   data,
@@ -327,7 +332,7 @@ pub impl AsyncStorage for NativeFileStorage with async_atomic_write(
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_del(
+pub impl AsyncStorage for NativeFileStorage with fn async_del(
   self,
   path,
   kind,
@@ -344,7 +349,7 @@ pub impl AsyncStorage for NativeFileStorage with async_del(
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_exists(
+pub impl AsyncStorage for NativeFileStorage with fn async_exists(
   self,
   path,
   kind,
@@ -355,7 +360,7 @@ pub impl AsyncStorage for NativeFileStorage with async_exists(
 }
 
 ///|
-pub impl AsyncStorage for NativeFileStorage with async_list(
+pub impl AsyncStorage for NativeFileStorage with fn async_list(
   self,
   kind,
   resolve,

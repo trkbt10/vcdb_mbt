@@ -25,11 +25,11 @@ async fn[T, E : Error] suspend(
 pub(open) trait AsyncStorage {
   /// Read file contents. Calls resolve with data, or reject on error.
   /// Missing files must reject rather than resolving empty Bytes.
-  async_read(Self, String, StorageKind, (Bytes) -> Unit, (String) -> Unit) -> Unit
+  fn async_read(Self, String, StorageKind, (Bytes) -> Unit, (String) -> Unit) -> Unit
   /// Write data to file (overwrites existing).
-  async_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  fn async_write(Self, String, Bytes, StorageKind, () -> Unit, (String) -> Unit) -> Unit
   /// Atomic write (same as write for most backends, but guarantees atomicity).
-  async_atomic_write(
+  fn async_atomic_write(
     Self,
     String,
     Bytes,
@@ -38,11 +38,11 @@ pub(open) trait AsyncStorage {
     (String) -> Unit,
   ) -> Unit
   /// Delete file.
-  async_del(Self, String, StorageKind, () -> Unit, (String) -> Unit) -> Unit
+  fn async_del(Self, String, StorageKind, () -> Unit, (String) -> Unit) -> Unit
   /// Check if file exists.
-  async_exists(Self, String, StorageKind, (Bool) -> Unit, (String) -> Unit) -> Unit
+  fn async_exists(Self, String, StorageKind, (Bool) -> Unit, (String) -> Unit) -> Unit
   /// List all files for a given kind. Rejects on backend failures.
-  async_list(Self, StorageKind, (Array[String]) -> Unit, (String) -> Unit) -> Unit
+  fn async_list(Self, StorageKind, (Array[String]) -> Unit, (String) -> Unit) -> Unit
 }
 
 ///|

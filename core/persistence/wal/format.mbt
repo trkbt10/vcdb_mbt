@@ -66,7 +66,7 @@ pub enum WalRecordType {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for WalRecordType with output(self, logger) {
+pub impl Show for WalRecordType with fn output(self, logger) {
   match self {
     Upsert => logger.write_string("Upsert")
     Remove => logger.write_string("Remove")
@@ -105,7 +105,7 @@ pub struct WalRecord {
 } derive(Debug)
 
 ///|
-pub impl Show for WalRecord with output(self, logger) {
+pub impl Show for WalRecord with fn output(self, logger) {
   logger.write_string("{ record_type: ")
   Show::output(self.record_type, logger)
   logger.write_string(", id: ")

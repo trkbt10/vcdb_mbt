@@ -132,7 +132,7 @@ fn await_promise_unit(
 }
 
 ///|
-pub impl AsyncStorage for JsAsyncCallbackStorage with async_read(
+pub impl AsyncStorage for JsAsyncCallbackStorage with fn async_read(
   self,
   path,
   kind,
@@ -147,7 +147,7 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_read(
 }
 
 ///|
-pub impl AsyncStorage for JsAsyncCallbackStorage with async_write(
+pub impl AsyncStorage for JsAsyncCallbackStorage with fn async_write(
   self,
   path,
   data,
@@ -163,7 +163,7 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_write(
 }
 
 ///|
-pub impl AsyncStorage for JsAsyncCallbackStorage with async_atomic_write(
+pub impl AsyncStorage for JsAsyncCallbackStorage with fn async_atomic_write(
   self,
   path,
   data,
@@ -179,7 +179,7 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_atomic_write(
 }
 
 ///|
-pub impl AsyncStorage for JsAsyncCallbackStorage with async_del(
+pub impl AsyncStorage for JsAsyncCallbackStorage with fn async_del(
   self,
   path,
   kind,
@@ -194,7 +194,7 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_del(
 }
 
 ///|
-pub impl AsyncStorage for JsAsyncCallbackStorage with async_exists(
+pub impl AsyncStorage for JsAsyncCallbackStorage with fn async_exists(
   self,
   path,
   kind,
@@ -209,7 +209,7 @@ pub impl AsyncStorage for JsAsyncCallbackStorage with async_exists(
 }
 
 ///|
-pub impl AsyncStorage for JsAsyncCallbackStorage with async_list(
+pub impl AsyncStorage for JsAsyncCallbackStorage with fn async_list(
   self,
   kind,
   resolve,

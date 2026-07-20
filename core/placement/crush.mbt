@@ -12,7 +12,7 @@ pub(all) struct TargetKey {
 } derive(Eq, Compare, Hash, Debug)
 
 ///|
-pub impl Show for TargetKey with output(self, logger) {
+pub impl Show for TargetKey with fn output(self, logger) {
   logger.write_string(self.value)
 }
 
@@ -35,7 +35,7 @@ pub struct CrushTarget {
 } derive(Debug)
 
 ///|
-pub impl Show for CrushTarget with output(self, logger) {
+pub impl Show for CrushTarget with fn output(self, logger) {
   logger.write_string("{ key: ")
   Show::output(self.key, logger)
   logger.write_string(", weight: ")
@@ -82,7 +82,7 @@ pub struct CrushMap {
 }
 
 ///|
-pub impl Show for CrushMap with output(self, logger) {
+pub impl Show for CrushMap with fn output(self, logger) {
   logger.write_string("{ pgs: ")
   Show::output(self.pgs, logger)
   logger.write_string(", replicas: ")
@@ -110,7 +110,7 @@ pub struct LocateResult {
 }
 
 ///|
-pub impl Show for LocateResult with output(self, logger) {
+pub impl Show for LocateResult with fn output(self, logger) {
   logger.write_string("{ pg: ")
   Show::output(self.pg, logger)
   logger.write_string(", primaries: ")
@@ -255,7 +255,7 @@ pub(all) struct SegmentEntry {
 }
 
 ///|
-pub impl Show for SegmentEntry with output(self, logger) {
+pub impl Show for SegmentEntry with fn output(self, logger) {
   logger.write_string("{ name: ")
   Show::output(self.name, logger)
   logger.write_string(", target_key: ")
@@ -274,7 +274,7 @@ pub(all) struct PlacementManifest {
 }
 
 ///|
-pub impl Show for PlacementManifest with output(self, logger) {
+pub impl Show for PlacementManifest with fn output(self, logger) {
   logger.write_string("{ base: ")
   Show::output(self.base, logger)
   logger.write_string(", segments: ")
@@ -297,7 +297,7 @@ pub(all) struct MovePlan {
 }
 
 ///|
-pub impl Show for MovePlan with output(self, logger) {
+pub impl Show for MovePlan with fn output(self, logger) {
   logger.write_string("{ name: ")
   Show::output(self.name, logger)
   logger.write_string(", from: ")

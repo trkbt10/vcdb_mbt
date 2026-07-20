@@ -40,7 +40,7 @@ pub fn KindAwareStorage::list_kind(
 }
 
 ///|
-pub impl Storage for KindAwareStorage with read(self, path, kind) {
+pub impl Storage for KindAwareStorage with fn read(self, path, kind) {
   match self.map_for(kind).get(path) {
     None => raise NotFound(path)
     Some(data) => data
@@ -48,12 +48,12 @@ pub impl Storage for KindAwareStorage with read(self, path, kind) {
 }
 
 ///|
-pub impl Storage for KindAwareStorage with write(self, path, data, kind) {
+pub impl Storage for KindAwareStorage with fn write(self, path, data, kind) {
   self.map_for(kind).set(path, data)
 }
 
 ///|
-pub impl Storage for KindAwareStorage with append(self, path, data, kind) {
+pub impl Storage for KindAwareStorage with fn append(self, path, data, kind) {
   match self.map_for(kind).get(path) {
     None => self.map_for(kind).set(path, data)
     Some(existing) => self.map_for(kind).set(path, concat_bytes(existing, data))
@@ -61,12 +61,17 @@ pub impl Storage for KindAwareStorage with append(self, path, data, kind) {
 }
 
 ///|
-pub impl Storage for KindAwareStorage with atomic_write(self, path, data, kind) {
+pub impl Storage for KindAwareStorage with fn atomic_write(
+  self,
+  path,
+  data,
+  kind,
+) {
   self.map_for(kind).set(path, data)
 }
 
 ///|
-pub impl Storage for KindAwareStorage with del(self, path, kind) {
+pub impl Storage for KindAwareStorage with fn del(self, path, kind) {
   if self.map_for(kind).contains(path) {
     self.map_for(kind).remove(path)
   } else {
@@ -75,19 +80,19 @@ pub impl Storage for KindAwareStorage with del(self, path, kind) {
 }
 
 ///|
-pub impl Storage for KindAwareStorage with exists(self, path, kind) {
+pub impl Storage for KindAwareStorage with fn exists(self, path, kind) {
   self.map_for(kind).contains(path)
 }
 
 ///|
-pub impl Storage for KindAwareStorage with list(self, kind) {
+pub impl Storage for KindAwareStorage with fn list(self, kind) {
   self.map_for(kind).keys().collect()
 }
 
 ///|
 /// AsyncStorage implementation for KindAwareStorage.
 /// Like MemoryStorage, resolve is called synchronously.
-pub impl AsyncStorage for KindAwareStorage with async_read(
+pub impl AsyncStorage for KindAwareStorage with fn async_read(
   self,
   path,
   kind,
@@ -101,7 +106,7 @@ pub impl AsyncStorage for KindAwareStorage with async_read(
 }
 
 ///|
-pub impl AsyncStorage for KindAwareStorage with async_write(
+pub impl AsyncStorage for KindAwareStorage with fn async_write(
   self,
   path,
   data,
@@ -114,7 +119,7 @@ pub impl AsyncStorage for KindAwareStorage with async_write(
 }
 
 ///|
-pub impl AsyncStorage for KindAwareStorage with async_atomic_write(
+pub impl AsyncStorage for KindAwareStorage with fn async_atomic_write(
   self,
   path,
   data,
@@ -127,7 +132,7 @@ pub impl AsyncStorage for KindAwareStorage with async_atomic_write(
 }
 
 ///|
-pub impl AsyncStorage for KindAwareStorage with async_del(
+pub impl AsyncStorage for KindAwareStorage with fn async_del(
   self,
   path,
   kind,
@@ -143,7 +148,7 @@ pub impl AsyncStorage for KindAwareStorage with async_del(
 }
 
 ///|
-pub impl AsyncStorage for KindAwareStorage with async_exists(
+pub impl AsyncStorage for KindAwareStorage with fn async_exists(
   self,
   path,
   kind,
@@ -154,7 +159,7 @@ pub impl AsyncStorage for KindAwareStorage with async_exists(
 }
 
 ///|
-pub impl AsyncStorage for KindAwareStorage with async_list(
+pub impl AsyncStorage for KindAwareStorage with fn async_list(
   self,
   kind,
   resolve,

@@ -22,7 +22,7 @@ pub(all) struct IndexHeader {
 }
 
 ///|
-pub impl Show for IndexHeader with output(self, logger) {
+pub impl Show for IndexHeader with fn output(self, logger) {
   logger.write_string("{ metric_code: ")
   Show::output(self.metric_code, logger)
   logger.write_string(", dim: ")
@@ -131,7 +131,7 @@ pub struct DecodedIndexFile {
 }
 
 ///|
-pub impl Show for DecodedIndexFile with output(self, logger) {
+pub impl Show for DecodedIndexFile with fn output(self, logger) {
   logger.write_string("{ header: ")
   Show::output(self.header, logger)
   logger.write_string(", entries: ")

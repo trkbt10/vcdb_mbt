@@ -17,7 +17,7 @@ pub(all) struct DataPointer {
 } derive(Eq)
 
 ///|
-pub impl Show for DataPointer with output(self, logger) {
+pub impl Show for DataPointer with fn output(self, logger) {
   logger.write_string("{ segment: ")
   Show::output(self.segment, logger)
   logger.write_string(", offset: ")
@@ -35,7 +35,7 @@ pub(all) struct IndexEntry {
 }
 
 ///|
-pub impl Show for IndexEntry with output(self, logger) {
+pub impl Show for IndexEntry with fn output(self, logger) {
   logger.write_string("{ id: ")
   Show::output(self.id, logger)
   logger.write_string(", ptr: ")

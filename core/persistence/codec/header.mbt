@@ -25,7 +25,7 @@ pub(all) enum FileType {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for FileType with output(self, logger) {
+pub impl Show for FileType with fn output(self, logger) {
   match self {
     Wal => logger.write_string("Wal")
     Segment => logger.write_string("Segment")

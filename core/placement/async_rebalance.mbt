@@ -24,7 +24,7 @@ pub(all) enum RebalancePhase {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for RebalancePhase with output(self, logger) {
+pub impl Show for RebalancePhase with fn output(self, logger) {
   match self {
     Planning => logger.write_string("Planning")
     Copying(completed, total) => {
@@ -54,7 +54,7 @@ pub(all) struct RebalanceProgress {
 }
 
 ///|
-pub impl Show for RebalanceProgress with output(self, logger) {
+pub impl Show for RebalanceProgress with fn output(self, logger) {
   logger.write_string("{ phase: ")
   Show::output(self.phase, logger)
   logger.write_string(", moves_total: ")

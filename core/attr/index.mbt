@@ -29,7 +29,7 @@ pub struct NumEntry {
 }
 
 ///|
-pub impl Show for NumEntry with output(self, logger) {
+pub impl Show for NumEntry with fn output(self, logger) {
   logger.write_string("{ value: ")
   Show::output(self.value, logger)
   logger.write_string(", id: ")

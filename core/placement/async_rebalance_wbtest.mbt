@@ -61,7 +61,7 @@ fn RebalanceTestStorage::has_data(
 }
 
 ///|
-impl @storage.AsyncStorage for RebalanceTestStorage with async_read(
+impl @storage.AsyncStorage for RebalanceTestStorage with fn async_read(
   self,
   path,
   _kind,
@@ -75,7 +75,7 @@ impl @storage.AsyncStorage for RebalanceTestStorage with async_read(
 }
 
 ///|
-impl @storage.AsyncStorage for RebalanceTestStorage with async_write(
+impl @storage.AsyncStorage for RebalanceTestStorage with fn async_write(
   self,
   path,
   data,
@@ -88,7 +88,7 @@ impl @storage.AsyncStorage for RebalanceTestStorage with async_write(
 }
 
 ///|
-impl @storage.AsyncStorage for RebalanceTestStorage with async_atomic_write(
+impl @storage.AsyncStorage for RebalanceTestStorage with fn async_atomic_write(
   self,
   path,
   data,
@@ -101,7 +101,7 @@ impl @storage.AsyncStorage for RebalanceTestStorage with async_atomic_write(
 }
 
 ///|
-impl @storage.AsyncStorage for RebalanceTestStorage with async_del(
+impl @storage.AsyncStorage for RebalanceTestStorage with fn async_del(
   self,
   path,
   _kind,
@@ -121,7 +121,7 @@ impl @storage.AsyncStorage for RebalanceTestStorage with async_del(
 }
 
 ///|
-impl @storage.AsyncStorage for RebalanceTestStorage with async_exists(
+impl @storage.AsyncStorage for RebalanceTestStorage with fn async_exists(
   self,
   path,
   _kind,
@@ -136,7 +136,7 @@ impl @storage.AsyncStorage for RebalanceTestStorage with async_exists(
 }
 
 ///|
-impl @storage.AsyncStorage for RebalanceTestStorage with async_list(
+impl @storage.AsyncStorage for RebalanceTestStorage with fn async_list(
   self,
   _kind,
   resolve,

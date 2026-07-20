@@ -202,7 +202,7 @@ pub struct MoveInfo {
 } derive(Debug)
 
 ///|
-pub impl Show for MoveInfo with output(self, logger) {
+pub impl Show for MoveInfo with fn output(self, logger) {
   logger.write_string("{ moved_id: ")
   Debug::to_repr(self.moved_id).output(logger)
   logger.write_string(", moved_from: ")

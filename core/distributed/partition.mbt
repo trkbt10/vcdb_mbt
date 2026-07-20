@@ -22,7 +22,7 @@ pub(all) enum PartitionStatus {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for PartitionStatus with output(self, logger) {
+pub impl Show for PartitionStatus with fn output(self, logger) {
   match self {
     Connected => logger.write_string("Connected")
     Partitioned(ts) => {
@@ -137,7 +137,7 @@ pub(all) enum ConflictResolution {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for ConflictResolution with output(self, logger) {
+pub impl Show for ConflictResolution with fn output(self, logger) {
   match self {
     KeepLocal => logger.write_string("KeepLocal")
     KeepRemote => logger.write_string("KeepRemote")

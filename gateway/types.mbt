@@ -13,7 +13,7 @@ pub(all) suberror GatewayError {
 }
 
 ///|
-pub impl Show for GatewayError with output(self, logger) {
+pub impl Show for GatewayError with fn output(self, logger) {
   match self {
     NotFound(s) => {
       logger.write_string("NotFound(")
@@ -60,7 +60,7 @@ pub struct CollectionConfig {
 }
 
 ///|
-pub impl Show for CollectionConfig with output(self, logger) {
+pub impl Show for CollectionConfig with fn output(self, logger) {
   logger.write_string("{ name: ")
   Show::output(self.name, logger)
   logger.write_string(", dim: ")
@@ -191,7 +191,7 @@ pub struct PointData {
 }
 
 ///|
-pub impl Show for PointData with output(self, logger) {
+pub impl Show for PointData with fn output(self, logger) {
   logger.write_string("{ id: ")
   Show::output(self.id, logger)
   logger.write_string(", vector: ")
@@ -249,7 +249,7 @@ pub struct UpsertRequest {
 }
 
 ///|
-pub impl Show for UpsertRequest with output(self, logger) {
+pub impl Show for UpsertRequest with fn output(self, logger) {
   logger.write_string("{ points: ")
   Show::output(self.points, logger)
   logger.write_string(" }")
@@ -288,7 +288,7 @@ pub struct SearchRequest {
 }
 
 ///|
-pub impl Show for SearchRequest with output(self, logger) {
+pub impl Show for SearchRequest with fn output(self, logger) {
   logger.write_string("{ vector: ")
   Show::output(self.vector, logger)
   logger.write_string(", limit: ")
@@ -338,7 +338,7 @@ pub struct SearchHitResponse {
 }
 
 ///|
-pub impl Show for SearchHitResponse with output(self, logger) {
+pub impl Show for SearchHitResponse with fn output(self, logger) {
   logger.write_string("{ id: ")
   Show::output(self.id, logger)
   logger.write_string(", score: ")
@@ -376,7 +376,7 @@ pub struct SearchResponse {
 }
 
 ///|
-pub impl Show for SearchResponse with output(self, logger) {
+pub impl Show for SearchResponse with fn output(self, logger) {
   logger.write_string("{ result: ")
   Show::output(self.result, logger)
   logger.write_string(", time_ms: ")
@@ -400,7 +400,7 @@ pub struct PointResponse {
 }
 
 ///|
-pub impl Show for PointResponse with output(self, logger) {
+pub impl Show for PointResponse with fn output(self, logger) {
   logger.write_string("{ id: ")
   Show::output(self.id, logger)
   logger.write_string(", payload: ")
@@ -430,7 +430,7 @@ pub struct ScrollRequest {
 }
 
 ///|
-pub impl Show for ScrollRequest with output(self, logger) {
+pub impl Show for ScrollRequest with fn output(self, logger) {
   logger.write_string("{ offset: ")
   Debug::to_repr(self.offset).output(logger)
   logger.write_string(", limit: ")
@@ -464,7 +464,7 @@ pub struct ScrollPointResponse {
 }
 
 ///|
-pub impl Show for ScrollPointResponse with output(self, logger) {
+pub impl Show for ScrollPointResponse with fn output(self, logger) {
   logger.write_string("{ id: ")
   Show::output(self.id, logger)
   logger.write_string(", payload: ")
@@ -495,7 +495,7 @@ pub struct ScrollResponse {
 }
 
 ///|
-pub impl Show for ScrollResponse with output(self, logger) {
+pub impl Show for ScrollResponse with fn output(self, logger) {
   logger.write_string("{ points: ")
   Show::output(self.points, logger)
   logger.write_string(", next_page_offset: ")
@@ -526,7 +526,7 @@ pub struct CollectionInfo {
 }
 
 ///|
-pub impl Show for CollectionInfo with output(self, logger) {
+pub impl Show for CollectionInfo with fn output(self, logger) {
   logger.write_string("{ name: ")
   Show::output(self.name, logger)
   logger.write_string(", vectors_count: ")
@@ -559,7 +559,7 @@ pub struct CollectionsResponse {
 }
 
 ///|
-pub impl Show for CollectionsResponse with output(self, logger) {
+pub impl Show for CollectionsResponse with fn output(self, logger) {
   logger.write_string("{ collections: ")
   Show::output(self.collections, logger)
   logger.write_string(" }")
@@ -581,7 +581,7 @@ pub struct ApiResponse {
 }
 
 ///|
-pub impl Show for ApiResponse with output(self, logger) {
+pub impl Show for ApiResponse with fn output(self, logger) {
   logger.write_string("{ status: ")
   Show::output(self.status, logger)
   logger.write_string(", result: ")
