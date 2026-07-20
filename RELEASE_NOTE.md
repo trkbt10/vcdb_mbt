@@ -1,3 +1,31 @@
+# vcdb 0.3.1 Release Notes
+
+## Highlights
+
+Compatibility release for the current MoonBit toolchain, plus fixes and features accumulated since 0.3.0 shipped.
+
+## Toolchain & Packaging
+
+- **Build restored on current moon (0.1.20260713+).** `moonbitlang/async` bumped 0.16.7 → 0.19.4; the previously pinned 0.16.7 no longer compiles against the current core, which also broke downstream consumers of the published 0.3.0 package.
+- **Manifest migrated to `moon.mod` (TOML)** from `moon.mod.json`.
+- **`core/distributed` whitebox tests follow the `*_wbtest.mbt` naming convention**, so they are no longer compiled into dependent builds (the published 0.3.0 shipped a bare `wbtest.mbt` that failed to compile in dependents on the current toolchain).
+- Formatting and generated interfaces refreshed with current `moon fmt` / `moon info`.
+
+## Fixes
+
+- **WAL**: accept v3 header in `read_wal_version` so real v3 WAL files decode; cross-version WAL migration test harness built from real historical encoders.
+- **CRUSH**: `crush_placement_group` returns the target index (not the raw PG number); FFI placement fix; `select_read_targets` dedup; `TargetKey` type safety.
+- **pg**: BigInt-based float8 decimal conversion for PostgreSQL-compatible output (extracted as `pg/ryu`).
+
+## Features
+
+- Version-aware byte reading with `BinaryReader::peek_byte`.
+- Persistent data source support; D1 storage adapter.
+- JS-native `DistributedDB` with `ShardTransport` interface; `vcdb/wasm` export path for static bundler imports.
+- VSCode plugin with webview bridge; web-dashboard restructured into workspace packages (`@vcdb/vcdb-features` extracted).
+
+---
+
 # vcdb 0.3.0 Release Notes
 
 ## Highlights
