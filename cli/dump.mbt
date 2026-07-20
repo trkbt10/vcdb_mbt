@@ -9,8 +9,8 @@ pub fn execute_dump(matches : @argparse.Matches) -> Unit {
     }
   }
   let data = @fs.read_file_to_bytes(path) catch {
-    e => {
-      println("Error: Failed to read file: " + e.to_string())
+    @fs.IOError(msg) => {
+      println("Error: Failed to read file: " + msg)
       return
     }
   }

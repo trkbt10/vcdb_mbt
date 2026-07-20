@@ -1,10 +1,10 @@
 name = "trkbt10/vcdb"
 
-version = "0.3.1"
+version = "0.3.2"
 
 import {
   "moonbitlang/async@0.19.4",
-  "moonbitlang/x@0.4.40",
+  "moonbitlang/x@0.4.44",
 }
 
 readme = "README.md"

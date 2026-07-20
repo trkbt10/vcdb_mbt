@@ -32,7 +32,11 @@ fn dirname(path : String) -> String {
 
 ///|
 fn raise_io_error(e : @fs.IOError) -> Unit raise IOError {
-  raise IoFailed(e.to_string())
+  // Pattern-match the payload instead of calling to_string: the Show-based
+  // helper was removed from @fs.IOError in newer moonbitlang/x releases.
+  match e {
+    @fs.IOError(msg) => raise IoFailed(msg)
+  }
 }
 
 ///|

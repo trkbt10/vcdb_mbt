@@ -1,3 +1,12 @@
+# vcdb 0.3.2 Release Notes
+
+## Fixes
+
+- **Compile against current `moonbitlang/x` (0.4.44+).** `@fs.IOError` no longer exposes `to_string()`; call sites now pattern-match the error payload instead. The published 0.3.1 failed to compile in dependents that resolve a newer `moonbitlang/x` (e.g. via `mizchi/x`).
+- `moonbitlang/x` dependency raised 0.4.40 -> 0.4.44 so the module is tested against the version dependents actually resolve.
+
+---
+
 # vcdb 0.3.1 Release Notes
 
 ## Highlights
